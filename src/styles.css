@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0c0d0c;
+  --color-surface: #151714;
+  --color-elevated: #1c1e1b;
+  --color-fg: #ecece8;
+  --color-muted: #8b8e86;
+  --color-subtle: #6a6d66;
+  --color-accent: #c8ccd4;
+  --color-accent-fg: #0c0d0c;
+  --color-border: #2a2c28;
+  --color-danger: #b4543c;
+  --color-gold: #f0d24a;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", "Times New Roman", serif;
+  --font-pixel: "Press Start 2P", "VT323", ui-monospace, monospace;
+  --text-pixel: 0.625rem;
+  --text-pixel-sm: 0.5rem;
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  html,
+  body,
+  #app {
+    height: 100%;
+    min-height: 100%;
+    min-height: 100dvh;
+    min-height: 100svh;
+    overflow: hidden;
+    background: var(--color-bg);
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    overflow: hidden;
+  }
+
+  .pixelated {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
