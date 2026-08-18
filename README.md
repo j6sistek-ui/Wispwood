@@ -22,7 +22,7 @@ Then open the preview. `WASD` move, click to shoot, `B` opens the spellbook.
 ## Modes
 
 - **Enter the clearing** — normal run, start with 0 gold
-- **Gold clearing** — same game, start with 99999 gold
+- **Sand box clearing** — same game, start with 99999 gold
 
 ## Repo
 

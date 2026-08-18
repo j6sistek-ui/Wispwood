@@ -371,7 +371,7 @@ function Title({
                   Enter the clearing
                 </PixelButton>
                 <PixelButton onClick={() => engine?.play(true)}>
-                  Gold clearing
+                  Sand box clearing
                 </PixelButton>
                 <PixelButton onClick={() => setMenu("multiplayer")}>Join</PixelButton>
                 <PixelButton onClick={() => setMenu("name")}>Name</PixelButton>
