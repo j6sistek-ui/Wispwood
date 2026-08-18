@@ -1,5 +1,4 @@
 import { BookOpen } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
@@ -8,7 +7,7 @@ import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
 import { generateSpell } from "@/game/spell-prompt";
-import { inventSpell } from "@/game/spell-ai";
+import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -240,8 +239,8 @@ function Title({
 
   const titleSrc =
     menu === "multiplayer" || menu === "join" || menu === "room"
-      ? "/game/logo-multiplayer.png"
-      : "/game/logo-wispwood.png";
+      ? asset("game/logo-multiplayer.png")
+      : asset("game/logo-wispwood.png");
   const titleAlt =
     menu === "multiplayer" || menu === "join" || menu === "room" ? "Multiplayer" : "Wispwood";
 
@@ -408,9 +407,9 @@ function Title({
             ) : (
               <>
                 <SignedOut>
-                  <Link to="/login" className="font-pixel text-pixel-sm leading-relaxed text-muted">
+                  <a href={asset("login")} className="font-pixel text-pixel-sm leading-relaxed text-muted">
                     Sign in
-                  </Link>
+                  </a>
                 </SignedOut>
                 <SignedIn>
                   <UserButton />
@@ -583,8 +582,7 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
     setWeaving(true);
     setResult("craft");
     try {
-      const out = await inventSpell({ data: { prompt } });
-      const spell = out.ok ? out.spell : generateSpell(prompt);
+      const spell = generateSpell(prompt);
       engine?.saveCrafted(spell);
       setMade(spell.name);
     } catch {
@@ -713,7 +711,7 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
       <div className="pointer-events-auto flex w-full max-w-3xl flex-col items-center gap-4">
         <div className="relative w-full">
           <img
-            src="/game/hud-spellbook.png"
+            src={asset("game/hud-spellbook.png")}
             alt="Spellbook"
             className="pixelated h-auto w-full select-none"
             draggable={false}

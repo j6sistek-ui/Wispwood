@@ -1,3 +1,5 @@
+import { asset } from "./paths";
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -36,19 +38,19 @@ export async function loadAssets(): Promise<GameAssets> {
   const playerEntries = await Promise.all(
     DIRS.map(async (dir) => {
       const frames = await Promise.all(
-        [1, 2, 3, 4].map((i) => loadImage(`/game/player/${dir}-${i}.png`)),
+        [1, 2, 3, 4].map((i) => loadImage(asset(`game/player/${dir}-${i}.png`))),
       );
       return [dir, frames] as const;
     }),
   );
   const [wisp, projectile, impact, pickup, ground, title, ...propImgs] = await Promise.all([
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(`/game/wisp/hover-${i}.png`))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(`/game/projectile/projectile-${i}.png`))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(`/game/impact/impact-${i}.png`))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(`/game/pickup/idle-${i}.png`))),
-    loadImage("/game/ground.png"),
-    loadImage("/game/title.jpg"),
-    ...PROP_KEYS.map((k) => loadImage(`/game/props/${k}.png`)),
+    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/wisp/hover-${i}.png`)))),
+    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/projectile/projectile-${i}.png`)))),
+    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/impact/impact-${i}.png`)))),
+    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/pickup/idle-${i}.png`)))),
+    loadImage(asset("game/ground.png")),
+    loadImage(asset("game/title.jpg")),
+    ...PROP_KEYS.map((k) => loadImage(asset(`game/props/${k}.png`))),
   ]);
 
   const props: Record<string, HTMLImageElement> = {};

@@ -25,15 +25,10 @@ jobs:
           cache: npm
       - run: npm install --no-audit --no-fund
       - name: Build static site
-        env:
-          GITHUB_PAGES: "1"
-          NITRO_PRESET: github_pages
-        run: |
-          set +e
-          npm run build:pages
-          set -e
-          ls -la .output/public/assets | head
-          sh scripts/write-pages-index.sh
+        run: npm run build:pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .output/public
