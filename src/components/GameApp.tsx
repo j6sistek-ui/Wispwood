@@ -78,7 +78,13 @@ export function GameApp() {
     const playing = () => game.phase === "playing";
 
     const onDown = (e: PointerEvent) => {
-      if (!playing() || isChromeTarget(e.target)) return;
+      if (isChromeTarget(e.target)) return;
+      if (game.phase === "title") {
+        e.preventDefault();
+        game.play();
+        return;
+      }
+      if (!playing()) return;
       e.preventDefault();
       game.pointAt(e.clientX, e.clientY, true, true);
     };
@@ -127,7 +133,10 @@ export function GameApp() {
   }, []);
 
   return (
-    <main className="relative h-full w-full overflow-hidden bg-bg text-fg">
+    <main
+      className="relative overflow-hidden bg-bg text-fg"
+      style={{ width: "var(--app-w, 100vw)", height: "var(--app-h, 100svh)" }}
+    >
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full touch-none select-none"

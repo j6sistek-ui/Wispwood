@@ -1,6 +1,4 @@
 import { BookOpen } from "lucide-react";
-import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
 import type { HudState } from "@/game/engine";
 import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
@@ -17,20 +15,22 @@ type Props = {
 };
 
 export function GameOverlay({ engine, hud }: Props) {
-  const { isPending } = useCurrentUserState();
   const coarse =
     typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
   const showSticks = coarse && hud.phase === "playing";
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-10 text-fg">
+    <div
+      className="pointer-events-none fixed top-0 left-0 z-20 text-fg"
+      style={{ width: "var(--app-w, 100vw)", height: "var(--app-h, 100svh)" }}
+    >
       {hud.phase === "playing" || hud.phase === "paused" || hud.phase === "book" || hud.phase === "wheel" ? (
         <Hud engine={engine} hud={hud} />
       ) : null}
 
       {hud.phase === "boot" || hud.loading ? <Boot /> : null}
       {hud.phase === "title" && !hud.loading ? (
-        <Title engine={engine} isPending={isPending} bestNight={hud.bestNight} />
+        <Title engine={engine} bestNight={hud.bestNight} />
       ) : null}
       {hud.phase === "paused" ? <Pause engine={engine} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
@@ -127,11 +127,9 @@ function makeRoomCode() {
 
 function Title({
   engine,
-  isPending,
   bestNight,
 }: {
   engine: GameEngine | null;
-  isPending: boolean;
   bestNight: number;
 }) {
   const [menu, setMenu] = useState<"home" | "multiplayer" | "join" | "room" | "name" | "account">("home");
@@ -359,7 +357,7 @@ function Title({
             </PixelButton>
           </div>
         ) : (
-          <div className="pointer-events-auto flex w-full max-w-xs flex-col gap-3">
+          <div className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border-2 border-border bg-bg/80 p-3">
             {menu === "multiplayer" ? (
               <>
                 <PixelButton primary onClick={createRoom}>
@@ -400,25 +398,11 @@ function Title({
           </button>
         ) : (
           <>
-            {isPending ? (
-              <div className="h-6 w-24 animate-pulse rounded-sm bg-elevated" />
-            ) : (
-              <>
-                <SignedOut>
-                  <a href={asset("login")} className="font-pixel text-pixel-sm leading-relaxed text-muted">
-                    Sign in
-                  </a>
-                </SignedOut>
-                <SignedIn>
-                  <UserButton />
-                </SignedIn>
-              </>
-            )}
             <p className="text-center font-pixel text-pixel-sm leading-relaxed text-subtle">
               Playing as {playerName}
             </p>
             <p className="text-center font-pixel text-pixel-sm leading-relaxed text-subtle">
-              WASD move · click shoot · B book
+              WASD move · tap shoot · B book
             </p>
           </>
         )}

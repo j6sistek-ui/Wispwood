@@ -1490,6 +1490,12 @@ export class GameEngine {
     const dw = img.width * scale;
     const dh = img.height * scale;
     this.ctx.drawImage(img, (vw - dw) / 2, (vh - dh) / 2, dw, dh);
+    this.ctx.fillStyle = "rgba(12,13,12,0.45)";
+    this.ctx.fillRect(0, vh * 0.72, vw, vh * 0.28);
+    this.ctx.fillStyle = "#ecece8";
+    this.ctx.font = "14px monospace";
+    this.ctx.textAlign = "center";
+    this.ctx.fillText("TAP TO ENTER", vw / 2, vh * 0.88);
   }
 
   private drawGround() {
