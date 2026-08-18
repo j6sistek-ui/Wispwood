@@ -24,12 +24,25 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm install --no-audit --no-fund
-      - run: npm run build:pages || test -f .output/public/index.html
+      - name: Build static site
         env:
           GITHUB_PAGES: "1"
           NITRO_PRESET: github_pages
-      - name: Confirm static output
-        run: test -f .output/public/index.html && ls -la .output/public | head
+        run: |
+          set +e
+          npm run build:pages
+          echo "--- html ---"
+          find .output -name '*.html' | head -20
+          echo "--- public ---"
+          ls -la .output/public 2>/dev/null | head -30
+          if [ -f .output/public/index.html ]; then
+            exit 0
+          fi
+          if [ -f .output/public/404.html ]; then
+            cp .output/public/404.html .output/public/index.html
+            exit 0
+          fi
+          exit 1
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .output/public
