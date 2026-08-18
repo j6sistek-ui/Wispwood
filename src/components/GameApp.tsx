@@ -34,8 +34,16 @@ function isChromeTarget(target: EventTarget | null) {
 
 function lockViewport() {
   const vv = window.visualViewport;
-  const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth));
-  const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight));
+  const w = Math.max(
+    window.innerWidth,
+    document.documentElement.clientWidth,
+    Math.round(vv?.width ?? 0),
+  );
+  const h = Math.max(
+    window.innerHeight,
+    document.documentElement.clientHeight,
+    Math.round(vv?.height ?? 0),
+  );
   const root = document.documentElement;
   root.style.setProperty("--app-w", `${w}px`);
   root.style.setProperty("--app-h", `${h}px`);
@@ -128,10 +136,7 @@ export function GameApp() {
   }, []);
 
   return (
-    <main
-      className="relative overflow-hidden bg-bg text-fg"
-      style={{ width: "var(--app-w, 100vw)", height: "var(--app-h, 100svh)" }}
-    >
+    <main className="fixed inset-0 overflow-hidden bg-bg text-fg">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full touch-none select-none"

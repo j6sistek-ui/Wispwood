@@ -20,10 +20,7 @@ export function GameOverlay({ engine, hud }: Props) {
   const showSticks = coarse && hud.phase === "playing";
 
   return (
-    <div
-      className="pointer-events-none fixed top-0 left-0 z-20 text-fg"
-      style={{ width: "var(--app-w, 100vw)", height: "var(--app-h, 100svh)" }}
-    >
+    <div className="pointer-events-none fixed inset-0 z-20 text-fg">
       {hud.phase === "playing" || hud.phase === "paused" || hud.phase === "book" || hud.phase === "wheel" ? (
         <Hud engine={engine} hud={hud} />
       ) : null}
@@ -243,7 +240,7 @@ function Title({
     menu === "multiplayer" || menu === "join" || menu === "room" ? "Multiplayer" : "Wispwood";
 
   return (
-    <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-4 overflow-y-auto bg-bg/15 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))]">
       <div className="pointer-events-none shrink-0 text-center">
         <p className="font-pixel text-pixel-sm text-muted">Max night</p>
         <p className="mt-1 font-display text-2xl tabular-nums sm:text-3xl">{bestNight}</p>
@@ -251,7 +248,7 @@ function Title({
       <img
         src={titleSrc}
         alt={titleAlt}
-        className="h-auto w-[min(92vw,22rem)] max-h-[18svh] shrink-0 object-contain"
+        className="h-auto w-[min(88vw,20rem)] max-h-[12vh] shrink-0 object-contain"
       />
 
       {menu === "room" && roomCode ? (
