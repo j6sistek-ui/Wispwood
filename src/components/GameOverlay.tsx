@@ -112,41 +112,6 @@ function Hud({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   );
 }
 
-      <div className="pointer-events-auto mx-auto mt-3 flex justify-center gap-2" data-ui>
-        <button
-          type="button"
-          data-ui
-          onClick={() => engine?.toggleBook()}
-          className="flex h-11 min-w-[7.5rem] items-center justify-center gap-1.5 border-2 border-fg bg-bg px-4 font-pixel text-[10px] text-fg"
-        >
-          <BookOpen className="size-3.5" strokeWidth={2} />
-          Book
-          <span className="text-muted">
-            {hud.spell === "frost"
-              ? "Ice"
-              : hud.spell === "bolt"
-                ? "Bolt"
-                : hud.spell === "void"
-                  ? "Void"
-                  : hud.spell === "craft"
-                  ? (hud.crafted?.name ?? "Rune")
-                  : "Ember"}
-          </span>
-        </button>
-        <button
-          type="button"
-          data-ui
-          onClick={() => engine?.openWheel()}
-          className="flex h-11 min-w-[7.5rem] items-center justify-center gap-1.5 border-2 border-gold bg-bg px-4 font-pixel text-[10px] text-fg"
-        >
-          Wheel
-          <span className="text-gold">100g</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function Boot() {
   return (
     <div className="absolute inset-0 grid place-items-center bg-bg">
