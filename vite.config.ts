@@ -150,10 +150,7 @@ export default defineConfig(({ command }) => ({
       ? [
           nitro({
             preset: pages ? "github_pages" : "vercel",
-            // Auto-registers server/middleware/* (the PWA install page +
-            // manifest + head-tag middleware). Nitro v3 defaults serverDir to
-            // false, so removing this silently unwires /?install=1 on deploys.
-            serverDir: "./server",
+            serverDir: pages ? false : "./server",
           }),
         ]
       : []),
