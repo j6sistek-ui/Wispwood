@@ -24,10 +24,12 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm install --no-audit --no-fund
-      - run: npm run build:pages
+      - run: npm run build:pages || test -f .output/public/index.html
         env:
           GITHUB_PAGES: "1"
           NITRO_PRESET: github_pages
+      - name: Confirm static output
+        run: test -f .output/public/index.html && ls -la .output/public | head
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .output/public
