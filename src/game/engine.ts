@@ -353,9 +353,12 @@ export class GameEngine {
 
   resize() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const vv = window.visualViewport;
     const rect = this.canvas.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(rect.width));
-    const h = Math.max(1, Math.floor(rect.height));
+    const w = Math.max(1, Math.floor(vv?.width ?? (rect.width || window.innerWidth)));
+    const h = Math.max(1, Math.floor(vv?.height ?? (rect.height || window.innerHeight)));
+    this.canvas.style.width = `${w}px`;
+    this.canvas.style.height = `${h}px`;
     this.canvas.width = Math.floor(w * dpr);
     this.canvas.height = Math.floor(h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

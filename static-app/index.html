@@ -10,6 +10,21 @@
     <meta name="description" content="Hold the lantern. Outlast the night." />
     <meta name="theme-color" content="#0c0d0c" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Press+Start+2P&display=swap"
+    />
+    <script>
+      (function () {
+        var vv = window.visualViewport;
+        var h = Math.round((vv && vv.height) || window.innerHeight);
+        var w = Math.round((vv && vv.width) || window.innerWidth);
+        document.documentElement.style.setProperty("--app-h", h + "px");
+        document.documentElement.style.setProperty("--app-w", w + "px");
+      })();
+    </script>
   </head>
   <body class="bg-bg text-fg">
     <div id="root"></div>

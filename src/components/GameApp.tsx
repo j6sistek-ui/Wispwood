@@ -32,6 +32,16 @@ function isChromeTarget(target: EventTarget | null) {
   return Boolean(target.closest("button, a, input, textarea, [data-ui]"));
 }
 
+function lockViewport() {
+  const vv = window.visualViewport;
+  const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth));
+  const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight));
+  const root = document.documentElement;
+  root.style.setProperty("--app-w", `${w}px`);
+  root.style.setProperty("--app-h", `${h}px`);
+  return { w, h };
+}
+
 export function GameApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
@@ -45,14 +55,19 @@ export function GameApp() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    lockViewport();
     const game = new GameEngine(canvas);
     engineRef.current = game;
     setEngine(game);
     const unsub = game.subscribe(setHud);
-    const onResize = () => game.resize();
+    const onResize = () => {
+      lockViewport();
+      game.resize();
+    };
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
     const ro = new ResizeObserver(onResize);
     ro.observe(canvas);
     const onVis = () => {
@@ -82,19 +97,25 @@ export function GameApp() {
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
 
-    void game.boot().then(() => {
-      game.resize();
-      game.startLoop();
-    }).catch(() => {
-      game.resize();
-      game.startLoop();
-    });
+    void game
+      .boot()
+      .then(() => {
+        lockViewport();
+        game.resize();
+        game.startLoop();
+      })
+      .catch(() => {
+        lockViewport();
+        game.resize();
+        game.startLoop();
+      });
 
     return () => {
       unsub();
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pointerdown", onDown);
@@ -106,7 +127,7 @@ export function GameApp() {
   }, []);
 
   return (
-    <main className="fixed inset-0 overflow-hidden bg-bg text-fg">
+    <main className="relative h-full w-full overflow-hidden bg-bg text-fg">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full touch-none select-none"

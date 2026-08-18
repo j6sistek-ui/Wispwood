@@ -245,19 +245,18 @@ function Title({
     menu === "multiplayer" || menu === "join" || menu === "room" ? "Multiplayer" : "Wispwood";
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-bg/20">
-      <div className="pointer-events-none pt-[max(1.25rem,env(safe-area-inset-top))] text-center">
+    <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-4 overflow-y-auto bg-bg/15 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="pointer-events-none shrink-0 text-center">
         <p className="font-pixel text-pixel-sm text-muted">Max night</p>
-        <p className="mt-1 font-display text-3xl tabular-nums">{bestNight}</p>
+        <p className="mt-1 font-display text-2xl tabular-nums sm:text-3xl">{bestNight}</p>
       </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-8">
-        <img
-          src={titleSrc}
-          alt={titleAlt}
-          className="h-auto w-full max-w-md object-contain sm:max-w-lg"
-        />
+      <img
+        src={titleSrc}
+        alt={titleAlt}
+        className="h-auto w-[min(92vw,22rem)] max-h-[18svh] shrink-0 object-contain"
+      />
 
-        {menu === "room" && roomCode ? (
+      {menu === "room" && roomCode ? (
           <Lobby
             key={roomCode}
             code={roomCode}
@@ -384,9 +383,8 @@ function Title({
             )}
           </div>
         )}
-      </div>
 
-      <div className="pointer-events-auto flex flex-col items-center gap-3 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="pointer-events-auto flex shrink-0 flex-col items-center gap-2">
         {menu !== "home" ? (
           <button
             type="button"
