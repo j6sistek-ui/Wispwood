@@ -67,9 +67,11 @@ export function GameApp() {
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
-    window.visualViewport?.addEventListener("scroll", onResize);
-    const ro = new ResizeObserver(onResize);
-    ro.observe(canvas);
+    const ro = new ResizeObserver(() => {
+      lockViewport();
+      game.resize();
+    });
+    ro.observe(canvas.parentElement ?? canvas);
     const onVis = () => {
       if (document.visibilityState === "visible") game.audio.resume();
     };
@@ -78,13 +80,7 @@ export function GameApp() {
     const playing = () => game.phase === "playing";
 
     const onDown = (e: PointerEvent) => {
-      if (isChromeTarget(e.target)) return;
-      if (game.phase === "title") {
-        e.preventDefault();
-        game.play();
-        return;
-      }
-      if (!playing()) return;
+      if (!playing() || isChromeTarget(e.target)) return;
       e.preventDefault();
       game.pointAt(e.clientX, e.clientY, true, true);
     };
@@ -121,7 +117,6 @@ export function GameApp() {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
-      window.visualViewport?.removeEventListener("scroll", onResize);
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pointerdown", onDown);

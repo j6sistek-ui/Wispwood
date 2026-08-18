@@ -353,12 +353,10 @@ export class GameEngine {
 
   resize() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const vv = window.visualViewport;
     const rect = this.canvas.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(vv?.width ?? (rect.width || window.innerWidth)));
-    const h = Math.max(1, Math.floor(vv?.height ?? (rect.height || window.innerHeight)));
-    this.canvas.style.width = `${w}px`;
-    this.canvas.style.height = `${h}px`;
+    const w = Math.max(1, Math.floor(rect.width || window.innerWidth));
+    const h = Math.max(1, Math.floor(rect.height || window.innerHeight));
+    if (w === this.view.w && h === this.view.h && this.canvas.width === Math.floor(w * dpr)) return;
     this.canvas.width = Math.floor(w * dpr);
     this.canvas.height = Math.floor(h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1490,12 +1488,6 @@ export class GameEngine {
     const dw = img.width * scale;
     const dh = img.height * scale;
     this.ctx.drawImage(img, (vw - dw) / 2, (vh - dh) / 2, dw, dh);
-    this.ctx.fillStyle = "rgba(12,13,12,0.45)";
-    this.ctx.fillRect(0, vh * 0.72, vw, vh * 0.28);
-    this.ctx.fillStyle = "#ecece8";
-    this.ctx.font = "14px monospace";
-    this.ctx.textAlign = "center";
-    this.ctx.fillText("TAP TO ENTER", vw / 2, vh * 0.88);
   }
 
   private drawGround() {
