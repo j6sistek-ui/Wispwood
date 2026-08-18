@@ -45,11 +45,14 @@ export function GameOverlay({ engine, hud }: Props) {
 function Hud({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   const pct = Math.max(0, hud.hp / hud.maxHp);
   return (
-    <div className="pointer-events-none px-2 pt-[max(0.35rem,env(safe-area-inset-top))] sm:px-3 sm:pt-1">
+    <div
+      className="pointer-events-none px-3"
+      style={{ paddingTop: "max(3.25rem, calc(env(safe-area-inset-top, 0px) + 2.25rem))" }}
+    >
       <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 rounded-xl border border-border bg-bg/70 px-2.5 py-1">
+        <div className="min-w-0 rounded-xl border border-border bg-bg/80 px-2.5 py-1.5">
           <p className="text-[9px] font-medium tracking-[0.16em] text-muted uppercase">Lantern</p>
-          <div className="mt-1 h-1 w-20 overflow-hidden rounded-full bg-elevated sm:w-32">
+          <div className="mt-1 h-1.5 w-20 overflow-hidden rounded-full bg-elevated sm:w-32">
             <div
               className="h-full rounded-full bg-accent transition-[width] duration-150"
               style={{ width: `${pct * 100}%` }}
@@ -58,31 +61,31 @@ function Hud({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="rounded-xl border border-border bg-bg/70 px-2.5 py-1 text-center">
+          <div className="rounded-xl border border-border bg-bg/80 px-2.5 py-1.5 text-center">
             <p className="text-[9px] font-medium tracking-[0.16em] text-muted uppercase">Night</p>
             <p className="font-display text-xl font-medium tabular-nums leading-none">{hud.wave}</p>
           </div>
-          <div className="rounded-xl border border-border bg-bg/70 px-2.5 py-1 text-center">
+          <div className="rounded-xl border border-border bg-bg/80 px-2.5 py-1.5 text-center">
             <p className="text-[9px] font-medium tracking-[0.16em] text-muted uppercase">Max</p>
             <p className="font-display text-xl font-medium tabular-nums leading-none">{hud.bestNight}</p>
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-bg/70 px-2.5 py-1 text-right">
+        <div className="rounded-xl border border-border bg-bg/80 px-2.5 py-1.5 text-right">
           <p className="text-[9px] font-medium tracking-[0.16em] text-muted uppercase">Score</p>
           <p className="font-display text-lg font-medium tabular-nums leading-none">{hud.score}</p>
           <p className="font-pixel text-[8px] tabular-nums text-gold">{hud.gold}g</p>
         </div>
       </div>
 
-      <div className="pointer-events-auto mx-auto mt-1.5 flex justify-center gap-1.5" data-ui>
+      <div className="pointer-events-auto mx-auto mt-3 flex justify-center gap-2" data-ui>
         <button
           type="button"
           data-ui
           onClick={() => engine?.toggleBook()}
-          className="flex h-8 items-center gap-1.5 border-2 border-muted bg-bg/80 px-3 font-pixel text-[8px] text-fg"
+          className="flex h-11 min-w-[7.5rem] items-center justify-center gap-1.5 border-2 border-fg bg-bg px-4 font-pixel text-[10px] text-fg"
         >
-          <BookOpen className="size-3" strokeWidth={2} />
+          <BookOpen className="size-3.5" strokeWidth={2} />
           Book
           <span className="text-muted">
             {hud.spell === "frost"
@@ -100,7 +103,7 @@ function Hud({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
           type="button"
           data-ui
           onClick={() => engine?.openWheel()}
-          className="flex h-8 items-center gap-1.5 border-2 border-muted bg-bg/80 px-3 font-pixel text-[8px] text-fg"
+          className="flex h-11 min-w-[7.5rem] items-center justify-center gap-1.5 border-2 border-gold bg-bg px-4 font-pixel text-[10px] text-fg"
         >
           Wheel
           <span className="text-gold">100g</span>
@@ -913,7 +916,7 @@ function Stick({
         active.current = false;
         onEnd();
       }}
-      className="pointer-events-auto size-28 rounded-full border border-border bg-bg/40 touch-none"
+      className="pointer-events-auto size-28 rounded-full border-2 border-fg/70 bg-bg/50 touch-none"
     />
   );
 }
