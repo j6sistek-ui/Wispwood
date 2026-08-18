@@ -37,9 +37,6 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .output/public
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .output/public
 
   deploy:
     needs: build
