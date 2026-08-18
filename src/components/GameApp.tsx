@@ -136,11 +136,21 @@ export function GameApp() {
   }, []);
 
   return (
-    <main className="fixed inset-0 overflow-hidden bg-bg text-fg">
+    <main
+      className="overflow-hidden bg-bg text-fg"
+      style={{ position: "fixed", inset: 0, width: "100%", height: "100%" }}
+    >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 block h-full w-full touch-none select-none"
-        style={{ touchAction: "none" }}
+        className="touch-none select-none"
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "block",
+          width: "100%",
+          height: "100%",
+          touchAction: "none",
+        }}
       />
       <GameOverlay engine={engine} hud={hud} />
     </main>

@@ -20,7 +20,10 @@ export function GameOverlay({ engine, hud }: Props) {
   const showSticks = coarse && hud.phase === "playing";
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-20 text-fg">
+    <div
+      className="pointer-events-none text-fg"
+      style={{ position: "fixed", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
+    >
       {hud.phase === "playing" || hud.phase === "paused" || hud.phase === "book" || hud.phase === "wheel" ? (
         <Hud engine={engine} hud={hud} />
       ) : null}
