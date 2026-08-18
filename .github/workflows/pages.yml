@@ -31,32 +31,12 @@ jobs:
         run: |
           set +e
           npm run build:pages
-          echo "--- html ---"
-          find .output -name '*.html' | head -20
-          echo "--- public ---"
-          ls -la .output/public 2>/dev/null | head -30
-          CLIENT=$(basename "$(ls .output/public/assets/index-*.js | head -1)")
-          CSS=$(basename "$(ls .output/public/assets/styles-*.css | head -1)")
-          cat > .output/public/index.html <<EOF
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
-  <title>Wispwood</title>
-  <meta name="description" content="Hold the lantern. Outlast the night."/>
-  <meta name="theme-color" content="#0c0d0c"/>
-  <link rel="icon" type="image/svg+xml" href="/Wispwood/favicon.svg"/>
-  <link rel="stylesheet" href="/Wispwood/assets/${CSS}"/>
-</head>
-<body>
-  <script type="module" src="/Wispwood/assets/${CLIENT}"></script>
-</body>
-</html>
-EOF
-          cp .output/public/index.html .output/public/404.html
-          test -s .output/public/index.html
-          exit 0
+          set -e
+          ls -la .output/public/assets | head
+          sh scripts/write-pages-index.sh
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .output/public
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .output/public
