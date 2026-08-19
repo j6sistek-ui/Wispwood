@@ -29,6 +29,7 @@ export interface SignalRow {
 export interface RtcPollResponse {
   peers: PeerRow[];
   signals: SignalRow[];
+  started?: boolean;
 }
 
 export interface PeerInfo {
@@ -52,6 +53,8 @@ export interface P2PRoomOptions {
   onMessage?: (from: string, data: unknown, channel: "state" | "reliable") => void;
   /** Fires once, on the first successful signaling poll (registration). */
   onConnected?: () => void;
+  /** Host pressed Start — every client in the room should enter the clearing. */
+  onRoomStarted?: () => void;
 }
 
 interface PeerSlot {
@@ -106,6 +109,7 @@ export class P2PRoom {
   private closed = false;
   private everPolled = false;
   private lastPeersFingerprint = "";
+  private roomStarted = false;
 
   constructor(opts: P2PRoomOptions) {
     this.opts = opts;
@@ -142,6 +146,18 @@ export class P2PRoom {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ op: "leave", room: this.opts.room, peer: this.opts.selfId }),
+      keepalive: true,
+    }).catch(() => {});
+  }
+
+  /** Tell every lantern in the room to enter the night. */
+  startRoom(): void {
+    this.markStarted();
+    this.send({ type: "ww-start" });
+    void fetch("/api/rtc", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ op: "start", room: this.opts.room, peer: this.opts.selfId }),
       keepalive: true,
     }).catch(() => {});
   }
@@ -202,6 +218,7 @@ export class P2PRoom {
       this.opts.onConnected?.();
     }
     this.reconcileRoster(body.peers);
+    if (body.started) this.markStarted();
     const roster = new Set(body.peers.map((p) => p.id));
     for (const sig of body.signals) {
       this.cursor = Math.max(this.cursor, sig.id);
@@ -341,6 +358,7 @@ export class P2PRoom {
           msg.d,
           channel.label === "state" ? "state" : "reliable",
         );
+        if (isStartPayload(msg.d)) this.markStarted();
       }
     };
   }
@@ -567,4 +585,16 @@ export class P2PRoom {
     this.lastPeersFingerprint = fingerprint;
     this.opts.onPeersChanged?.(list);
   }
+
+  private markStarted() {
+    if (this.roomStarted) return;
+    this.roomStarted = true;
+    this.opts.onRoomStarted?.();
+  }
+}
+
+function isStartPayload(data: unknown) {
+  return Boolean(
+    data && typeof data === "object" && (data as { type?: string }).type === "ww-start",
+  );
 }

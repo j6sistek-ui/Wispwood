@@ -17,7 +17,8 @@ const signalSchema = z.object({
   }),
 });
 const leaveSchema = z.object({ op: z.literal("leave"), room: ID, peer: ID });
-const postSchema = z.discriminatedUnion("op", [signalSchema, leaveSchema]);
+const startSchema = z.object({ op: z.literal("start"), room: ID, peer: ID });
+const postSchema = z.discriminatedUnion("op", [signalSchema, leaveSchema, startSchema]);
 
 const PEER_TTL_SECONDS = 30;
 const SIGNAL_TTL_SECONDS = 60;
@@ -51,6 +52,12 @@ function ensureSchema(sql: Sql): Promise<void> {
     await sql.query(
       `CREATE INDEX IF NOT EXISTS webrtc_signals_inbox
          ON webrtc_signals (room, to_peer, id)`,
+    );
+    await sql.query(
+      `CREATE TABLE IF NOT EXISTS webrtc_rooms (
+         room TEXT PRIMARY KEY,
+         started TIMESTAMPTZ
+       )`,
     );
   })().catch((err) => {
     globalRef.__rtcSchemaPromise__ = undefined;
@@ -129,6 +136,10 @@ async function handleGet(url: URL): Promise<Response> {
      ORDER BY id LIMIT 200`,
     [room, peer, since],
   );
+  const startedRows = await sql.query<{ started: string | Date | null }>(
+    `SELECT started FROM webrtc_rooms WHERE room = $1`,
+    [room],
+  );
   const body: RtcPollResponse = {
     peers: await roster(sql, room),
     signals: rows.map((r) => ({
@@ -137,6 +148,7 @@ async function handleGet(url: URL): Promise<Response> {
       kind: r.kind,
       payload: r.payload,
     })),
+    started: Boolean(startedRows[0]?.started),
   };
   return json(body);
 }
@@ -159,6 +171,13 @@ async function handlePost(request: Request): Promise<Response> {
       `INSERT INTO webrtc_signals (room, to_peer, from_peer, kind, payload)
        VALUES ($1, $2, $3, $4, $5)`,
       [msg.room, msg.to, msg.from, msg.kind, JSON.stringify(msg.payload)],
+    );
+  } else if (msg.op === "start") {
+    await sql.query(
+      `INSERT INTO webrtc_rooms (room, started)
+       VALUES ($1, now())
+       ON CONFLICT (room) DO UPDATE SET started = now()`,
+      [msg.room],
     );
   } else {
     await sql.query(`DELETE FROM webrtc_peers WHERE room = $1 AND peer_id = $2`, [

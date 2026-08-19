@@ -4,6 +4,7 @@ import { P2PRoom, type PeerInfo } from "./p2p";
 export interface UseP2PRoomOptions {
   room: string;
   name?: string;
+  onStart?: () => void;
 }
 
 export interface P2PRoomHandle {
@@ -13,6 +14,7 @@ export interface P2PRoomHandle {
   joined: boolean;
   broadcast: (data: unknown) => void;
   send: (data: unknown, peerId?: string) => void;
+  startRoom: () => void;
   onMessage: (
     fn: (from: string, data: unknown, channel: "state" | "reliable") => void,
   ) => () => void;
@@ -28,6 +30,8 @@ export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
   const listeners = useRef(
     new Set<(from: string, data: unknown, channel: "state" | "reliable") => void>(),
   );
+  const onStartRef = useRef(options.onStart);
+  onStartRef.current = options.onStart;
 
   useEffect(() => {
     const p2p = new P2PRoom({
@@ -39,6 +43,7 @@ export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
         for (const fn of listeners.current) fn(from, data, channel);
       },
       onConnected: () => setJoined(true),
+      onRoomStarted: () => onStartRef.current?.(),
     });
     roomRef.current = p2p;
     void p2p.join();
@@ -53,6 +58,7 @@ export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
     (data: unknown, peerId?: string) => roomRef.current?.send(data, peerId),
     [],
   );
+  const startRoom = useCallback(() => roomRef.current?.startRoom(), []);
   const onMessage = useCallback(
     (fn: (from: string, data: unknown, channel: "state" | "reliable") => void) => {
       listeners.current.add(fn);
@@ -63,5 +69,5 @@ export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
     [],
   );
 
-  return { selfId, room, peers, joined, broadcast, send, onMessage };
+  return { selfId, room, peers, joined, broadcast, send, startRoom, onMessage };
 }

@@ -426,7 +426,13 @@ function Lobby({
   onStart: () => void;
   onLeave: () => void;
 }) {
-  const p2p = useP2PRoom({ room: `ww${code}`, name: playerName });
+  const started = useRef(false);
+  const enter = () => {
+    if (started.current) return;
+    started.current = true;
+    onStart();
+  };
+  const p2p = useP2PRoom({ room: `ww${code}`, name: playerName, onStart: enter });
   const others = p2p.peers.length;
   const status = !p2p.joined
     ? "Opening path"
@@ -434,7 +440,7 @@ function Lobby({
       ? `${others + 1} lanterns`
       : isHost
         ? "Give this code to a friend"
-        : "Looking for host";
+        : "Waiting for host to start";
 
   return (
     <div className="pointer-events-auto flex w-full max-w-xs flex-col items-center gap-4">
@@ -443,7 +449,7 @@ function Lobby({
         <p className="mt-3 font-pixel text-xl tracking-[0.35em] text-fg">{code}</p>
         <p className="mt-3 font-pixel text-pixel-sm leading-relaxed text-subtle">{status}</p>
         <div className="mt-3 flex flex-col gap-1">
-          <p className="font-pixel text-pixel-sm text-fg">{playerName}</p>
+          <p className="font-pixel text-pixel-sm text-fg">{playerName}{isHost ? " · host" : ""}</p>
           {p2p.peers.map((peer) => (
             <p key={peer.id} className="font-pixel text-pixel-sm text-muted">
               {peer.name || "Ranger"}
@@ -452,10 +458,20 @@ function Lobby({
         </div>
       </div>
       {isHost ? (
-        <PixelButton primary onClick={onStart}>
+        <PixelButton
+          primary
+          onClick={() => {
+            p2p.startRoom();
+            enter();
+          }}
+        >
           Start night
         </PixelButton>
-      ) : null}
+      ) : (
+        <p className="text-center font-pixel text-pixel-sm leading-relaxed text-subtle">
+          Stay here. You enter when they start.
+        </p>
+      )}
       <PixelButton onClick={onLeave}>Leave</PixelButton>
     </div>
   );
