@@ -102,6 +102,11 @@ type Enemy = {
   voidIcd: number;
   vineIcd: number;
   wrapped: number;
+  knockT: number;
+  knockX: number;
+  knockY: number;
+  kvx: number;
+  kvy: number;
 };
 
 type Pickup = { alive: boolean; x: number; y: number; ttl: number; frame: number };
@@ -241,7 +246,7 @@ export class GameEngine {
   private bookLatch = false;
   private pauseLatch = false;
 
-  player = { x: ARENA / 2, y: ARENA / 2, hp: 100, maxHp: 100, invuln: 0, face: "down" as Dir, frame: 0, moving: false, vx: 0, vy: 0 };
+  player = { x: ARENA / 2, y: ARENA / 2, hp: 100, maxHp: 100, invuln: 0, face: "down" as Dir, frame: 0, moving: false, vx: 0, vy: 0, knockT: 0, knockX: 0, knockY: 1 };
   aim = { x: 1, y: 0 };
   cam = { x: 0, y: 0 };
   fireCd = 0;
@@ -608,6 +613,9 @@ export class GameEngine {
       moving: false,
       vx: 0,
       vy: 0,
+      knockT: 0,
+      knockX: 0,
+      knockY: 1,
     };
     this.aim = { x: 0, y: 1 };
     this.score = 0;
@@ -673,6 +681,7 @@ export class GameEngine {
     this.animT += dt;
     this.fireCd = Math.max(0, this.fireCd - dt);
     this.player.invuln = Math.max(0, this.player.invuln - dt);
+    this.player.knockT = Math.max(0, this.player.knockT - dt);
     this.trauma = Math.max(0, this.trauma - dt * 1.8);
     const actions = this.input.poll();
     this.aimFrom(actions);
@@ -800,6 +809,7 @@ export class GameEngine {
     }
     this.player.vx -= this.aim.x * (this.spell === "boom" ? 420 : 36);
     this.player.vy -= this.aim.y * (this.spell === "boom" ? 420 : 36);
+    if (this.spell === "boom") this.markPlayerKnock(-this.aim.x, -this.aim.y, 0.42);
     this.trauma = Math.min(1, this.trauma + (this.spell === "boom" ? 0.42 : 0.08));
   }
 
@@ -1210,9 +1220,15 @@ export class GameEngine {
       this.floatAt(e.x, e.y - 22, "stun", spell === "craft" ? (this.crafted?.color ?? "#f0d24a") : "#f0d24a");
     }
     const m = Math.hypot(vx, vy) || 1;
+    const nx = vx / m;
+    const ny = vy / m;
     const knock = spell === "void" ? 180 : spell === "boom" ? 280 : 10;
-    e.x = clamp(e.x + (vx / m) * knock, 40, ARENA - 40);
-    e.y = clamp(e.y + (vy / m) * knock, 40, ARENA - 40);
+    e.kvx = nx * (knock / 0.22);
+    e.kvy = ny * (knock / 0.22);
+    e.knockX = nx;
+    e.knockY = ny;
+    e.knockT = spell === "boom" || spell === "void" ? 0.4 : 0.18;
+    this.spawnKnockDust(e.x, e.y, nx, ny, spell === "boom" ? 14 : 6);
     if (spell === "void") e.stun = Math.max(e.stun, 0.35);
     this.hitstop = 0.035;
     this.trauma = Math.min(1, this.trauma + 0.18);
@@ -1310,6 +1326,13 @@ export class GameEngine {
     e.dash = 0.4 + Math.random() * 0.8;
     e.lunging = 0;
     e.voidIcd = 0;
+    e.vineIcd = 0;
+    e.wrapped = 0;
+    e.knockT = 0;
+    e.knockX = 0;
+    e.knockY = 1;
+    e.kvx = 0;
+    e.kvy = 0;
     if (e.kind === "elite") {
       e.r = 26;
       e.speed = 90 + this.wave * 3;
@@ -1364,6 +1387,11 @@ export class GameEngine {
       voidIcd: 0,
       vineIcd: 0,
       wrapped: 0,
+      knockT: 0,
+      knockX: 0,
+      knockY: 1,
+      kvx: 0,
+      kvy: 0,
     };
     this.enemies.push(e);
     return e;
@@ -1427,10 +1455,19 @@ export class GameEngine {
       const lunge = e.lunging > 0 ? (e.kind === "elite" ? 2.6 : 2.2) : 1;
       const frozen = e.freeze > 0 ? (e.kind === "elite" ? 0.55 : 0.28) : 1;
       const stunned = e.stun > 0 ? 0 : 1;
-      vx = (vx / vm) * e.speed * lunge * frozen * stunned;
-      vy = (vy / vm) * e.speed * lunge * frozen * stunned;
-      e.x = clamp(e.x + vx * dt, 40, ARENA - 40);
-      e.y = clamp(e.y + vy * dt, 40, ARENA - 40);
+      if (e.knockT > 0) {
+        e.knockT = Math.max(0, e.knockT - dt);
+        e.x = clamp(e.x + e.kvx * dt, 40, ARENA - 40);
+        e.y = clamp(e.y + e.kvy * dt, 40, ARENA - 40);
+        e.kvx *= Math.exp(-7 * dt);
+        e.kvy *= Math.exp(-7 * dt);
+        if (Math.random() < 0.45) this.spawnKnockDust(e.x, e.y, e.knockX, e.knockY, 1);
+      } else {
+        vx = (vx / vm) * e.speed * lunge * frozen * stunned;
+        vy = (vy / vm) * e.speed * lunge * frozen * stunned;
+        e.x = clamp(e.x + vx * dt, 40, ARENA - 40);
+        e.y = clamp(e.y + vy * dt, 40, ARENA - 40);
+      }
       for (const p of this.props) {
         const r = resolveCircle(e.x, e.y, e.r, p.x, p.y, p.r);
         e.x = r.x;
@@ -1443,6 +1480,7 @@ export class GameEngine {
         const kd = Math.hypot(px - e.x, py - e.y) || 1;
         this.player.vx += ((px - e.x) / kd) * 220;
         this.player.vy += ((py - e.y) / kd) * 220;
+        this.markPlayerKnock((px - e.x) / kd, (py - e.y) / kd, 0.32);
         this.trauma = Math.min(1, this.trauma + 0.45);
         this.audio.hurt();
         this.emit();
@@ -1526,6 +1564,35 @@ export class GameEngine {
       s.max = s.ttl;
       s.size = 2 + Math.random() * 3;
       s.color = color;
+      s.kind = "dot";
+    }
+  }
+
+  private markPlayerKnock(dx: number, dy: number, dur: number) {
+    const m = Math.hypot(dx, dy) || 1;
+    this.player.knockX = dx / m;
+    this.player.knockY = dy / m;
+    this.player.knockT = Math.max(this.player.knockT, dur);
+    this.spawnKnockDust(this.player.x, this.player.y, this.player.knockX, this.player.knockY, 10);
+  }
+
+  private spawnKnockDust(x: number, y: number, dirX: number, dirY: number, n: number) {
+    const colors = ["#ecece8", "#c8ccd4", "#6a6d66", "#2a2c28", "#f0d24a"];
+    for (let i = 0; i < n; i++) {
+      const s = this.allocSpark();
+      if (!s) return;
+      const spread = (Math.random() - 0.5) * 1.4;
+      const ang = Math.atan2(dirY, dirX) + Math.PI + spread;
+      const sp = 50 + Math.random() * 160;
+      s.alive = true;
+      s.x = x + (Math.random() - 0.5) * 12;
+      s.y = y + 8 + (Math.random() - 0.5) * 8;
+      s.vx = Math.cos(ang) * sp;
+      s.vy = Math.sin(ang) * sp;
+      s.ttl = 0.18 + Math.random() * 0.22;
+      s.max = s.ttl;
+      s.size = 2 + Math.floor(Math.random() * 4);
+      s.color = colors[Math.floor(Math.random() * colors.length)]!;
       s.kind = "dot";
     }
   }
@@ -1744,7 +1811,7 @@ export class GameEngine {
     const s = 64;
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
-    this.ctx.drawImage(img, this.player.x - s / 2, this.player.y - s * 0.78, s, s);
+    this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.42);
     this.ctx.globalAlpha = 1;
     if (this.spell === "vine") this.drawVineAura(this.player.x, this.player.y);
   }
@@ -1757,7 +1824,7 @@ export class GameEngine {
     else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
     else if (e.freeze > 0) this.ctx.filter = "hue-rotate(160deg) saturate(0.85) brightness(1.15)";
     else if (e.burn > 0) this.ctx.filter = "sepia(0.6) saturate(2.2) hue-rotate(-10deg)";
-    this.ctx.drawImage(img, e.x - s / 2, e.y - s * 0.72, s, s);
+    this.drawKnockSprite(img, e.x, e.y, s, 0.72, e.knockX, e.knockY, e.knockT, 0.4);
     this.ctx.filter = "none";
     if (e.wrapped > 0) this.drawVineWrap(e.x, e.y, s * 0.42);
     const barW = s * 0.7;
@@ -1765,6 +1832,59 @@ export class GameEngine {
     this.ctx.fillRect(e.x - barW / 2, e.y - s * 0.78, barW, 3);
     this.ctx.fillStyle = "#ecece8";
     this.ctx.fillRect(e.x - barW / 2, e.y - s * 0.78, barW * clamp(e.hp / e.maxHp, 0, 1), 3);
+  }
+
+  private drawKnockSprite(
+    img: HTMLImageElement,
+    x: number,
+    y: number,
+    s: number,
+    anchor: number,
+    kx: number,
+    ky: number,
+    knockT: number,
+    maxT: number,
+  ) {
+    const ctx = this.ctx;
+    const k = this.reduced ? 0 : clamp(knockT / maxT, 0, 1);
+    const ang = Math.atan2(ky, kx);
+    if (k > 0.04) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(236,236,232,0.35)";
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) {
+        const back = 18 + i * 11 + k * 10;
+        const side = (i - 2) * 7;
+        const px = -ky * side;
+        const py = kx * side;
+        ctx.globalAlpha = 0.18 + i * 0.04;
+        ctx.beginPath();
+        ctx.moveTo(x - kx * back + px, y - ky * back + py);
+        ctx.lineTo(x - kx * (back + 16 + k * 12) + px, y - ky * (back + 16 + k * 12) + py);
+        ctx.stroke();
+      }
+      ctx.restore();
+      for (let g = 3; g >= 1; g--) {
+        const gt = g / 3;
+        ctx.save();
+        ctx.globalAlpha = 0.12 * k * gt;
+        ctx.translate(x - kx * g * 16, y - ky * g * 16);
+        ctx.rotate(ang);
+        ctx.scale(1 + 0.45 * k, 1 - 0.28 * k);
+        ctx.rotate(-ang);
+        ctx.drawImage(img, -s / 2, -s * anchor, s, s);
+        ctx.restore();
+      }
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    if (k > 0.04) {
+      ctx.rotate(ang);
+      ctx.scale(1 + 0.55 * k, 1 - 0.32 * k);
+      ctx.rotate(-ang);
+    }
+    ctx.drawImage(img, -s / 2, -s * anchor, s, s);
+    ctx.restore();
   }
 
   private drawPickup(p: Pickup) {
