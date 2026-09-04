@@ -74,6 +74,7 @@ type Bullet = {
   color: string;
   ang: number;
   orbit: number;
+  home: Enemy | null;
 };
 
 type Enemy = {
@@ -735,7 +736,7 @@ export class GameEngine {
       this.spawnShot(this.spell, 0);
       this.audio.bolt();
     } else if (this.spell === "vine") {
-      this.spawnShot(this.spell, 0);
+      this.shootVine();
       this.audio.ice();
     } else {
       this.spawnShot(this.spell, 0);
@@ -854,6 +855,7 @@ export class GameEngine {
     b.dirX = this.aim.x;
     b.dirY = this.aim.y;
     b.speed = speed;
+    b.home = null;
     this.burstSparks(b.x, b.y, 3, spell === "frost" ? "#c5eaf6" : spell === "bolt" ? "#f0d24a" : spell === "vine" ? "#6fbf6a" : "#e8c070");
     if (spell === "frost") this.spawnFlake(b.x, b.y, true);
     if (spell === "vine") this.burstSparks(b.x, b.y, 2, "#3d7a45");
@@ -861,6 +863,43 @@ export class GameEngine {
       this.spawnArc(b.x, b.y);
       this.burstSparks(b.x, b.y, 6, "#ffe27a");
     }
+  }
+
+  private shootVine() {
+    const wrapped = this.enemies.filter((e) => e.alive && e.wrapped > 0);
+    if (wrapped.length === 0) {
+      this.spawnShot("vine", 0);
+      return;
+    }
+    const n = Math.min(wrapped.length, 16);
+    for (let i = 0; i < n; i++) this.spawnVineHoming(wrapped[i]!, i, n);
+  }
+
+  private spawnVineHoming(target: Enemy, i: number, n: number) {
+    const speed = BULLET_SPEED * (0.92 + this.upgrades.vine.speed * 0.04);
+    const spread = n === 1 ? 0 : (i / (n - 1) - 0.5) * 0.7;
+    const base = Math.atan2(target.y - this.player.y, target.x - this.player.x);
+    const ang = base + spread;
+    const dirX = Math.cos(ang);
+    const dirY = Math.sin(ang);
+    const b = this.allocBullet();
+    b.alive = true;
+    b.x = this.player.x + dirX * 22;
+    b.y = this.player.y + dirY * 18;
+    b.vx = dirX * speed;
+    b.vy = dirY * speed;
+    b.ttl = 1.45;
+    b.r = 11;
+    b.spell = "vine";
+    b.trail = 0;
+    b.ox = b.x;
+    b.oy = b.y;
+    b.dist = 0;
+    b.dirX = dirX;
+    b.dirY = dirY;
+    b.speed = speed;
+    b.home = target;
+    this.burstSparks(b.x, b.y, 2, "#6fbf6a");
   }
 
   private allocBullet(): Bullet {
@@ -887,6 +926,7 @@ export class GameEngine {
       color: "#e8c070",
       ang: 0,
       orbit: 0,
+      home: null,
     };
     this.bullets.push(b);
     return b;
@@ -897,6 +937,20 @@ export class GameEngine {
     let bestD = 999999;
     for (const e of this.enemies) {
       if (!e.alive) continue;
+      const d = (e.x - x) * (e.x - x) + (e.y - y) * (e.y - y);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+    return best;
+  }
+
+  private nearestWrapped(x: number, y: number) {
+    let best: Enemy | null = null;
+    let bestD = 999999;
+    for (const e of this.enemies) {
+      if (!e.alive || e.wrapped <= 0) continue;
       const d = (e.x - x) * (e.x - x) + (e.y - y) * (e.y - y);
       if (d < bestD) {
         bestD = d;
@@ -955,6 +1009,26 @@ export class GameEngine {
             b.dirY /= nm;
             b.vx = b.dirX * b.speed;
             b.vy = b.dirY * b.speed;
+          }
+        }
+        if (b.spell === "vine") {
+          const t = b.home?.alive ? b.home : this.nearestWrapped(b.x, b.y) ?? this.nearestEnemy(b.x, b.y);
+          if (t) {
+            const dx = t.x - b.x;
+            const dy = t.y - b.y;
+            const dm = Math.hypot(dx, dy) || 1;
+            b.dirX += (dx / dm) * 7 * dt;
+            b.dirY += (dy / dm) * 7 * dt;
+            const nm = Math.hypot(b.dirX, b.dirY) || 1;
+            b.dirX /= nm;
+            b.dirY /= nm;
+            b.vx = b.dirX * b.speed;
+            b.vy = b.dirY * b.speed;
+          }
+          b.trail += dt;
+          if (b.trail >= 0.024) {
+            b.trail = 0;
+            this.burstSparks(b.x, b.y, 1, "#6fbf6a");
           }
         }
         b.x += b.vx * dt;
