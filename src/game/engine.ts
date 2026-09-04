@@ -9,6 +9,7 @@ export type SpellStat = "speed" | "damage";
 export type SpellUpgrades = { speed: number; damage: number };
 export type CraftShape = "single" | "triple" | "weave" | "orb" | "beam" | "nova" | "wave" | "meteor" | "shard" | "homing";
 export type CraftExtra = "none" | "burn" | "slow" | "stun";
+export type SpellRarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
 export type CraftedSpell = {
   name: string;
   color: string;
@@ -16,6 +17,7 @@ export type CraftedSpell = {
   shape: CraftShape;
   extra: CraftExtra;
   cooldown: number;
+  rarity: SpellRarity;
 };
 
 export const MAX_SPELL_UP = 20;
@@ -477,6 +479,7 @@ export class GameEngine {
       shape: spell.shape,
       extra: spell.extra,
       cooldown: clamp(spell.cooldown, 0.28, 2.2),
+      rarity: spell.rarity ?? "common",
     };
     this.upgrades.craft = { speed: 0, damage: 0 };
     this.spell = "craft";

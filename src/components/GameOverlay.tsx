@@ -4,7 +4,7 @@ import type { HudState } from "@/game/engine";
 import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
-import { wheelChoices } from "@/game/spell-prompt";
+import { rarityTint, wheelChoices } from "@/game/spell-prompt";
 import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -597,21 +597,25 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
         ) : result === "pick" ? (
           <>
             <p className="font-pixel text-pixel text-fg">Choose a spell</p>
-            <p className="font-pixel text-pixel-sm text-muted">Eight from the wheel</p>
+            <p className="font-pixel text-pixel-sm text-muted">Common to legendary</p>
             <div className="grid w-full grid-cols-2 gap-2">
               {picks.map((spell) => (
                 <button
-                  key={spell.name + spell.shape + spell.extra}
+                  key={spell.name + spell.rarity}
                   type="button"
                   data-ui
                   onClick={() => takeSpell(spell)}
-                  className="border-2 border-muted bg-surface px-2 py-3 text-center font-pixel text-pixel-sm text-fg"
+                  className="border-2 bg-surface px-2 py-3 text-center font-pixel text-pixel-sm text-fg"
+                  style={{ borderColor: rarityTint(spell.rarity) }}
                 >
                   <span className="block" style={{ color: spell.color }}>
                     {spell.name}
                   </span>
+                  <span className="mt-1 block text-[8px] leading-relaxed" style={{ color: rarityTint(spell.rarity) }}>
+                    {spell.rarity}
+                  </span>
                   <span className="mt-1 block text-[8px] leading-relaxed text-muted">
-                    {spell.shape} · {spell.extra === "none" ? "plain" : spell.extra}
+                    {spell.damage} dmg · {spell.cooldown.toFixed(2)}s
                   </span>
                 </button>
               ))}
@@ -703,9 +707,9 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
   const lines =
     spell === "craft"
       ? [
+          `${hud.crafted?.rarity ?? "common"}`,
           `${dmg} damage`,
           hud.crafted?.shape ?? "single",
-          hud.crafted?.extra === "none" ? "No extra" : (hud.crafted?.extra ?? ""),
         ]
       : spell === "void" && !hud.voidUnlocked
         ? ["Locked", "300 gold", "This night"]

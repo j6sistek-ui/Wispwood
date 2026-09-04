@@ -70,6 +70,7 @@ export const inventSpell = createServerFn({ method: "POST" })
         shape: asShape(parsed.shape),
         extra: asExtra(parsed.extra),
         cooldown,
+        rarity: damage >= 24 ? "legendary" : damage >= 20 ? "epic" : damage >= 16 ? "rare" : damage >= 12 ? "uncommon" : "common",
       },
     };
   });

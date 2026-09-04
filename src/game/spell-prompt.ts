@@ -1,4 +1,4 @@
-import type { CraftedSpell, CraftExtra, CraftShape } from "./engine";
+import type { CraftedSpell, CraftExtra, CraftShape, SpellRarity } from "./engine";
 
 const COLORS: Array<[RegExp, string]> = [
   [/\b(crimson|scarlet|blood|red)\b/, "#c45a48"],
@@ -14,71 +14,85 @@ const COLORS: Array<[RegExp, string]> = [
   [/\b(shadow|void|black|sable)\b/, "#3a3c3a"],
 ];
 
+export const RARITY_ORDER: SpellRarity[] = ["common", "uncommon", "rare", "epic", "legendary"];
+
+export function rarityTint(rarity: SpellRarity) {
+  if (rarity === "legendary") return "#f0d24a";
+  if (rarity === "epic") return "#9a7ab8";
+  if (rarity === "rare") return "#6a8ec8";
+  if (rarity === "uncommon") return "#7db86a";
+  return "#9aa094";
+}
+
 const CATALOG: CraftedSpell[] = [
-  { name: "Thornlash", color: "#7db86a", damage: 16, shape: "wave", extra: "burn", cooldown: 0.6 },
-  { name: "Moonwell", color: "#9ad8ea", damage: 10, shape: "nova", extra: "slow", cooldown: 1.1 },
-  { name: "Ashcomet", color: "#e08a3c", damage: 26, shape: "meteor", extra: "burn", cooldown: 1.2 },
-  { name: "Gloam", color: "#3a1a58", damage: 18, shape: "orb", extra: "stun", cooldown: 0.9 },
-  { name: "Riftbeam", color: "#9a7ab8", damage: 20, shape: "beam", extra: "none", cooldown: 0.65 },
-  { name: "Hexfan", color: "#d48aa8", damage: 9, shape: "shard", extra: "slow", cooldown: 0.7 },
-  { name: "Wraith", color: "#6a6d66", damage: 15, shape: "homing", extra: "none", cooldown: 0.5 },
-  { name: "Bramble", color: "#4aa88a", damage: 12, shape: "triple", extra: "burn", cooldown: 0.55 },
-  { name: "Starfall", color: "#f0d24a", damage: 22, shape: "meteor", extra: "stun", cooldown: 1.15 },
-  { name: "Rimeorb", color: "#c5eaf6", damage: 19, shape: "orb", extra: "slow", cooldown: 0.85 },
-  { name: "Nightfan", color: "#2a1038", damage: 8, shape: "shard", extra: "stun", cooldown: 0.75 },
-  { name: "Cinder", color: "#c45a48", damage: 17, shape: "weave", extra: "burn", cooldown: 0.5 },
-  { name: "Gale", color: "#ecece8", damage: 13, shape: "wave", extra: "none", cooldown: 0.45 },
-  { name: "Howl", color: "#6a8ec8", damage: 11, shape: "nova", extra: "stun", cooldown: 1.05 },
-  { name: "Vesper", color: "#9a7ab8", damage: 16, shape: "homing", extra: "slow", cooldown: 0.7 },
-  { name: "Pyre", color: "#e08a3c", damage: 21, shape: "beam", extra: "burn", cooldown: 0.8 },
-  { name: "Hollow", color: "#3a3c3a", damage: 14, shape: "single", extra: "stun", cooldown: 0.5 },
-  { name: "Dewburst", color: "#4aa88a", damage: 9, shape: "nova", extra: "none", cooldown: 0.95 },
-  { name: "Quill", color: "#c8ccd4", damage: 10, shape: "triple", extra: "none", cooldown: 0.4 },
-  { name: "Sable", color: "#1a1018", damage: 18, shape: "orb", extra: "burn", cooldown: 0.9 },
-  { name: "Aurora", color: "#9ad8ea", damage: 15, shape: "weave", extra: "slow", cooldown: 0.55 },
-  { name: "Knell", color: "#7a48b8", damage: 24, shape: "meteor", extra: "none", cooldown: 1.25 },
-  { name: "Moth", color: "#d48aa8", damage: 12, shape: "homing", extra: "burn", cooldown: 0.6 },
-  { name: "Brine", color: "#4aa88a", damage: 14, shape: "wave", extra: "slow", cooldown: 0.65 },
-  { name: "Foxfire", color: "#e08a3c", damage: 13, shape: "homing", extra: "burn", cooldown: 0.48 },
-  { name: "Lichen", color: "#7db86a", damage: 11, shape: "nova", extra: "slow", cooldown: 1.0 },
-  { name: "Needler", color: "#c8ccd4", damage: 8, shape: "shard", extra: "none", cooldown: 0.38 },
-  { name: "Gravemark", color: "#3a3c3a", damage: 22, shape: "meteor", extra: "stun", cooldown: 1.3 },
-  { name: "Sundew", color: "#d48aa8", damage: 10, shape: "triple", extra: "slow", cooldown: 0.5 },
-  { name: "Lantern", color: "#f0d24a", damage: 18, shape: "beam", extra: "burn", cooldown: 0.72 },
-  { name: "Prowl", color: "#2a1038", damage: 16, shape: "weave", extra: "none", cooldown: 0.46 },
-  { name: "Hailshot", color: "#9ad8ea", damage: 9, shape: "shard", extra: "slow", cooldown: 0.62 },
-  { name: "Heartwood", color: "#4aa88a", damage: 20, shape: "orb", extra: "none", cooldown: 0.88 },
-  { name: "Duskfan", color: "#9a7ab8", damage: 8, shape: "wave", extra: "stun", cooldown: 0.7 },
-  { name: "Embercap", color: "#c45a48", damage: 15, shape: "triple", extra: "burn", cooldown: 0.52 },
-  { name: "Wispnet", color: "#ecece8", damage: 10, shape: "nova", extra: "slow", cooldown: 1.08 },
-  { name: "Boglight", color: "#4aa88a", damage: 17, shape: "homing", extra: "stun", cooldown: 0.78 },
-  { name: "Cindermaw", color: "#e08a3c", damage: 25, shape: "meteor", extra: "burn", cooldown: 1.22 },
-  { name: "Silkshot", color: "#d48aa8", damage: 12, shape: "single", extra: "slow", cooldown: 0.42 },
-  { name: "Ironroot", color: "#6a6d66", damage: 19, shape: "orb", extra: "stun", cooldown: 0.95 },
-  { name: "Palebeam", color: "#c5eaf6", damage: 21, shape: "beam", extra: "slow", cooldown: 0.68 },
-  { name: "Crowcall", color: "#3a1a58", damage: 14, shape: "homing", extra: "none", cooldown: 0.58 },
-  { name: "Sparkfen", color: "#f0d24a", damage: 11, shape: "nova", extra: "burn", cooldown: 0.98 },
-  { name: "Briar", color: "#7db86a", damage: 13, shape: "wave", extra: "none", cooldown: 0.5 },
-  { name: "Frostgnat", color: "#9ad8ea", damage: 7, shape: "shard", extra: "slow", cooldown: 0.44 },
-  { name: "Nettle", color: "#4aa88a", damage: 12, shape: "triple", extra: "burn", cooldown: 0.47 },
-  { name: "Umbral", color: "#1a1018", damage: 23, shape: "beam", extra: "stun", cooldown: 0.9 },
-  { name: "Petalfall", color: "#d48aa8", damage: 9, shape: "meteor", extra: "slow", cooldown: 1.05 },
-  { name: "Hearth", color: "#e08a3c", damage: 16, shape: "orb", extra: "burn", cooldown: 0.82 },
-  { name: "Mire", color: "#3a3c3a", damage: 14, shape: "wave", extra: "slow", cooldown: 0.66 },
-  { name: "Gleam", color: "#ecece8", damage: 18, shape: "weave", extra: "none", cooldown: 0.54 },
-  { name: "Owlsight", color: "#6a8ec8", damage: 15, shape: "homing", extra: "stun", cooldown: 0.73 },
-  { name: "Redcap", color: "#c45a48", damage: 20, shape: "single", extra: "burn", cooldown: 0.56 },
-  { name: "Thaw", color: "#c5eaf6", damage: 11, shape: "nova", extra: "none", cooldown: 0.92 },
-  { name: "Spindle", color: "#9a7ab8", damage: 10, shape: "weave", extra: "stun", cooldown: 0.61 },
-  { name: "Acorn", color: "#7db86a", damage: 22, shape: "meteor", extra: "none", cooldown: 1.18 },
-  { name: "Widow", color: "#2a1038", damage: 13, shape: "triple", extra: "slow", cooldown: 0.57 },
-  { name: "Kindling", color: "#f0d24a", damage: 12, shape: "shard", extra: "burn", cooldown: 0.49 },
-  { name: "Deepwell", color: "#6a8ec8", damage: 19, shape: "orb", extra: "slow", cooldown: 0.91 },
-  { name: "Shrike", color: "#c8ccd4", damage: 17, shape: "beam", extra: "none", cooldown: 0.63 },
-  { name: "Fennel", color: "#4aa88a", damage: 8, shape: "wave", extra: "burn", cooldown: 0.43 },
-  { name: "Lullaby", color: "#9a7ab8", damage: 10, shape: "nova", extra: "stun", cooldown: 1.12 },
-  { name: "Tinder", color: "#e08a3c", damage: 14, shape: "single", extra: "burn", cooldown: 0.4 },
-  { name: "Hoarfrost", color: "#9ad8ea", damage: 16, shape: "weave", extra: "slow", cooldown: 0.67 },
+  { name: "Needler", color: "#c8ccd4", damage: 8, shape: "shard", extra: "none", cooldown: 0.38, rarity: "common" },
+  { name: "Frostgnat", color: "#9ad8ea", damage: 7, shape: "shard", extra: "slow", cooldown: 0.44, rarity: "common" },
+  { name: "Fennel", color: "#4aa88a", damage: 8, shape: "wave", extra: "burn", cooldown: 0.43, rarity: "common" },
+  { name: "Quill", color: "#c8ccd4", damage: 10, shape: "triple", extra: "none", cooldown: 0.4, rarity: "common" },
+  { name: "Dewburst", color: "#4aa88a", damage: 9, shape: "nova", extra: "none", cooldown: 0.95, rarity: "common" },
+  { name: "Hailshot", color: "#9ad8ea", damage: 9, shape: "shard", extra: "slow", cooldown: 0.62, rarity: "common" },
+  { name: "Hexfan", color: "#d48aa8", damage: 9, shape: "shard", extra: "slow", cooldown: 0.7, rarity: "common" },
+  { name: "Nightfan", color: "#2a1038", damage: 8, shape: "shard", extra: "stun", cooldown: 0.75, rarity: "common" },
+  { name: "Duskfan", color: "#9a7ab8", damage: 8, shape: "wave", extra: "stun", cooldown: 0.7, rarity: "common" },
+  { name: "Sundew", color: "#d48aa8", damage: 10, shape: "triple", extra: "slow", cooldown: 0.5, rarity: "common" },
+  { name: "Thaw", color: "#c5eaf6", damage: 11, shape: "nova", extra: "none", cooldown: 0.92, rarity: "common" },
+  { name: "Spindle", color: "#9a7ab8", damage: 10, shape: "weave", extra: "stun", cooldown: 0.61, rarity: "common" },
+  { name: "Moonwell", color: "#9ad8ea", damage: 10, shape: "nova", extra: "slow", cooldown: 1.1, rarity: "common" },
+  { name: "Wispnet", color: "#ecece8", damage: 10, shape: "nova", extra: "slow", cooldown: 1.08, rarity: "common" },
+  { name: "Lullaby", color: "#9a7ab8", damage: 10, shape: "nova", extra: "stun", cooldown: 1.12, rarity: "common" },
+  { name: "Petalfall", color: "#d48aa8", damage: 9, shape: "meteor", extra: "slow", cooldown: 1.05, rarity: "common" },
+
+  { name: "Gale", color: "#ecece8", damage: 13, shape: "wave", extra: "none", cooldown: 0.45, rarity: "uncommon" },
+  { name: "Briar", color: "#7db86a", damage: 13, shape: "wave", extra: "none", cooldown: 0.5, rarity: "uncommon" },
+  { name: "Tinder", color: "#e08a3c", damage: 14, shape: "single", extra: "burn", cooldown: 0.4, rarity: "uncommon" },
+  { name: "Foxfire", color: "#e08a3c", damage: 13, shape: "homing", extra: "burn", cooldown: 0.48, rarity: "uncommon" },
+  { name: "Bramble", color: "#4aa88a", damage: 12, shape: "triple", extra: "burn", cooldown: 0.55, rarity: "uncommon" },
+  { name: "Nettle", color: "#4aa88a", damage: 12, shape: "triple", extra: "burn", cooldown: 0.47, rarity: "uncommon" },
+  { name: "Moth", color: "#d48aa8", damage: 12, shape: "homing", extra: "burn", cooldown: 0.6, rarity: "uncommon" },
+  { name: "Silkshot", color: "#d48aa8", damage: 12, shape: "single", extra: "slow", cooldown: 0.42, rarity: "uncommon" },
+  { name: "Kindling", color: "#f0d24a", damage: 12, shape: "shard", extra: "burn", cooldown: 0.49, rarity: "uncommon" },
+  { name: "Widow", color: "#2a1038", damage: 13, shape: "triple", extra: "slow", cooldown: 0.57, rarity: "uncommon" },
+  { name: "Crowcall", color: "#3a1a58", damage: 14, shape: "homing", extra: "none", cooldown: 0.58, rarity: "uncommon" },
+  { name: "Brine", color: "#4aa88a", damage: 14, shape: "wave", extra: "slow", cooldown: 0.65, rarity: "uncommon" },
+  { name: "Mire", color: "#3a3c3a", damage: 14, shape: "wave", extra: "slow", cooldown: 0.66, rarity: "uncommon" },
+  { name: "Howl", color: "#6a8ec8", damage: 11, shape: "nova", extra: "stun", cooldown: 1.05, rarity: "uncommon" },
+  { name: "Lichen", color: "#7db86a", damage: 11, shape: "nova", extra: "slow", cooldown: 1.0, rarity: "uncommon" },
+  { name: "Sparkfen", color: "#f0d24a", damage: 11, shape: "nova", extra: "burn", cooldown: 0.98, rarity: "uncommon" },
+
+  { name: "Hollow", color: "#3a3c3a", damage: 14, shape: "single", extra: "stun", cooldown: 0.5, rarity: "rare" },
+  { name: "Wraith", color: "#6a6d66", damage: 15, shape: "homing", extra: "none", cooldown: 0.5, rarity: "rare" },
+  { name: "Aurora", color: "#9ad8ea", damage: 15, shape: "weave", extra: "slow", cooldown: 0.55, rarity: "rare" },
+  { name: "Embercap", color: "#c45a48", damage: 15, shape: "triple", extra: "burn", cooldown: 0.52, rarity: "rare" },
+  { name: "Owlsight", color: "#6a8ec8", damage: 15, shape: "homing", extra: "stun", cooldown: 0.73, rarity: "rare" },
+  { name: "Thornlash", color: "#7db86a", damage: 16, shape: "wave", extra: "burn", cooldown: 0.6, rarity: "rare" },
+  { name: "Prowl", color: "#2a1038", damage: 16, shape: "weave", extra: "none", cooldown: 0.46, rarity: "rare" },
+  { name: "Vesper", color: "#9a7ab8", damage: 16, shape: "homing", extra: "slow", cooldown: 0.7, rarity: "rare" },
+  { name: "Hoarfrost", color: "#9ad8ea", damage: 16, shape: "weave", extra: "slow", cooldown: 0.67, rarity: "rare" },
+  { name: "Hearth", color: "#e08a3c", damage: 16, shape: "orb", extra: "burn", cooldown: 0.82, rarity: "rare" },
+  { name: "Cinder", color: "#c45a48", damage: 17, shape: "weave", extra: "burn", cooldown: 0.5, rarity: "rare" },
+  { name: "Shrike", color: "#c8ccd4", damage: 17, shape: "beam", extra: "none", cooldown: 0.63, rarity: "rare" },
+  { name: "Boglight", color: "#4aa88a", damage: 17, shape: "homing", extra: "stun", cooldown: 0.78, rarity: "rare" },
+  { name: "Gleam", color: "#ecece8", damage: 18, shape: "weave", extra: "none", cooldown: 0.54, rarity: "rare" },
+  { name: "Lantern", color: "#f0d24a", damage: 18, shape: "beam", extra: "burn", cooldown: 0.72, rarity: "rare" },
+  { name: "Sable", color: "#1a1018", damage: 18, shape: "orb", extra: "burn", cooldown: 0.9, rarity: "rare" },
+
+  { name: "Gloam", color: "#3a1a58", damage: 18, shape: "orb", extra: "stun", cooldown: 0.9, rarity: "epic" },
+  { name: "Rimeorb", color: "#c5eaf6", damage: 19, shape: "orb", extra: "slow", cooldown: 0.85, rarity: "epic" },
+  { name: "Ironroot", color: "#6a6d66", damage: 19, shape: "orb", extra: "stun", cooldown: 0.95, rarity: "epic" },
+  { name: "Deepwell", color: "#6a8ec8", damage: 19, shape: "orb", extra: "slow", cooldown: 0.91, rarity: "epic" },
+  { name: "Heartwood", color: "#4aa88a", damage: 20, shape: "orb", extra: "none", cooldown: 0.88, rarity: "epic" },
+  { name: "Riftbeam", color: "#9a7ab8", damage: 20, shape: "beam", extra: "none", cooldown: 0.65, rarity: "epic" },
+  { name: "Redcap", color: "#c45a48", damage: 20, shape: "single", extra: "burn", cooldown: 0.56, rarity: "epic" },
+  { name: "Palebeam", color: "#c5eaf6", damage: 21, shape: "beam", extra: "slow", cooldown: 0.68, rarity: "epic" },
+  { name: "Pyre", color: "#e08a3c", damage: 21, shape: "beam", extra: "burn", cooldown: 0.8, rarity: "epic" },
+  { name: "Acorn", color: "#7db86a", damage: 22, shape: "meteor", extra: "none", cooldown: 1.18, rarity: "epic" },
+
+  { name: "Starfall", color: "#f0d24a", damage: 22, shape: "meteor", extra: "stun", cooldown: 1.15, rarity: "legendary" },
+  { name: "Gravemark", color: "#3a3c3a", damage: 22, shape: "meteor", extra: "stun", cooldown: 1.3, rarity: "legendary" },
+  { name: "Umbral", color: "#1a1018", damage: 23, shape: "beam", extra: "stun", cooldown: 0.9, rarity: "legendary" },
+  { name: "Knell", color: "#7a48b8", damage: 24, shape: "meteor", extra: "none", cooldown: 1.25, rarity: "legendary" },
+  { name: "Cindermaw", color: "#e08a3c", damage: 25, shape: "meteor", extra: "burn", cooldown: 1.22, rarity: "legendary" },
+  { name: "Ashcomet", color: "#e08a3c", damage: 26, shape: "meteor", extra: "burn", cooldown: 1.2, rarity: "legendary" },
 ];
 
 const SHAPES: CraftShape[] = ["single", "triple", "weave", "orb", "beam", "nova", "wave", "meteor", "shard", "homing"];
@@ -92,22 +106,52 @@ export function generateSpell(prompt = ""): CraftedSpell {
 }
 
 export function wheelChoices(count = 8): CraftedSpell[] {
-  const bag = [...CATALOG];
-  for (let i = bag.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const a = bag[i]!;
-    bag[i] = bag[j]!;
-    bag[j] = a;
+  const used = new Set<string>();
+  const out: CraftedSpell[] = [];
+  const pull = (rarity: SpellRarity, n: number) => {
+    const pool = CATALOG.filter((s) => s.rarity === rarity && !used.has(s.name));
+    shuffle(pool);
+    for (const s of pool.slice(0, n)) {
+      used.add(s.name);
+      out.push({ ...s });
+    }
+  };
+  pull("common", 3);
+  pull("uncommon", 2);
+  pull("rare", 2);
+  pull(Math.random() < 0.28 ? "legendary" : "epic", 1);
+  if (out.length < count) {
+    const rest = CATALOG.filter((s) => !used.has(s.name));
+    shuffle(rest);
+    for (const s of rest) {
+      if (out.length >= count) break;
+      used.add(s.name);
+      out.push({ ...s });
+    }
   }
-  return bag.slice(0, Math.min(count, bag.length)).map((s) => remix({ ...s }));
+  out.sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
+  return out;
+}
+
+function shuffle<T>(arr: T[]) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = arr[i]!;
+    arr[i] = arr[j]!;
+    arr[j] = t;
+  }
 }
 
 function remix(base: CraftedSpell): CraftedSpell {
   const twist = Math.random();
   let extra = base.extra;
   let shape = base.shape;
-  if (twist > 0.82) extra = EXTRAS[Math.floor(Math.random() * EXTRAS.length)]!;
-  if (twist > 0.9) shape = SHAPES[Math.floor(Math.random() * SHAPES.length)]!;
+  if (base.rarity !== "legendary" && base.rarity !== "epic" && twist > 0.82) {
+    extra = EXTRAS[Math.floor(Math.random() * EXTRAS.length)]!;
+  }
+  if (base.rarity !== "legendary" && base.rarity !== "epic" && twist > 0.9) {
+    shape = SHAPES[Math.floor(Math.random() * SHAPES.length)]!;
+  }
   const dmgJitter = Math.floor(Math.random() * 5) - 1;
   return {
     ...base,
@@ -115,6 +159,7 @@ function remix(base: CraftedSpell): CraftedSpell {
     extra,
     damage: Math.max(6, Math.min(28, base.damage + dmgJitter)),
     name: base.name.slice(0, 10),
+    rarity: base.rarity,
   };
 }
 
@@ -164,7 +209,10 @@ export function parseSpellPrompt(raw: string): CraftedSpell {
   if (shape === "orb") cooldown = 0.85;
   if (/\b(fast|quick|rapid)\b/.test(text)) cooldown = Math.max(0.3, cooldown - 0.25);
 
-  return { name: nameFromPrompt(raw), color, damage, shape, extra, cooldown };
+  const rarity: SpellRarity =
+    damage >= 24 ? "legendary" : damage >= 20 ? "epic" : damage >= 16 ? "rare" : damage >= 12 ? "uncommon" : "common";
+
+  return { name: nameFromPrompt(raw), color, damage, shape, extra, cooldown, rarity };
 }
 
 function nameFromPrompt(raw: string) {
