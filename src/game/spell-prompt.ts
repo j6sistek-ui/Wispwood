@@ -87,12 +87,12 @@ const CATALOG: CraftedSpell[] = [
   { name: "Pyre", color: "#e08a3c", damage: 21, shape: "beam", extra: "burn", cooldown: 0.8, rarity: "epic" },
   { name: "Acorn", color: "#7db86a", damage: 22, shape: "meteor", extra: "none", cooldown: 1.18, rarity: "epic" },
 
-  { name: "Starfall", color: "#f0d24a", damage: 22, shape: "meteor", extra: "stun", cooldown: 1.15, rarity: "legendary" },
-  { name: "Gravemark", color: "#3a3c3a", damage: 22, shape: "meteor", extra: "stun", cooldown: 1.3, rarity: "legendary" },
-  { name: "Umbral", color: "#1a1018", damage: 23, shape: "beam", extra: "stun", cooldown: 0.9, rarity: "legendary" },
-  { name: "Knell", color: "#7a48b8", damage: 24, shape: "meteor", extra: "none", cooldown: 1.25, rarity: "legendary" },
-  { name: "Cindermaw", color: "#e08a3c", damage: 25, shape: "meteor", extra: "burn", cooldown: 1.22, rarity: "legendary" },
-  { name: "Ashcomet", color: "#e08a3c", damage: 26, shape: "meteor", extra: "burn", cooldown: 1.2, rarity: "legendary" },
+  { name: "Starfall", color: "#f0d24a", damage: 42, shape: "meteor", extra: "stun", cooldown: 1.15, rarity: "legendary" },
+  { name: "Gravemark", color: "#3a3c3a", damage: 42, shape: "meteor", extra: "stun", cooldown: 1.3, rarity: "legendary" },
+  { name: "Umbral", color: "#1a1018", damage: 43, shape: "beam", extra: "stun", cooldown: 0.9, rarity: "legendary" },
+  { name: "Knell", color: "#7a48b8", damage: 44, shape: "meteor", extra: "none", cooldown: 1.25, rarity: "legendary" },
+  { name: "Cindermaw", color: "#e08a3c", damage: 45, shape: "meteor", extra: "burn", cooldown: 1.22, rarity: "legendary" },
+  { name: "Ashcomet", color: "#e08a3c", damage: 46, shape: "meteor", extra: "burn", cooldown: 1.2, rarity: "legendary" },
 ];
 
 const SHAPES: CraftShape[] = ["single", "triple", "weave", "orb", "beam", "nova", "wave", "meteor", "shard", "homing"];
@@ -157,7 +157,7 @@ function remix(base: CraftedSpell): CraftedSpell {
     ...base,
     shape,
     extra,
-    damage: Math.max(6, Math.min(28, base.damage + dmgJitter)),
+    damage: Math.max(6, Math.min(60, base.damage + dmgJitter)),
     name: base.name.slice(0, 10),
     rarity: base.rarity,
   };

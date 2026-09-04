@@ -475,7 +475,7 @@ export class GameEngine {
     this.crafted = {
       name: spell.name.trim().slice(0, 10) || "Rune",
       color: spell.color || "#ecece8",
-      damage: clamp(Math.round(spell.damage), 4, 28),
+      damage: clamp(Math.round(spell.damage), 4, 60),
       shape: spell.shape,
       extra: spell.extra,
       cooldown: clamp(spell.cooldown, 0.28, 2.2),
