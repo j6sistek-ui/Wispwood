@@ -25,8 +25,14 @@ const GAME_CODES = new Set([
   "Tab",
   "Digit1",
   "Digit2",
+  "Digit3",
+  "Digit4",
+  "Digit5",
   "Numpad1",
   "Numpad2",
+  "Numpad3",
+  "Numpad4",
+  "Numpad5",
 ]);
 
 function isTypingTarget(target: EventTarget | null) {

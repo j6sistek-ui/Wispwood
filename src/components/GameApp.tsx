@@ -20,6 +20,7 @@ const idleHud: HudState = {
     frost: { speed: 0, damage: 0 },
     bolt: { speed: 0, damage: 0 },
     void: { speed: 0, damage: 0 },
+    vine: { speed: 0, damage: 0 },
     craft: { speed: 0, damage: 0 },
   },
   boltUnlocked: false,

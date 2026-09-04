@@ -4,7 +4,7 @@ import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
-export type Spell = "ember" | "frost" | "bolt" | "void" | "craft";
+export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "craft";
 export type SpellStat = "speed" | "damage";
 export type SpellUpgrades = { speed: number; damage: number };
 export type CraftShape = "single" | "triple" | "weave" | "orb" | "beam" | "nova" | "wave" | "meteor" | "shard" | "homing";
@@ -28,6 +28,7 @@ export function spellDamage(spell: Spell, damageUp: number, crafted?: CraftedSpe
   if (spell === "frost") return 8 + damageUp;
   if (spell === "bolt") return 35 + damageUp * 3;
   if (spell === "void") return 15 + damageUp * 2;
+  if (spell === "vine") return 12 + damageUp * 2;
   if (spell === "craft") return (crafted?.damage ?? 10) + 5 + damageUp * 2;
   return 19 + damageUp * 2;
 }
@@ -93,6 +94,8 @@ type Enemy = {
   dash: number;
   lunging: number;
   voidIcd: number;
+  vineIcd: number;
+  wrapped: number;
 };
 
 type Pickup = { alive: boolean; x: number; y: number; ttl: number; frame: number };
@@ -196,6 +199,7 @@ function emptyUpgrades(): Record<Spell, SpellUpgrades> {
     frost: { speed: 0, damage: 0 },
     bolt: { speed: 0, damage: 0 },
     void: { speed: 0, damage: 0 },
+    vine: { speed: 0, damage: 0 },
     craft: { speed: 0, damage: 0 },
   };
 }
@@ -295,6 +299,7 @@ export class GameEngine {
         frost: { ...this.upgrades.frost },
         bolt: { ...this.upgrades.bolt },
         void: { ...this.upgrades.void },
+        vine: { ...this.upgrades.vine },
         craft: { ...this.upgrades.craft },
       },
       boltUnlocked: this.boltUnlocked,
@@ -651,6 +656,7 @@ export class GameEngine {
     if (this.input.has("Digit2") || this.input.has("Numpad2")) this.chooseSpell("frost");
     if (this.input.has("Digit3") || this.input.has("Numpad3")) this.chooseSpell("bolt");
     if (this.input.has("Digit4") || this.input.has("Numpad4")) this.chooseSpell("void");
+    if (this.input.has("Digit5") || this.input.has("Numpad5")) this.chooseSpell("vine");
   }
 
   private aimFrom(actions: Actions) {
@@ -728,6 +734,9 @@ export class GameEngine {
     } else if (this.spell === "bolt") {
       this.spawnShot(this.spell, 0);
       this.audio.bolt();
+    } else if (this.spell === "vine") {
+      this.spawnShot(this.spell, 0);
+      this.audio.ice();
     } else {
       this.spawnShot(this.spell, 0);
       this.audio.fire();
@@ -835,8 +844,8 @@ export class GameEngine {
     b.y = this.player.y + this.aim.y * 18 + py * side;
     b.vx = this.aim.x * speed;
     b.vy = this.aim.y * speed;
-    b.ttl = spell === "ember" ? 1.05 : 0.85;
-    b.r = spell === "ember" ? 22 : 6;
+    b.ttl = spell === "ember" ? 1.05 : spell === "vine" ? 0.95 : 0.85;
+    b.r = spell === "ember" ? 22 : spell === "vine" ? 11 : 6;
     b.spell = spell;
     b.trail = 0;
     b.ox = b.x;
@@ -845,8 +854,9 @@ export class GameEngine {
     b.dirX = this.aim.x;
     b.dirY = this.aim.y;
     b.speed = speed;
-    this.burstSparks(b.x, b.y, 3, spell === "frost" ? "#c5eaf6" : spell === "bolt" ? "#f0d24a" : "#e8c070");
+    this.burstSparks(b.x, b.y, 3, spell === "frost" ? "#c5eaf6" : spell === "bolt" ? "#f0d24a" : spell === "vine" ? "#6fbf6a" : "#e8c070");
     if (spell === "frost") this.spawnFlake(b.x, b.y, true);
+    if (spell === "vine") this.burstSparks(b.x, b.y, 2, "#3d7a45");
     if (spell === "bolt") {
       this.spawnArc(b.x, b.y);
       this.burstSparks(b.x, b.y, 6, "#ffe27a");
@@ -1013,6 +1023,7 @@ export class GameEngine {
       e.stun = 1.25;
       this.floatAt(e.x, e.y - 22, "stun", spell === "craft" ? (this.crafted?.color ?? "#f0d24a") : "#f0d24a");
     }
+    if (spell === "vine") this.wrapEnemy(e);
     const m = Math.hypot(vx, vy) || 1;
     const knock = spell === "void" ? 180 : 10;
     e.x = clamp(e.x + (vx / m) * knock, 40, ARENA - 40);
@@ -1023,6 +1034,16 @@ export class GameEngine {
     this.audio.hit();
     this.spawnBurst(e.x, e.y, spell);
     if (e.hp <= 0) this.killEnemy(e);
+  }
+
+  private wrapEnemy(e: Enemy) {
+    if (e.vineIcd > 0) return;
+    e.stun = 5;
+    e.wrapped = 5;
+    e.vineIcd = 8;
+    this.floatAt(e.x, e.y - 22, "wrap", "#6fbf6a");
+    this.burstSparks(e.x, e.y, 8, "#6fbf6a");
+    this.audio.ice();
   }
 
   private killEnemy(e: Enemy) {
@@ -1156,6 +1177,8 @@ export class GameEngine {
       dash: 0,
       lunging: 0,
       voidIcd: 0,
+      vineIcd: 0,
+      wrapped: 0,
     };
     this.enemies.push(e);
     return e;
@@ -1173,6 +1196,12 @@ export class GameEngine {
       e.freeze = Math.max(0, e.freeze - dt);
       e.stun = Math.max(0, e.stun - dt);
       e.voidIcd = Math.max(0, e.voidIcd - dt);
+      e.vineIcd = Math.max(0, e.vineIcd - dt);
+      e.wrapped = Math.max(0, e.wrapped - dt);
+      if (this.spell === "vine" && e.vineIcd <= 0) {
+        const reach = 118 + e.r;
+        if (Math.hypot(e.x - px, e.y - py) < reach) this.wrapEnemy(e);
+      }
       if (e.stun <= 0) {
         for (const a of this.arcs) {
           if (!a.alive) continue;
@@ -1222,7 +1251,7 @@ export class GameEngine {
         e.x = r.x;
         e.y = r.y;
       }
-      if (this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, PLAYER_R)) {
+      if (e.stun <= 0 && this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, PLAYER_R)) {
         const hit = e.kind === "elite" ? 22 : e.kind === "brute" ? 18 : e.kind === "runner" ? 10 : 8;
         this.player.hp -= hit;
         this.player.invuln = 0.85;
@@ -1524,17 +1553,20 @@ export class GameEngine {
     if (blink) this.ctx.globalAlpha = 0.45;
     this.ctx.drawImage(img, this.player.x - s / 2, this.player.y - s * 0.78, s, s);
     this.ctx.globalAlpha = 1;
+    if (this.spell === "vine") this.drawVineAura(this.player.x, this.player.y);
   }
 
   private drawEnemy(e: Enemy) {
     const img = this.assets!.wisp[Math.floor(e.frame) % 4]!;
     const s = e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
     if (e.flash > 0) this.ctx.filter = "brightness(2.4)";
+    else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
     else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
     else if (e.freeze > 0) this.ctx.filter = "hue-rotate(160deg) saturate(0.85) brightness(1.15)";
     else if (e.burn > 0) this.ctx.filter = "sepia(0.6) saturate(2.2) hue-rotate(-10deg)";
     this.ctx.drawImage(img, e.x - s / 2, e.y - s * 0.72, s, s);
     this.ctx.filter = "none";
+    if (e.wrapped > 0) this.drawVineWrap(e.x, e.y, s * 0.42);
     const barW = s * 0.7;
     this.ctx.fillStyle = "rgba(12,13,12,0.55)";
     this.ctx.fillRect(e.x - barW / 2, e.y - s * 0.78, barW, 3);
@@ -1567,6 +1599,10 @@ export class GameEngine {
       }
       if (b.spell === "void") {
         this.drawVoidOrb(b);
+        continue;
+      }
+      if (b.spell === "vine") {
+        this.drawVineBolt(b.x, b.y, ang);
         continue;
       }
       if (b.spell === "ember") {
@@ -1746,6 +1782,60 @@ export class GameEngine {
       ctx.lineTo(Math.cos(a) * radius, Math.sin(a) * radius * (i % 2 === 0 ? 1 : 0.55));
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  private drawVineBolt(x: number, y: number, ang: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    ctx.strokeStyle = "#3d7a45";
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    for (let i = -10; i <= 12; i++) {
+      const t = i / 12;
+      const px = i * 1.6;
+      const py = Math.sin(i * 0.7 + this.animT * 10) * 4.5;
+      if (i === -10) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+      void t;
+    }
+    ctx.stroke();
+    ctx.strokeStyle = "#8ed48a";
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.fillStyle = "#6fbf6a";
+    ctx.beginPath();
+    ctx.arc(12, 0, 4.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  private drawVineWrap(x: number, y: number, r: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(this.animT * 1.4);
+    ctx.strokeStyle = "#4a8f52";
+    ctx.lineWidth = 2.4;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r + i * 3, r * 0.62 + i, (i * Math.PI) / 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private drawVineAura(x: number, y: number) {
+    const ctx = this.ctx;
+    const pulse = 118 + Math.sin(this.animT * 3) * 6;
+    ctx.save();
+    ctx.strokeStyle = "rgba(111,191,106,0.35)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y + 8, pulse, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 
