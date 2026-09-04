@@ -2,7 +2,7 @@ import { Input, type Actions } from "./input";
 import { GameAudio } from "./audio";
 import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
-import { BOSSES, bossForNight, type BossDef } from "./bosses";
+import { BOSSES, bossForNight, drawBossPixels, type BossDef } from "./bosses";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
@@ -693,6 +693,24 @@ export class GameEngine {
   spawnBoss(id: number) {
     if (this.phase !== "playing" && this.phase !== "paused") return;
     this.placeBoss(id);
+  }
+
+  lineupBosses() {
+    if (this.phase !== "playing" && this.phase !== "paused") return;
+    this.clearFoes();
+    this.player.x = 700;
+    this.player.y = 620;
+    const cols = 5;
+    for (let i = 0; i < BOSSES.length; i++) {
+      const e = this.placeBoss(i);
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      e.x = 420 + col * 140;
+      e.y = 380 + row * 150;
+      e.kvx = 0;
+      e.kvy = 0;
+      e.speed = 0;
+    }
   }
 
   clearFoes() {
@@ -1459,6 +1477,7 @@ export class GameEngine {
     e.kvy = Math.sin(ang) * def.speed;
     this.floatAt(this.player.x, this.player.y - 64, def.name, def.color2);
     this.audio.wave();
+    return e;
   }
 
   private pickEnemyKind(): EnemyKind {
@@ -2084,73 +2103,19 @@ export class GameEngine {
   private drawBoss(e: Enemy) {
     const def = BOSSES[e.bossId] ?? BOSSES[0]!;
     const ctx = this.ctx;
-    const squash = e.lunging > 0 ? e.lunging / 0.2 : 0;
-    const spd = Math.hypot(e.kvx, e.kvy) || 1;
-    const stretch = 1 + squash * 0.4;
-    const thin = 1 - squash * 0.24;
-    const wobble = 1 + Math.sin(e.frame * 2.2) * 0.05;
-    const r = e.r * wobble;
     ctx.save();
-    ctx.translate(e.x, e.y);
-    ctx.rotate(Math.atan2(e.kvy, e.kvx));
-    ctx.scale(stretch, thin);
-    if (e.flash > 0) ctx.globalAlpha = 0.85;
-    if (def.move === "swoop") {
-      ctx.fillStyle = def.color2;
-      ctx.globalAlpha = 0.55;
-      ctx.beginPath();
-      ctx.ellipse(-r * 0.2, -r * 0.7, r * 0.85, r * 0.28, -0.4, 0, Math.PI * 2);
-      ctx.ellipse(-r * 0.2, r * 0.7, r * 0.85, r * 0.28, 0.4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    const body = ctx.createRadialGradient(-r * 0.25, -r * 0.35, r * 0.1, 0, 0, r);
-    body.addColorStop(0, def.color2);
-    body.addColorStop(0.45, def.color);
-    body.addColorStop(1, "#0c0d0c");
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r, r * (def.move === "hop" ? 0.78 : 0.88), 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#0c0d0c";
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    if (def.name === "VAMPIRE") {
-      ctx.fillStyle = def.color2;
-      ctx.beginPath();
-      ctx.moveTo(-8, 8);
-      ctx.lineTo(-3, 18);
-      ctx.lineTo(0, 8);
-      ctx.moveTo(8, 8);
-      ctx.lineTo(3, 18);
-      ctx.lineTo(0, 8);
-      ctx.fill();
-    }
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.28, -r * 0.32, r * 0.2, r * 0.12, -0.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#0c0d0c";
-    ctx.beginPath();
-    ctx.arc(-r * 0.22, -r * 0.08, 6, 0, Math.PI * 2);
-    ctx.arc(r * 0.18, -r * 0.1, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#ecece8";
-    ctx.beginPath();
-    ctx.arc(-r * 0.2, -r * 0.11, 2, 0, Math.PI * 2);
-    ctx.arc(r * 0.2, -r * 0.13, 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.imageSmoothingEnabled = false;
+    drawBossPixels(ctx, def, e.x, e.y, e.r, e.flash > 0);
     ctx.restore();
-    const barW = r * 1.6;
-    ctx.fillStyle = "rgba(12,13,12,0.6)";
-    ctx.fillRect(e.x - barW / 2, e.y - r - 16, barW, 5);
+    const barW = e.r * 1.6;
+    ctx.fillStyle = "rgba(12,13,12,0.7)";
+    ctx.fillRect(Math.round(e.x - barW / 2), Math.round(e.y - e.r - 18), Math.round(barW), 4);
     ctx.fillStyle = def.color2;
-    ctx.fillRect(e.x - barW / 2, e.y - r - 16, barW * clamp(e.hp / e.maxHp, 0, 1), 5);
+    ctx.fillRect(Math.round(e.x - barW / 2), Math.round(e.y - e.r - 18), Math.round(barW * clamp(e.hp / e.maxHp, 0, 1)), 4);
     ctx.fillStyle = def.color2;
-    ctx.font = "10px sans-serif";
+    ctx.font = "8px monospace";
     ctx.textAlign = "center";
-    ctx.fillText(def.name, e.x, e.y - r - 22);
-    void spd;
+    ctx.fillText(def.name, Math.round(e.x), Math.round(e.y - e.r - 24));
   }
 
   private drawKnockSprite(

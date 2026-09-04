@@ -546,6 +546,7 @@ function SpawnMenu({ engine, onClose }: { engine: GameEngine | null; onClose: ()
             </button>
           ))}
         </div>
+        <PixelButton onClick={() => engine?.lineupBosses()}>Line up bosses</PixelButton>
         <PixelButton onClick={() => engine?.clearFoes()}>Clear all</PixelButton>
         <PixelButton primary onClick={onClose}>
           Close
