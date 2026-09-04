@@ -29,9 +29,9 @@ export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
   return (
     <div
       className="pointer-events-none text-fg"
-      style={{ position: "fixed", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
+      style={{ position: "absolute", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
     >
-      {inRun ? <NightBar hud={hud} /> : null}
+      {inRun ? <NightBar hud={hud} compact={tilt} /> : null}
       {hud.phase === "playing" || hud.phase === "paused" ? (
         <Hud engine={engine} hud={hud} tilt={tilt} onTilt={onTilt} />
       ) : null}
@@ -45,12 +45,13 @@ export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
       {hud.phase === "wheel" ? <FortuneWheel engine={engine} hud={hud} /> : null}
       {hud.phase === "dead" ? <Dead engine={engine} hud={hud} /> : null}
 
-      {showSticks ? <TouchSticks engine={engine} /> : null}
+      {showSticks ? <TouchSticks engine={engine} compact={tilt} /> : null}
     </div>
   );
 }
 
-function NightBar({ hud }: { hud: HudState }) {
+function NightBar({ hud, compact = false }: { hud: HudState; compact?: boolean }) {
+  if (compact) return null;
   return (
     <div
       className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-3"
@@ -82,6 +83,66 @@ function Hud({
   onTilt?: (on: boolean) => void;
 }) {
   const pct = Math.max(0, hud.hp / hud.maxHp);
+  const spellLabel =
+    hud.spell === "frost"
+      ? "Ice"
+      : hud.spell === "bolt"
+        ? "Bolt"
+        : hud.spell === "void"
+          ? "Void"
+          : hud.spell === "vine"
+            ? "Vine"
+            : hud.spell === "craft"
+              ? (hud.crafted?.name ?? "Rune")
+              : "Ember";
+
+  if (tilt) {
+    return (
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center gap-2 px-2 py-1.5">
+        <div className="border-2 border-fg bg-bg/95 px-2 py-1 text-center">
+          <p className="font-pixel text-[7px] text-muted">NIGHT</p>
+          <p className="font-pixel text-lg tabular-nums leading-none text-fg">{hud.wave}</p>
+        </div>
+        <div className="border-2 border-gold bg-bg/95 px-2 py-1 text-center">
+          <p className="font-pixel text-[7px] text-gold">MAX</p>
+          <p className="font-pixel text-lg tabular-nums leading-none text-gold">{hud.bestNight}</p>
+        </div>
+        <div className="min-w-0 flex-1 border border-border bg-bg/80 px-2 py-1">
+          <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
+            <div className="h-full rounded-full bg-accent" style={{ width: `${pct * 100}%` }} />
+          </div>
+          <p className="mt-0.5 font-pixel text-[7px] tabular-nums text-gold">{hud.gold}g</p>
+        </div>
+        <div className="pointer-events-auto flex gap-1" data-ui>
+          <button
+            type="button"
+            data-ui
+            onClick={() => engine?.toggleBook()}
+            className="h-9 border-2 border-fg bg-bg px-2 font-pixel text-[8px] text-fg"
+          >
+            Book
+          </button>
+          <button
+            type="button"
+            data-ui
+            onClick={() => engine?.openWheel()}
+            className="h-9 border-2 border-gold bg-bg px-2 font-pixel text-[8px] text-fg"
+          >
+            Wheel
+          </button>
+          <button
+            type="button"
+            data-ui
+            onClick={() => onTilt?.(false)}
+            className="h-9 border-2 border-muted bg-bg px-2 font-pixel text-[8px] text-fg"
+          >
+            Upright
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="pointer-events-none px-3"
@@ -113,19 +174,7 @@ function Hud({
         >
           <BookOpen className="size-3.5" strokeWidth={2} />
           Book
-          <span className="text-muted">
-            {hud.spell === "frost"
-              ? "Ice"
-              : hud.spell === "bolt"
-                ? "Bolt"
-                : hud.spell === "void"
-                  ? "Void"
-                  : hud.spell === "vine"
-                    ? "Vine"
-                    : hud.spell === "craft"
-                      ? (hud.crafted?.name ?? "Rune")
-                      : "Ember"}
-          </span>
+          <span className="text-muted">{spellLabel}</span>
         </button>
         <button
           type="button"
@@ -142,7 +191,7 @@ function Hud({
           onClick={() => onTilt?.(!tilt)}
           className="flex h-11 items-center justify-center border-2 border-muted bg-bg px-3 font-pixel text-[10px] text-fg"
         >
-          {tilt ? "Upright" : "Sideways"}
+          Sideways
         </button>
       </div>
     </div>
@@ -286,7 +335,13 @@ function Title({
     menu === "multiplayer" || menu === "join" || menu === "room" ? "Multiplayer" : "Wispwood";
 
   return (
-    <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))] pointer-events-auto">
+    <div
+      className={
+        tilt
+          ? "absolute inset-0 flex flex-row items-center justify-center gap-4 overflow-hidden px-3 py-2 pointer-events-auto"
+          : "absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))] pointer-events-auto"
+      }
+    >
       <div className="pointer-events-none shrink-0 text-center">
         <p className="font-pixel text-pixel-sm text-muted">Max night</p>
         <p className="mt-1 font-display text-2xl tabular-nums sm:text-3xl">{bestNight}</p>
@@ -294,7 +349,11 @@ function Title({
       <img
         src={titleSrc}
         alt={titleAlt}
-        className="h-auto w-[min(88vw,20rem)] max-h-[12vh] shrink-0 object-contain"
+        className={
+          tilt
+            ? "h-auto w-[min(38vw,14rem)] max-h-[70%] shrink-0 object-contain"
+            : "h-auto w-[min(88vw,20rem)] max-h-[12vh] shrink-0 object-contain"
+        }
       />
 
       {menu === "room" && roomCode ? (
@@ -400,7 +459,13 @@ function Title({
             </PixelButton>
           </div>
         ) : (
-          <div className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border-2 border-border bg-bg/80 p-3">
+          <div
+            className={
+              tilt
+                ? "pointer-events-auto grid w-full max-w-md grid-cols-2 gap-2 rounded-2xl border-2 border-border bg-bg/80 p-2"
+                : "pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border-2 border-border bg-bg/80 p-3"
+            }
+          >
             {menu === "multiplayer" ? (
               <>
                 <PixelButton primary onClick={createRoom}>
@@ -772,13 +837,13 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
               : [`${dmg} damage`, "Yellow stun trail", "1.5s wait"];
 
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg/80 px-3 pointer-events-auto">
-      <div className="flex w-full max-w-lg flex-col items-center gap-3">
-        <div className="relative w-full">
+    <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-bg/80 px-3 py-2 pointer-events-auto">
+      <div className="flex w-full max-w-lg max-h-full flex-col items-center gap-2">
+        <div className="relative w-full max-h-[min(70%,22rem)]">
           <img
             src={asset("game/hud-spellbook.png")}
             alt="Spellbook"
-            className="pixelated h-auto w-full select-none"
+            className="pixelated h-auto max-h-[min(70vh,22rem)] w-full select-none object-contain"
             draggable={false}
           />
 
@@ -934,11 +999,22 @@ function Dead({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   );
 }
 
-function TouchSticks({ engine }: { engine: GameEngine | null }) {
+function TouchSticks({ engine, compact = false }: { engine: GameEngine | null; compact?: boolean }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-      <Stick onVec={(x, y) => engine?.setTouchMove(x, y)} onEnd={() => engine?.setTouchMove(0, 0)} />
+    <div
+      className={
+        compact
+          ? "pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-6 pb-2"
+          : "pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+      }
+    >
       <Stick
+        compact={compact}
+        onVec={(x, y) => engine?.setTouchMove(x, y)}
+        onEnd={() => engine?.setTouchMove(0, 0)}
+      />
+      <Stick
+        compact={compact}
         onVec={(x, y) => engine?.setTouchAim(x, y, true)}
         onEnd={() => engine?.setTouchAim(0, 0, false)}
       />
@@ -949,9 +1025,11 @@ function TouchSticks({ engine }: { engine: GameEngine | null }) {
 function Stick({
   onVec,
   onEnd,
+  compact = false,
 }: {
   onVec: (x: number, y: number) => void;
   onEnd: () => void;
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const active = useRef(false);
@@ -988,7 +1066,11 @@ function Stick({
         active.current = false;
         onEnd();
       }}
-      className="pointer-events-auto size-28 rounded-full border-2 border-fg/70 bg-bg/50 touch-none"
+      className={
+        compact
+          ? "pointer-events-auto size-16 rounded-full border-2 border-fg/70 bg-bg/50 touch-none"
+          : "pointer-events-auto size-28 rounded-full border-2 border-fg/70 bg-bg/50 touch-none"
+      }
     />
   );
 }
