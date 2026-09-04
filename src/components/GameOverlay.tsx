@@ -31,7 +31,9 @@ export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
       className="pointer-events-none text-fg"
       style={{ position: "absolute", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
     >
-      {inRun ? <NightBar hud={hud} compact={tilt} /> : null}
+      {inRun && (tilt || hud.phase === "book" || hud.phase === "wheel") ? (
+        <NightBar hud={hud} compact={tilt} />
+      ) : null}
       {hud.phase === "playing" || hud.phase === "paused" ? (
         <Hud engine={engine} hud={hud} tilt={tilt} onTilt={onTilt} />
       ) : null}
@@ -55,7 +57,7 @@ function NightBar({ hud, compact = false }: { hud: HudState; compact?: boolean }
   return (
     <div
       className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-3"
-      style={{ top: "max(0.4rem, env(safe-area-inset-top, 0px))" }}
+      style={{ top: "max(2.75rem, calc(env(safe-area-inset-top, 0px) + 1.75rem))" }}
     >
       <div className="flex w-full max-w-sm items-stretch gap-2">
         <div className="flex-1 border-2 border-fg bg-bg/95 px-3 py-1.5 text-center">
@@ -146,9 +148,20 @@ function Hud({
   return (
     <div
       className="pointer-events-none px-3"
-      style={{ paddingTop: "max(5.75rem, calc(env(safe-area-inset-top, 0px) + 4.75rem))" }}
+      style={{ paddingTop: "max(2.75rem, calc(env(safe-area-inset-top, 0px) + 1.75rem))" }}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="mx-auto flex max-w-sm items-stretch justify-center gap-2">
+        <div className="flex-1 border-2 border-fg bg-bg/95 px-3 py-2 text-center">
+          <p className="font-pixel text-[8px] tracking-wide text-muted">NIGHT</p>
+          <p className="mt-1 font-pixel text-2xl tabular-nums leading-none text-fg">{hud.wave}</p>
+        </div>
+        <div className="flex-1 border-2 border-gold bg-bg/95 px-3 py-2 text-center">
+          <p className="font-pixel text-[8px] tracking-wide text-gold">MAX NIGHTS</p>
+          <p className="mt-1 font-pixel text-2xl tabular-nums leading-none text-gold">{hud.bestNight}</p>
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-2">
         <div className="min-w-0 rounded-xl border border-border bg-bg/80 px-2.5 py-1.5">
           <p className="text-[9px] font-medium tracking-[0.16em] text-muted uppercase">Lantern</p>
           <div className="mt-1 h-1.5 w-20 overflow-hidden rounded-full bg-elevated sm:w-32">
