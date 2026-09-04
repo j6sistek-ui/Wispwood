@@ -730,7 +730,7 @@ export class GameEngine {
     if (this.phase !== "playing" && this.phase !== "paused") return;
     this.clearFoes();
     this.player.x = 700;
-    this.player.y = 620;
+    this.player.y = 1040;
     const cols = 5;
     for (let i = 0; i < BOSSES.length; i++) {
       const e = this.placeBoss(i);
@@ -741,6 +741,7 @@ export class GameEngine {
       e.kvx = 0;
       e.kvy = 0;
       e.speed = 0;
+      e.voidIcd = 999;
     }
   }
 
@@ -1760,6 +1761,7 @@ export class GameEngine {
       }
     }
     const atk = BOSS_ATTACK[def.name] ?? "slam";
+    if (e.speed <= 0) return;
     if ((atk === "drip" || atk === "acid" || atk === "dust") && e.vineIcd <= 0) {
       this.dropHazard(e.x, e.y, atk === "acid" ? "acid" : atk === "dust" ? "dust" : "goo", def.color2, atk === "dust" ? 46 : 28);
       e.vineIcd = atk === "dust" ? 0.45 : 0.28;
@@ -2238,6 +2240,7 @@ export class GameEngine {
 
     if (this.assets) {
       this.drawGround();
+      this.drawHazards();
       const drawables: Array<{ y: number; draw: () => void }> = [];
       for (const p of this.props) drawables.push({ y: p.y, draw: () => this.drawProp(p) });
       for (const pk of this.pickups) {
@@ -2254,7 +2257,6 @@ export class GameEngine {
       this.drawBullets();
       this.drawBlasts();
       this.drawBossShots();
-      this.drawHazards();
       this.drawFx();
       if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel") this.drawLight();
     }
@@ -2926,10 +2928,7 @@ export class GameEngine {
   private installControlsTest() {
     window.__controlsTest = {
       getYaw: () => Math.atan2(this.aim.y, this.aim.x),
-      getSpeed: () => {
-        const a = this.input.poll();
-        return Math.hypot(this.player.vx, this.player.vy);
-      },
+      getSpeed: () => Math.hypot(this.player.vx, this.player.vy),
       getPos: () => ({ x: this.player.x, y: this.player.y }),
       setKeys: (codes: string[]) => this.input.setKeys(codes),
       clearKeys: () => this.input.clearInjected(),

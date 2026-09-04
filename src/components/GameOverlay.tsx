@@ -21,6 +21,9 @@ export function GameOverlay({ engine, hud }: Props) {
   useEffect(() => {
     setCoarse(window.matchMedia("(pointer: coarse)").matches);
   }, []);
+  useEffect(() => {
+    if (hud.phase !== "playing" && hud.phase !== "paused") setSpawnOpen(false);
+  }, [hud.phase]);
   const showSticks = coarse && hud.phase === "playing";
 
   return (
@@ -636,6 +639,9 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
   const [result, setResult] = useState<"idle" | "miss" | "craft" | "poor" | "pick" | "jackpot">("idle");
   const [made, setMade] = useState("");
   const [picks, setPicks] = useState<CraftedSpell[]>([]);
+  const spinTimer = useRef<number>(0);
+
+  useEffect(() => () => window.clearTimeout(spinTimer.current), []);
 
   const takeSpell = (spell: CraftedSpell) => {
     engine?.saveCrafted(spell);
@@ -652,7 +658,8 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
     setMade("");
     const extra = 5 + Math.floor(Math.random() * 3);
     setAngle(360 * extra);
-    window.setTimeout(() => {
+    window.clearTimeout(spinTimer.current);
+    spinTimer.current = window.setTimeout(() => {
       setSpinning(false);
       const prize = engine?.grantJackpot(pickLegendary());
       setMade(prize?.name ?? "Rune");
@@ -679,7 +686,8 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
           ? 360 * extra + 45
           : 360 * extra + 225,
     );
-    window.setTimeout(() => {
+    window.clearTimeout(spinTimer.current);
+    spinTimer.current = window.setTimeout(() => {
       setSpinning(false);
       if (rolled === "jackpot") {
         const prize = engine?.grantJackpot(pickLegendary());
@@ -804,22 +812,10 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
   };
 
   const onPageClick = () => {
-    if (spell === "bolt" && !hud.boltUnlocked) {
-      engine?.unlockBolt();
-      return;
-    }
-    if (spell === "void" && !hud.voidUnlocked) {
-      engine?.unlockVoid();
-      return;
-    }
-    if (spell === "vine" && !hud.vineUnlocked) {
-      engine?.unlockVine();
-      return;
-    }
-    if (spell === "boom" && !hud.boomUnlocked) {
-      engine?.unlockBoom();
-      return;
-    }
+    if (spell === "bolt" && !hud.boltUnlocked) return;
+    if (spell === "void" && !hud.voidUnlocked) return;
+    if (spell === "vine" && !hud.vineUnlocked) return;
+    if (spell === "boom" && !hud.boomUnlocked) return;
     const now = performance.now();
     if (now - lastTap.current < 380) {
       lastTap.current = 0;
@@ -907,6 +903,13 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
           <PixelButton onClick={() => flip(-1)}>Prev</PixelButton>
           <PixelButton onClick={() => flip(1)}>Next</PixelButton>
         </div>
+        {spell === "bolt" && !hud.boltUnlocked ? (
+          <div className="w-full max-w-xs">
+            <PixelButton primary onClick={() => engine?.unlockBolt()}>
+              {hud.gold < 100 ? "Need 100g" : "Buy Bolt 100g"}
+            </PixelButton>
+          </div>
+        ) : null}
         {spell === "void" && !hud.voidUnlocked ? (
           <div className="w-full max-w-xs">
             <PixelButton primary onClick={() => engine?.unlockVoid()}>
