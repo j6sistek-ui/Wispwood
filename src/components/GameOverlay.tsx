@@ -13,36 +13,28 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 type Props = {
   engine: GameEngine | null;
   hud: HudState;
-  tilt?: boolean;
-  onTilt?: (on: boolean) => void;
 };
 
-export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
+export function GameOverlay({ engine, hud }: Props) {
   const [coarse, setCoarse] = useState(false);
   const [spawnOpen, setSpawnOpen] = useState(false);
   useEffect(() => {
     setCoarse(window.matchMedia("(pointer: coarse)").matches);
   }, []);
   const showSticks = coarse && hud.phase === "playing";
-  const inRun =
-    hud.phase === "playing" ||
-    hud.phase === "paused" ||
-    hud.phase === "book" ||
-    hud.phase === "wheel";
 
   return (
     <div
       className="pointer-events-none text-fg"
       style={{ position: "absolute", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
     >
-      {inRun && tilt ? <NightBar hud={hud} compact /> : null}
       {hud.phase === "playing" || hud.phase === "paused" ? (
-        <Hud engine={engine} hud={hud} tilt={tilt} onTilt={onTilt} onSpawn={() => setSpawnOpen(true)} />
+        <Hud engine={engine} hud={hud} onSpawn={() => setSpawnOpen(true)} />
       ) : null}
 
       {hud.phase === "boot" || hud.loading ? <Boot /> : null}
       {hud.phase === "title" && !hud.loading ? (
-        <Title engine={engine} bestNight={hud.bestNight} tilt={tilt} onTilt={onTilt} />
+        <Title engine={engine} bestNight={hud.bestNight} />
       ) : null}
       {hud.phase === "paused" ? <Pause engine={engine} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
@@ -52,28 +44,7 @@ export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
         <SpawnMenu engine={engine} onClose={() => setSpawnOpen(false)} />
       ) : null}
 
-      {showSticks ? <TouchSticks engine={engine} compact={tilt} /> : null}
-    </div>
-  );
-}
-
-function NightBar({ hud, compact = false }: { hud: HudState; compact?: boolean }) {
-  if (compact) return null;
-  return (
-    <div
-      className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-3"
-      style={{ top: "max(2.75rem, calc(env(safe-area-inset-top, 0px) + 1.75rem))" }}
-    >
-      <div className="flex w-full max-w-sm items-stretch gap-2">
-        <div className="flex-1 border-2 border-fg bg-bg/95 px-3 py-1.5 text-center">
-          <p className="font-pixel text-[8px] tracking-wide text-muted">NIGHT</p>
-          <p className="mt-1 font-pixel text-2xl tabular-nums leading-none text-fg">{hud.wave}</p>
-        </div>
-        <div className="flex-1 border-2 border-gold bg-bg/95 px-3 py-1.5 text-center">
-          <p className="font-pixel text-[8px] tracking-wide text-gold">MAX NIGHTS</p>
-          <p className="mt-1 font-pixel text-2xl tabular-nums leading-none text-gold">{hud.bestNight}</p>
-        </div>
-      </div>
+      {showSticks ? <TouchSticks engine={engine} /> : null}
     </div>
   );
 }
@@ -81,14 +52,10 @@ function NightBar({ hud, compact = false }: { hud: HudState; compact?: boolean }
 function Hud({
   engine,
   hud,
-  tilt,
-  onTilt,
   onSpawn,
 }: {
   engine: GameEngine | null;
   hud: HudState;
-  tilt: boolean;
-  onTilt?: (on: boolean) => void;
   onSpawn?: () => void;
 }) {
   const pct = Math.max(0, hud.hp / hud.maxHp);
@@ -106,63 +73,6 @@ function Hud({
             : hud.spell === "craft"
               ? (hud.crafted?.name ?? "Rune")
               : "Ember";
-
-  if (tilt) {
-    return (
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center gap-2 px-2 py-1.5">
-        <div className="border-2 border-fg bg-bg/95 px-2 py-1 text-center">
-          <p className="font-pixel text-[7px] text-muted">NIGHT</p>
-          <p className="font-pixel text-lg tabular-nums leading-none text-fg">{hud.wave}</p>
-        </div>
-        <div className="border-2 border-gold bg-bg/95 px-2 py-1 text-center">
-          <p className="font-pixel text-[7px] text-gold">MAX</p>
-          <p className="font-pixel text-lg tabular-nums leading-none text-gold">{hud.bestNight}</p>
-        </div>
-        <div className="min-w-0 flex-1 border border-border bg-bg/80 px-2 py-1">
-          <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
-            <div className="h-full rounded-full bg-accent" style={{ width: `${pct * 100}%` }} />
-          </div>
-          <p className="mt-0.5 font-pixel text-[7px] tabular-nums text-gold">{hud.gold}g</p>
-        </div>
-        <div className="pointer-events-auto flex gap-1" data-ui>
-          <button
-            type="button"
-            data-ui
-            onClick={() => engine?.toggleBook()}
-            className="h-9 border-2 border-fg bg-bg px-2 font-pixel text-[8px] text-fg"
-          >
-            Book
-          </button>
-          <button
-            type="button"
-            data-ui
-            onClick={() => engine?.openWheel()}
-            className="h-9 border-2 border-gold bg-bg px-2 font-pixel text-[8px] text-fg"
-          >
-            Wheel
-          </button>
-          {hud.sandbox ? (
-            <button
-              type="button"
-              data-ui
-              onClick={() => onSpawn?.()}
-              className="h-9 border-2 border-accent bg-bg px-2 font-pixel text-[8px] text-fg"
-            >
-              Spawn
-            </button>
-          ) : null}
-          <button
-            type="button"
-            data-ui
-            onClick={() => onTilt?.(false)}
-            className="h-9 border-2 border-muted bg-bg px-2 font-pixel text-[8px] text-fg"
-          >
-            Upright
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -227,14 +137,6 @@ function Hud({
             Spawn
           </button>
         ) : null}
-        <button
-          type="button"
-          data-ui
-          onClick={() => onTilt?.(!tilt)}
-          className="flex h-11 items-center justify-center border-2 border-muted bg-bg px-3 font-pixel text-[10px] text-fg"
-        >
-          Sideways
-        </button>
       </div>
     </div>
   );
@@ -258,13 +160,9 @@ function makeRoomCode() {
 function Title({
   engine,
   bestNight,
-  tilt = false,
-  onTilt,
 }: {
   engine: GameEngine | null;
   bestNight: number;
-  tilt?: boolean;
-  onTilt?: (on: boolean) => void;
 }) {
   const [menu, setMenu] = useState<"home" | "multiplayer" | "join" | "room" | "name" | "account">("home");
   const [roomCode, setRoomCode] = useState<string | null>(null);
@@ -377,21 +275,11 @@ function Title({
     menu === "multiplayer" || menu === "join" || menu === "room" ? "Multiplayer" : "Wispwood";
 
   return (
-    <div
-      className={
-        tilt
-          ? "absolute inset-0 flex flex-row items-center justify-center gap-4 overflow-hidden px-3 py-2 pointer-events-auto"
-          : "absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))] pointer-events-auto"
-      }
-    >
+    <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))] pointer-events-auto">
       <img
         src={titleSrc}
         alt={titleAlt}
-        className={
-          tilt
-            ? "h-auto w-[min(42vw,16rem)] max-h-[64%] shrink-0 object-contain"
-            : "h-auto w-[min(90vw,22rem)] max-h-[22vh] shrink-0 object-contain"
-        }
+        className="h-auto w-[min(90vw,22rem)] max-h-[22vh] shrink-0 object-contain"
       />
       <div className="pointer-events-none shrink-0 text-center">
         <p className="font-pixel text-pixel-sm text-muted">Max night {bestNight}</p>
@@ -500,13 +388,7 @@ function Title({
             </PixelButton>
           </div>
         ) : (
-          <div
-            className={
-              tilt
-                ? "pointer-events-auto grid w-full max-w-md grid-cols-2 gap-2 rounded-2xl border-2 border-border bg-bg/80 p-2"
-                : "pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border-2 border-border bg-bg/80 p-3"
-            }
-          >
+          <div className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border-2 border-border bg-bg/80 p-3">
             {menu === "multiplayer" ? (
               <>
                 <PixelButton primary onClick={createRoom}>
@@ -526,7 +408,6 @@ function Title({
                 <PixelButton onClick={() => setMenu("name")}>Name</PixelButton>
                 <PixelButton onClick={() => setMenu("account")}>Account</PixelButton>
                 <PixelButton onClick={() => void shareGame()}>{shareNote || "Share"}</PixelButton>
-                <PixelButton onClick={() => onTilt?.(!tilt)}>{tilt ? "Upright" : "Sideways"}</PixelButton>
               </>
             )}
           </div>

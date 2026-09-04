@@ -60,7 +60,6 @@ export function GameApp() {
   const engineRef = useRef<GameEngine | null>(null);
   const [engine, setEngine] = useState<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>(idleHud);
-  const [tilt, setTilt] = useState(false);
   const [crash, setCrash] = useState<string | null>(null);
 
   useEffect(() => {
@@ -148,28 +147,10 @@ export function GameApp() {
     };
   }, []);
 
-  useEffect(() => {
-    engine?.setTilt(tilt);
-    lockViewport();
-    engine?.resize();
-  }, [tilt, engine]);
-
   return (
     <main
       className="overflow-hidden bg-bg text-fg"
-      style={
-        tilt
-          ? {
-              position: "fixed",
-              width: "100dvh",
-              height: "100dvw",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%) rotate(90deg)",
-              transformOrigin: "center center",
-            }
-          : { position: "fixed", inset: 0, width: "100%", height: "100%" }
-      }
+      style={{ position: "fixed", inset: 0, width: "100%", height: "100%" }}
     >
       <canvas
         ref={canvasRef}
@@ -183,7 +164,7 @@ export function GameApp() {
           touchAction: "none",
         }}
       />
-      <GameOverlay engine={engine} hud={hud} tilt={tilt} onTilt={setTilt} />
+      <GameOverlay engine={engine} hud={hud} />
       {crash ? (
         <div className="absolute inset-0 z-50 grid place-items-center bg-bg px-6 text-center">
           <p className="font-pixel text-pixel text-fg">Could not load</p>
