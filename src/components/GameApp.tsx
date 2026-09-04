@@ -60,6 +60,7 @@ export function GameApp() {
   const [engine, setEngine] = useState<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>(idleHud);
   const [tilt, setTilt] = useState(false);
+  const [crash, setCrash] = useState<string | null>(null);
 
   useEffect(() => {
     void ensureGuestAccount();
@@ -69,7 +70,13 @@ export function GameApp() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     lockViewport();
-    const game = new GameEngine(canvas);
+    let game: GameEngine;
+    try {
+      game = new GameEngine(canvas);
+    } catch (err) {
+      setCrash(err instanceof Error ? err.message : "Could not start");
+      return;
+    }
     engineRef.current = game;
     setEngine(game);
     const unsub = game.subscribe(setHud);
@@ -176,6 +183,12 @@ export function GameApp() {
         }}
       />
       <GameOverlay engine={engine} hud={hud} tilt={tilt} onTilt={setTilt} />
+      {crash ? (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-bg px-6 text-center">
+          <p className="font-pixel text-pixel text-fg">Could not load</p>
+          <p className="mt-3 font-pixel text-pixel-sm leading-relaxed text-muted">{crash}</p>
+        </div>
+      ) : null}
     </main>
   );
 }

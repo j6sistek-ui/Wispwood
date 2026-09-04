@@ -4,7 +4,7 @@ import type { HudState } from "@/game/engine";
 import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
-import { rarityTint, wheelChoices } from "@/game/spell-prompt";
+import { rarityTint, wheelChoices, pickLegendary } from "@/game/spell-prompt";
 import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -17,8 +17,10 @@ type Props = {
 };
 
 export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
-  const coarse =
-    typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+  const [coarse, setCoarse] = useState(false);
+  useEffect(() => {
+    setCoarse(window.matchMedia("(pointer: coarse)").matches);
+  }, []);
   const showSticks = coarse && hud.phase === "playing";
   const inRun =
     hud.phase === "playing" ||
@@ -708,7 +710,7 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
     window.setTimeout(() => {
       setSpinning(false);
       if (rolled === "jackpot") {
-        const prize = engine?.grantJackpot();
+        const prize = engine?.grantJackpot(pickLegendary());
         setMade(prize?.name ?? "Rune");
         setResult("jackpot");
         return;

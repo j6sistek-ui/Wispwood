@@ -2,7 +2,6 @@ import { Input, type Actions } from "./input";
 import { GameAudio } from "./audio";
 import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
-import { pickLegendary } from "./spell-prompt";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
@@ -498,8 +497,7 @@ export class GameEngine {
     return Math.random() < 0.5 ? "craft" : "miss";
   }
 
-  grantJackpot(): CraftedSpell {
-    const spell = pickLegendary();
+  grantJackpot(spell: CraftedSpell): CraftedSpell {
     this.gold += 1000;
     this.crafted = {
       name: spell.name.trim().slice(0, 10) || "Rune",
