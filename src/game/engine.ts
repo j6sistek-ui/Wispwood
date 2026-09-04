@@ -53,6 +53,7 @@ export type HudState = {
   boltUnlocked: boolean;
   voidUnlocked: boolean;
   vineUnlocked: boolean;
+  boomUnlocked: boolean;
   crafted: CraftedSpell | null;
 };
 
@@ -262,6 +263,7 @@ export class GameEngine {
   boltUnlocked = false;
   voidUnlocked = false;
   vineUnlocked = false;
+  boomUnlocked = false;
   richRun = false;
   crafted: CraftedSpell | null = null;
   private toSpawn = 0;
@@ -331,6 +333,7 @@ export class GameEngine {
       boltUnlocked: this.boltUnlocked,
       voidUnlocked: this.voidUnlocked,
       vineUnlocked: this.vineUnlocked,
+      boomUnlocked: this.boomUnlocked,
       crafted: this.crafted ? { ...this.crafted } : null,
     };
   }
@@ -457,6 +460,7 @@ export class GameEngine {
     if (spell === "bolt" && !this.boltUnlocked) return;
     if (spell === "void" && !this.voidUnlocked) return;
     if (spell === "vine" && !this.vineUnlocked) return;
+    if (spell === "boom" && !this.boomUnlocked) return;
     if (spell === "craft" && !this.crafted) return;
     this.setSpell(spell);
   }
@@ -465,6 +469,7 @@ export class GameEngine {
     if (spell === "bolt" && !this.boltUnlocked) return;
     if (spell === "void" && !this.voidUnlocked) return;
     if (spell === "vine" && !this.vineUnlocked) return;
+    if (spell === "boom" && !this.boomUnlocked) return;
     if (spell === "craft" && !this.crafted) return;
     if (this.spell === spell) return;
     this.spell = spell;
@@ -543,10 +548,22 @@ export class GameEngine {
     return true;
   }
 
+  unlockBoom(): boolean {
+    if (this.boomUnlocked) return true;
+    if (this.gold < 2500) return false;
+    this.gold -= 2500;
+    this.boomUnlocked = true;
+    this.spell = "boom";
+    this.audio.pickup();
+    this.emit();
+    return true;
+  }
+
   upgradeSpell(spell: Spell, stat: SpellStat): boolean {
     if (spell === "bolt" && !this.boltUnlocked) return false;
     if (spell === "void" && !this.voidUnlocked) return false;
     if (spell === "vine" && !this.vineUnlocked) return false;
+    if (spell === "boom" && !this.boomUnlocked) return false;
     const cur = this.upgrades[spell][stat];
     if (cur >= MAX_SPELL_UP) return false;
     const cost = upgradeCost(cur);
@@ -624,6 +641,7 @@ export class GameEngine {
     this.boltUnlocked = false;
     this.voidUnlocked = false;
     this.vineUnlocked = false;
+    this.boomUnlocked = false;
     this.crafted = null;
     this.spell = "ember";
     this.wave = 0;
@@ -774,6 +792,7 @@ export class GameEngine {
     if (this.spell === "bolt" && !this.boltUnlocked) return;
     if (this.spell === "void" && !this.voidUnlocked) return;
     if (this.spell === "vine" && !this.vineUnlocked) return;
+    if (this.spell === "boom" && !this.boomUnlocked) return;
     if (this.spell === "craft" && !this.crafted) return;
     const speedUp = this.upgrades[this.spell].speed;
     const baseCd =
