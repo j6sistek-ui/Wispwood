@@ -2,6 +2,7 @@ import { Input, type Actions } from "./input";
 import { GameAudio } from "./audio";
 import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
+import { BOSSES, bossForNight, type BossDef } from "./bosses";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
@@ -59,7 +60,7 @@ export type HudState = {
 };
 
 type Dir = "down" | "left" | "right" | "up";
-type EnemyKind = "wisp" | "runner" | "brute" | "elite" | "slime";
+type EnemyKind = "wisp" | "runner" | "brute" | "elite" | "boss";
 
 type Bullet = {
   alive: boolean;
@@ -109,6 +110,7 @@ type Enemy = {
   knockY: number;
   kvx: number;
   kvy: number;
+  bossId: number;
 };
 
 type Pickup = { alive: boolean; x: number; y: number; ttl: number; frame: number };
@@ -180,7 +182,6 @@ function clamp(v: number, a: number, b: number) {
 }
 
 function goldFor(kind: EnemyKind) {
-  if (kind === "slime") return 300;
   if (kind === "elite") return 35;
   if (kind === "brute") return 16;
   if (kind === "runner") return 7;
@@ -188,7 +189,6 @@ function goldFor(kind: EnemyKind) {
 }
 
 function coinCountFor(kind: EnemyKind) {
-  if (kind === "slime") return 22;
   if (kind === "elite") return 9;
   if (kind === "brute") return 5;
   if (kind === "runner") return 3;
@@ -708,9 +708,8 @@ export class GameEngine {
     this.audio.wave();
     this.floatAt(this.player.x, this.player.y - 40, `Night ${this.wave}`);
     if (this.wave % 5 === 0) {
-      this.spawnSlimeBoss();
+      this.spawnNightBoss();
       this.toSpawn = 6;
-      this.floatAt(this.player.x, this.player.y - 64, "SLIME");
     }
     this.emit();
   }
@@ -1277,7 +1276,7 @@ export class GameEngine {
     const m = Math.hypot(vx, vy) || 1;
     const nx = vx / m;
     const ny = vy / m;
-    const knock = spell === "void" ? 180 : spell === "boom" ? 280 : e.kind === "slime" ? 18 : 10;
+    const knock = spell === "void" ? 180 : spell === "boom" ? 280 : e.kind === "boss" ? 18 : 10;
     e.kvx = nx * (knock / 0.22);
     e.kvy = ny * (knock / 0.22);
     e.knockX = nx;
@@ -1304,17 +1303,30 @@ export class GameEngine {
 
   private killEnemy(e: Enemy) {
     e.alive = false;
-    const pts = e.kind === "slime" ? 400 : e.kind === "elite" ? 80 : e.kind === "brute" ? 40 : e.kind === "runner" ? 18 : 12;
+    const pts = e.kind === "boss" ? 400 : e.kind === "elite" ? 80 : e.kind === "brute" ? 40 : e.kind === "runner" ? 18 : 12;
     this.score += pts;
     if (this.score > this.best) {
       this.best = this.score;
       this.persist();
     }
-    const gold = goldFor(e.kind);
+    let gold = goldFor(e.kind);
+    let coins = coinCountFor(e.kind);
+    let sparkColor = e.kind === "brute" ? "#8aa0b8" : "#6a7a9a";
+    let sparkN = 14;
+    if (e.kind === "boss") {
+      const def = BOSSES[e.bossId] ?? BOSSES[0]!;
+      gold = def.goldMin + Math.floor(Math.random() * (def.goldMax - def.goldMin + 1));
+      if (Math.random() < 0.5) gold += 40 + Math.floor(Math.random() * 120);
+      coins = 14 + Math.floor(Math.random() * 10);
+      sparkColor = def.color2;
+      sparkN = 36;
+      this.floatAt(e.x, e.y - 36, def.drop, def.color2);
+      if (Math.random() < 0.4) this.spawnPickup(e.x + 18, e.y);
+    }
     this.gold += gold;
     this.floatAt(e.x, e.y - 18, `+${gold}`, "#f0d24a");
-    this.spawnCoins(e.x, e.y, coinCountFor(e.kind));
-    this.burstSparks(e.x, e.y, e.kind === "slime" ? 36 : 14, e.kind === "slime" ? "#7db86a" : e.kind === "brute" ? "#8aa0b8" : "#6a7a9a");
+    this.spawnCoins(e.x, e.y, coins);
+    this.burstSparks(e.x, e.y, sparkN, sparkColor);
     if (Math.random() < 0.28) this.spawnPickup(e.x, e.y);
     this.emit();
   }
@@ -1388,6 +1400,7 @@ export class GameEngine {
     e.knockY = 1;
     e.kvx = 0;
     e.kvy = 0;
+    e.bossId = -1;
     if (e.kind === "elite") {
       e.r = 26;
       e.speed = 90 + this.wave * 3;
@@ -1409,24 +1422,26 @@ export class GameEngine {
     if (e.kind === "elite") this.floatAt(e.x, e.y - 28, "Nightbound");
   }
 
-  private spawnSlimeBoss() {
+  private spawnNightBoss() {
+    const def = bossForNight(this.wave);
     const e = this.allocEnemy();
     e.alive = true;
-    e.kind = "slime";
-    const away = this.player.x > ARENA / 2 ? 140 : ARENA - 140;
+    e.kind = "boss";
+    e.bossId = BOSSES.indexOf(def);
+    const away = this.player.x > ARENA / 2 ? 150 : ARENA - 150;
     e.x = away;
-    e.y = this.player.y > ARENA / 2 ? 140 : ARENA - 140;
-    e.r = 64;
-    e.speed = 250;
-    e.maxHp = 1000;
-    e.hp = 1000;
+    e.y = this.player.y > ARENA / 2 ? 150 : ARENA - 150;
+    e.r = def.r;
+    e.speed = def.speed;
+    e.maxHp = def.hp + Math.max(0, this.wave - 5) * 40;
+    e.hp = e.maxHp;
     e.flash = 0;
     e.frame = 0;
     e.contact = 0;
     e.freeze = 0;
     e.stun = 0;
     e.burn = 0;
-    e.dash = 0;
+    e.dash = 0.4;
     e.lunging = 0;
     e.voidIcd = 0;
     e.vineIcd = 0;
@@ -1435,8 +1450,10 @@ export class GameEngine {
     e.knockX = 0;
     e.knockY = 1;
     const ang = Math.random() * Math.PI * 2;
-    e.kvx = Math.cos(ang) * 250;
-    e.kvy = Math.sin(ang) * 250;
+    e.kvx = Math.cos(ang) * def.speed;
+    e.kvy = Math.sin(ang) * def.speed;
+    this.floatAt(this.player.x, this.player.y - 64, def.name, def.color2);
+    this.audio.wave();
   }
 
   private pickEnemyKind(): EnemyKind {
@@ -1477,6 +1494,7 @@ export class GameEngine {
       knockY: 1,
       kvx: 0,
       kvy: 0,
+      bossId: -1,
     };
     this.enemies.push(e);
     return e;
@@ -1496,7 +1514,7 @@ export class GameEngine {
       e.voidIcd = Math.max(0, e.voidIcd - dt);
       e.vineIcd = Math.max(0, e.vineIcd - dt);
       e.wrapped = Math.max(0, e.wrapped - dt);
-      if (this.spell === "vine" && e.kind !== "slime" && e.vineIcd <= 0 && e.wrapped <= 0) {
+      if (this.spell === "vine" && e.kind !== "boss" && e.vineIcd <= 0 && e.wrapped <= 0) {
         const reach = 72 + e.r;
         if (Math.hypot(e.x - px, e.y - py) < reach) this.wrapEnemy(e);
       }
@@ -1527,8 +1545,8 @@ export class GameEngine {
       }
       e.dash = Math.max(0, e.dash - dt);
       e.lunging = Math.max(0, e.lunging - dt);
-      if (e.kind === "slime") {
-        this.updateSlime(e, dt, px, py, i);
+      if (e.kind === "boss") {
+        this.updateBoss(e, dt, px, py, i);
         continue;
       }
       const tx = px - e.x;
@@ -1577,11 +1595,78 @@ export class GameEngine {
     }
   }
 
-  private updateSlime(e: Enemy, dt: number, px: number, py: number, index: number) {
-    const slow = e.freeze > 0 ? 0.72 : 1;
-    e.x += e.kvx * dt * slow;
-    e.y += e.kvy * dt * slow;
+  private updateBoss(e: Enemy, dt: number, px: number, py: number, index: number) {
+    const def: BossDef = BOSSES[e.bossId] ?? BOSSES[0]!;
+    const slow = e.freeze > 0 ? 0.7 : 1;
     const pad = e.r + 8;
+    if (def.move === "bounce") {
+      e.x += e.kvx * dt * slow;
+      e.y += e.kvy * dt * slow;
+    } else if (def.move === "chase") {
+      const dx = px - e.x;
+      const dy = py - e.y;
+      const d = Math.hypot(dx, dy) || 1;
+      e.kvx += (dx / d) * def.speed * 2.4 * dt;
+      e.kvy += (dy / d) * def.speed * 2.4 * dt;
+      const sp = Math.hypot(e.kvx, e.kvy) || 1;
+      const cap = def.speed * slow;
+      if (sp > cap) {
+        e.kvx = (e.kvx / sp) * cap;
+        e.kvy = (e.kvy / sp) * cap;
+      }
+      e.x += e.kvx * dt;
+      e.y += e.kvy * dt;
+    } else if (def.move === "swoop") {
+      const dx = px - e.x;
+      const dy = py - e.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const side = Math.sin(e.frame * 1.7) * 180;
+      e.kvx = (dx / d) * def.speed + (-dy / d) * side * 0.35;
+      e.kvy = (dy / d) * def.speed + (dx / d) * side * 0.35;
+      e.x += e.kvx * dt * slow;
+      e.y += e.kvy * dt * slow;
+    } else if (def.move === "charge") {
+      e.dash -= dt;
+      if (e.dash <= 0) {
+        const dx = px - e.x;
+        const dy = py - e.y;
+        const d = Math.hypot(dx, dy) || 1;
+        e.kvx = (dx / d) * def.speed * 1.6;
+        e.kvy = (dy / d) * def.speed * 1.6;
+        e.dash = 1.35;
+        e.lunging = 0.2;
+      }
+      e.x += e.kvx * dt * slow;
+      e.y += e.kvy * dt * slow;
+    } else if (def.move === "orbit") {
+      const dx = e.x - px;
+      const dy = e.y - py;
+      const d = Math.hypot(dx, dy) || 1;
+      const want = 160;
+      const tx = px + (-dy / d) * want * 1.1 + (dx / d) * (d > want ? -20 : 40);
+      const ty = py + (dx / d) * want * 1.1 + (dy / d) * (d > want ? -20 : 40);
+      e.kvx = tx - e.x;
+      e.kvy = ty - e.y;
+      const sp = Math.hypot(e.kvx, e.kvy) || 1;
+      e.x += (e.kvx / sp) * def.speed * dt * slow;
+      e.y += (e.kvy / sp) * def.speed * dt * slow;
+    } else {
+      e.dash -= dt;
+      if (e.dash <= 0) {
+        const dx = px - e.x;
+        const dy = py - e.y;
+        const d = Math.hypot(dx, dy) || 1;
+        e.kvx = (dx / d) * def.speed * 1.8;
+        e.kvy = (dy / d) * def.speed * 1.8;
+        e.dash = 0.85;
+        e.lunging = 0.22;
+      } else {
+        e.kvx *= Math.exp(-2.2 * dt);
+        e.kvy *= Math.exp(-2.2 * dt);
+      }
+      e.x += e.kvx * dt * slow;
+      e.y += e.kvy * dt * slow;
+    }
     if (e.x < pad) {
       e.x = pad;
       e.kvx = Math.abs(e.kvx);
@@ -1614,26 +1699,29 @@ export class GameEngine {
         e.lunging = 0.16;
       }
     }
-    for (let j = 0; j < this.enemies.length; j++) {
-      if (j === index) continue;
-      const o = this.enemies[j]!;
-      if (!o.alive || o.kind === "slime") continue;
-      if (!circleHit(e.x, e.y, e.r, o.x, o.y, o.r)) continue;
-      o.alive = false;
-      this.burstSparks(o.x, o.y, 16, "#7db86a");
-      this.floatAt(o.x, o.y - 16, "splat", "#8ed48a");
-      this.trauma = Math.min(1, this.trauma + 0.12);
+    if (def.smash) {
+      for (let j = 0; j < this.enemies.length; j++) {
+        if (j === index) continue;
+        const o = this.enemies[j]!;
+        if (!o.alive || o.kind === "boss") continue;
+        if (!circleHit(e.x, e.y, e.r, o.x, o.y, o.r)) continue;
+        o.alive = false;
+        this.burstSparks(o.x, o.y, 14, def.color2);
+        this.floatAt(o.x, o.y - 16, "splat", def.color2);
+        this.trauma = Math.min(1, this.trauma + 0.1);
+      }
     }
     if (this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, PLAYER_R)) {
-      this.player.hp -= 36;
+      this.player.hp -= def.hit;
       this.player.invuln = 0.75;
+      if (def.name === "VAMPIRE") e.hp = Math.min(e.maxHp, e.hp + 48);
       const kd = Math.hypot(px - e.x, py - e.y) || 1;
-      this.player.vx += ((px - e.x) / kd) * 340;
-      this.player.vy += ((py - e.y) / kd) * 340;
-      this.markPlayerKnock((px - e.x) / kd, (py - e.y) / kd, 0.36);
-      this.trauma = Math.min(1, this.trauma + 0.55);
+      this.player.vx += ((px - e.x) / kd) * 320;
+      this.player.vy += ((py - e.y) / kd) * 320;
+      this.markPlayerKnock((px - e.x) / kd, (py - e.y) / kd, 0.34);
+      this.trauma = Math.min(1, this.trauma + 0.5);
       this.audio.hurt();
-      this.burstSparks(px, py, 10, "#7db86a");
+      this.burstSparks(px, py, 10, def.color2);
       this.emit();
     }
   }
@@ -1967,8 +2055,8 @@ export class GameEngine {
   }
 
   private drawEnemy(e: Enemy) {
-    if (e.kind === "slime") {
-      this.drawSlime(e);
+    if (e.kind === "boss") {
+      this.drawBoss(e);
       return;
     }
     const img = this.assets!.wisp[Math.floor(e.frame) % 4]!;
@@ -1988,36 +2076,54 @@ export class GameEngine {
     this.ctx.fillRect(e.x - barW / 2, e.y - s * 0.78, barW * clamp(e.hp / e.maxHp, 0, 1), 3);
   }
 
-  private drawSlime(e: Enemy) {
+  private drawBoss(e: Enemy) {
+    const def = BOSSES[e.bossId] ?? BOSSES[0]!;
     const ctx = this.ctx;
-    const squash = e.lunging > 0 ? e.lunging / 0.16 : 0;
+    const squash = e.lunging > 0 ? e.lunging / 0.2 : 0;
     const spd = Math.hypot(e.kvx, e.kvy) || 1;
-    const alongX = e.kvx / spd;
-    const alongY = e.kvy / spd;
-    const stretch = 1 + squash * 0.45;
-    const thin = 1 - squash * 0.28;
-    const wobble = 1 + Math.sin(e.frame * 2.2) * 0.06;
+    const stretch = 1 + squash * 0.4;
+    const thin = 1 - squash * 0.24;
+    const wobble = 1 + Math.sin(e.frame * 2.2) * 0.05;
     const r = e.r * wobble;
     ctx.save();
     ctx.translate(e.x, e.y);
-    ctx.rotate(Math.atan2(alongY, alongX));
+    ctx.rotate(Math.atan2(e.kvy, e.kvx));
     ctx.scale(stretch, thin);
     if (e.flash > 0) ctx.globalAlpha = 0.85;
+    if (def.move === "swoop") {
+      ctx.fillStyle = def.color2;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.2, -r * 0.7, r * 0.85, r * 0.28, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(-r * 0.2, r * 0.7, r * 0.85, r * 0.28, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
     const body = ctx.createRadialGradient(-r * 0.25, -r * 0.35, r * 0.1, 0, 0, r);
-    body.addColorStop(0, "#d8f5c8");
-    body.addColorStop(0.35, "#7db86a");
-    body.addColorStop(0.75, "#3d7a45");
-    body.addColorStop(1, "#1e3a24");
+    body.addColorStop(0, def.color2);
+    body.addColorStop(0.45, def.color);
+    body.addColorStop(1, "#0c0d0c");
     ctx.fillStyle = body;
     ctx.beginPath();
-    ctx.ellipse(0, 0, r, r * 0.88, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, r, r * (def.move === "hop" ? 0.78 : 0.88), 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "#1e3a24";
+    ctx.strokeStyle = "#0c0d0c";
     ctx.lineWidth = 4;
     ctx.stroke();
-    ctx.fillStyle = "rgba(236,252,220,0.7)";
+    if (def.name === "VAMPIRE") {
+      ctx.fillStyle = def.color2;
+      ctx.beginPath();
+      ctx.moveTo(-8, 8);
+      ctx.lineTo(-3, 18);
+      ctx.lineTo(0, 8);
+      ctx.moveTo(8, 8);
+      ctx.lineTo(3, 18);
+      ctx.lineTo(0, 8);
+      ctx.fill();
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
     ctx.beginPath();
-    ctx.ellipse(-r * 0.28, -r * 0.32, r * 0.22, r * 0.14, -0.4, 0, Math.PI * 2);
+    ctx.ellipse(-r * 0.28, -r * 0.32, r * 0.2, r * 0.12, -0.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#0c0d0c";
     ctx.beginPath();
@@ -2033,8 +2139,13 @@ export class GameEngine {
     const barW = r * 1.6;
     ctx.fillStyle = "rgba(12,13,12,0.6)";
     ctx.fillRect(e.x - barW / 2, e.y - r - 16, barW, 5);
-    ctx.fillStyle = "#8ed48a";
+    ctx.fillStyle = def.color2;
     ctx.fillRect(e.x - barW / 2, e.y - r - 16, barW * clamp(e.hp / e.maxHp, 0, 1), 5);
+    ctx.fillStyle = def.color2;
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(def.name, e.x, e.y - r - 22);
+    void spd;
   }
 
   private drawKnockSprite(
