@@ -24,7 +24,7 @@ export function GameOverlay({ engine, hud }: Props) {
       className="pointer-events-none text-fg"
       style={{ position: "fixed", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
     >
-      {hud.phase === "playing" || hud.phase === "paused" || hud.phase === "book" || hud.phase === "wheel" ? (
+      {hud.phase === "playing" || hud.phase === "paused" ? (
         <Hud engine={engine} hud={hud} />
       ) : null}
 
@@ -247,7 +247,7 @@ function Title({
     menu === "multiplayer" || menu === "join" || menu === "room" ? "Multiplayer" : "Wispwood";
 
   return (
-    <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))]">
+    <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))] pointer-events-auto">
       <div className="pointer-events-none shrink-0 text-center">
         <p className="font-pixel text-pixel-sm text-muted">Max night</p>
         <p className="mt-1 font-display text-2xl tabular-nums sm:text-3xl">{bestNight}</p>
@@ -491,6 +491,7 @@ function PixelButton({
   return (
     <button
       type="button"
+      data-ui
       onClick={onClick}
       className={
         "h-14 w-full rounded-none border-2 px-3 font-pixel text-pixel leading-tight shadow-[4px_4px_0_0_var(--color-bg)] transition-transform duration-150 active:translate-x-px active:translate-y-px " +
@@ -506,7 +507,7 @@ function PixelButton({
 
 function Pause({ engine }: { engine: GameEngine | null }) {
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg/60">
+    <div className="absolute inset-0 grid place-items-center bg-bg/60 pointer-events-auto">
       <div className="pointer-events-auto flex w-[min(92vw,20rem)] flex-col gap-3 rounded-3xl border border-border bg-surface p-6">
         <p className="text-center font-display text-2xl">Paused</p>
         <button
@@ -598,7 +599,7 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
   };
 
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg/75 px-4">
+    <div className="absolute inset-0 grid place-items-center bg-bg/75 px-4 pointer-events-auto">
       <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-4">
         {result === "craft" ? (
           <p className="font-pixel text-pixel-sm text-gold">Bound to the book</p>
@@ -712,8 +713,8 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
               : [`${dmg} damage`, "Yellow stun trail", "1.5s wait"];
 
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg/75 px-3">
-      <div className="pointer-events-auto flex w-full max-w-3xl flex-col items-center gap-4">
+    <div className="absolute inset-0 grid place-items-center bg-bg/80 px-3 pointer-events-auto">
+      <div className="flex w-full max-w-lg flex-col items-center gap-3">
         <div className="relative w-full">
           <img
             src={asset("game/hud-spellbook.png")}
@@ -730,19 +731,19 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
               onBack={() => setTuning(false)}
             />
           ) : (
-            <div className="absolute inset-x-[11%] inset-y-[16%] grid grid-cols-2 gap-[10%]">
-              <div className="flex flex-col items-center justify-center px-2 text-center font-pixel text-bg">
+            <div className="absolute inset-x-[12%] inset-y-[18%] grid grid-cols-2 gap-[8%]">
+              <div className="flex flex-col items-center justify-center px-1 text-center font-pixel text-bg">
                 <p className="text-pixel-sm text-bg/70">
                   {page + 1} / {pages.length}
                 </p>
-                <p className="mt-3 text-pixel">{spellName(spell, hud.crafted)}</p>
-                {hud.spell === spell ? <p className="mt-3 text-pixel-sm">Prepared</p> : null}
+                <p className="mt-2 text-pixel">{spellName(spell, hud.crafted)}</p>
+                {hud.spell === spell ? <p className="mt-2 text-pixel-sm">Prepared</p> : null}
               </div>
               <button
                 type="button"
                 data-ui
                 onClick={onPageClick}
-                className="flex flex-col items-center justify-center gap-2 px-2 text-center font-pixel text-bg"
+                className="flex flex-col items-center justify-center gap-1.5 px-1 text-center font-pixel text-bg"
               >
                 {lines.map((line) => (
                   <span key={line} className="text-pixel-sm leading-relaxed">
@@ -752,27 +753,12 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
               </button>
             </div>
           )}
-
-          <button
-            type="button"
-            data-ui
-            disabled={page <= 0}
-            onClick={() => flip(-1)}
-            className="absolute top-1/2 left-1 -translate-y-1/2 border-2 border-bg bg-surface/80 px-2 py-3 font-pixel text-pixel text-fg disabled:opacity-30"
-          >
-            {"<"}
-          </button>
-          <button
-            type="button"
-            data-ui
-            disabled={page >= pages.length - 1}
-            onClick={() => flip(1)}
-            className="absolute top-1/2 right-1 -translate-y-1/2 border-2 border-bg bg-surface/80 px-2 py-3 font-pixel text-pixel text-fg disabled:opacity-30"
-          >
-            {">"}
-          </button>
         </div>
         <p className="font-pixel text-pixel-sm tabular-nums text-gold">{hud.gold}g</p>
+        <div className="flex w-full max-w-xs gap-2">
+          <PixelButton onClick={() => flip(-1)}>Prev</PixelButton>
+          <PixelButton onClick={() => flip(1)}>Next</PixelButton>
+        </div>
         {spell === "void" && !hud.voidUnlocked ? (
           <div className="w-full max-w-xs">
             <PixelButton primary onClick={() => engine?.unlockVoid()}>
@@ -866,7 +852,7 @@ function UpgradeStat({
 
 function Dead({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg/70">
+    <div className="absolute inset-0 grid place-items-center bg-bg/70 pointer-events-auto">
       <div className="pointer-events-auto w-[min(92vw,22rem)] rounded-3xl border border-border bg-surface p-7 text-center">
         <p className="text-[11px] font-medium tracking-[0.22em] text-muted uppercase">The lantern fades</p>
         <h2 className="mt-2 font-display text-4xl font-medium">Night {hud.wave}</h2>
