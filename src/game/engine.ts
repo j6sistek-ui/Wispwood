@@ -59,7 +59,7 @@ export type HudState = {
 };
 
 type Dir = "down" | "left" | "right" | "up";
-type EnemyKind = "wisp" | "runner" | "brute" | "elite";
+type EnemyKind = "wisp" | "runner" | "brute" | "elite" | "slime";
 
 type Bullet = {
   alive: boolean;
@@ -180,6 +180,7 @@ function clamp(v: number, a: number, b: number) {
 }
 
 function goldFor(kind: EnemyKind) {
+  if (kind === "slime") return 300;
   if (kind === "elite") return 35;
   if (kind === "brute") return 16;
   if (kind === "runner") return 7;
@@ -187,6 +188,7 @@ function goldFor(kind: EnemyKind) {
 }
 
 function coinCountFor(kind: EnemyKind) {
+  if (kind === "slime") return 22;
   if (kind === "elite") return 9;
   if (kind === "brute") return 5;
   if (kind === "runner") return 3;
@@ -705,6 +707,11 @@ export class GameEngine {
     this.waveGap = 0;
     this.audio.wave();
     this.floatAt(this.player.x, this.player.y - 40, `Night ${this.wave}`);
+    if (this.wave % 5 === 0) {
+      this.spawnSlimeBoss();
+      this.toSpawn = 6;
+      this.floatAt(this.player.x, this.player.y - 64, "SLIME");
+    }
     this.emit();
   }
 
@@ -1270,7 +1277,7 @@ export class GameEngine {
     const m = Math.hypot(vx, vy) || 1;
     const nx = vx / m;
     const ny = vy / m;
-    const knock = spell === "void" ? 180 : spell === "boom" ? 280 : 10;
+    const knock = spell === "void" ? 180 : spell === "boom" ? 280 : e.kind === "slime" ? 18 : 10;
     e.kvx = nx * (knock / 0.22);
     e.kvy = ny * (knock / 0.22);
     e.knockX = nx;
@@ -1297,7 +1304,7 @@ export class GameEngine {
 
   private killEnemy(e: Enemy) {
     e.alive = false;
-    const pts = e.kind === "elite" ? 80 : e.kind === "brute" ? 40 : e.kind === "runner" ? 18 : 12;
+    const pts = e.kind === "slime" ? 400 : e.kind === "elite" ? 80 : e.kind === "brute" ? 40 : e.kind === "runner" ? 18 : 12;
     this.score += pts;
     if (this.score > this.best) {
       this.best = this.score;
@@ -1307,7 +1314,7 @@ export class GameEngine {
     this.gold += gold;
     this.floatAt(e.x, e.y - 18, `+${gold}`, "#f0d24a");
     this.spawnCoins(e.x, e.y, coinCountFor(e.kind));
-    this.burstSparks(e.x, e.y, 14, e.kind === "brute" ? "#8aa0b8" : "#6a7a9a");
+    this.burstSparks(e.x, e.y, e.kind === "slime" ? 36 : 14, e.kind === "slime" ? "#7db86a" : e.kind === "brute" ? "#8aa0b8" : "#6a7a9a");
     if (Math.random() < 0.28) this.spawnPickup(e.x, e.y);
     this.emit();
   }
@@ -1402,6 +1409,36 @@ export class GameEngine {
     if (e.kind === "elite") this.floatAt(e.x, e.y - 28, "Nightbound");
   }
 
+  private spawnSlimeBoss() {
+    const e = this.allocEnemy();
+    e.alive = true;
+    e.kind = "slime";
+    const away = this.player.x > ARENA / 2 ? 140 : ARENA - 140;
+    e.x = away;
+    e.y = this.player.y > ARENA / 2 ? 140 : ARENA - 140;
+    e.r = 64;
+    e.speed = 250;
+    e.maxHp = 1000;
+    e.hp = 1000;
+    e.flash = 0;
+    e.frame = 0;
+    e.contact = 0;
+    e.freeze = 0;
+    e.stun = 0;
+    e.burn = 0;
+    e.dash = 0;
+    e.lunging = 0;
+    e.voidIcd = 0;
+    e.vineIcd = 0;
+    e.wrapped = 0;
+    e.knockT = 0;
+    e.knockX = 0;
+    e.knockY = 1;
+    const ang = Math.random() * Math.PI * 2;
+    e.kvx = Math.cos(ang) * 250;
+    e.kvy = Math.sin(ang) * 250;
+  }
+
   private pickEnemyKind(): EnemyKind {
     const w = this.wave;
     const roll = Math.random();
@@ -1459,7 +1496,7 @@ export class GameEngine {
       e.voidIcd = Math.max(0, e.voidIcd - dt);
       e.vineIcd = Math.max(0, e.vineIcd - dt);
       e.wrapped = Math.max(0, e.wrapped - dt);
-      if (this.spell === "vine" && e.vineIcd <= 0 && e.wrapped <= 0) {
+      if (this.spell === "vine" && e.kind !== "slime" && e.vineIcd <= 0 && e.wrapped <= 0) {
         const reach = 72 + e.r;
         if (Math.hypot(e.x - px, e.y - py) < reach) this.wrapEnemy(e);
       }
@@ -1488,10 +1525,14 @@ export class GameEngine {
           sy += dy / d;
         }
       }
-      const tx = px - e.x;
-      const ty = py - e.y;
       e.dash = Math.max(0, e.dash - dt);
       e.lunging = Math.max(0, e.lunging - dt);
+      if (e.kind === "slime") {
+        this.updateSlime(e, dt, px, py, i);
+        continue;
+      }
+      const tx = px - e.x;
+      const ty = py - e.y;
       const td = Math.hypot(tx, ty) || 1;
       if (e.freeze <= 0 && e.stun <= 0 && e.dash <= 0 && (e.kind === "runner" || e.kind === "elite") && td < (e.kind === "elite" ? 250 : 190)) {
         e.lunging = e.kind === "elite" ? 0.38 : 0.28;
@@ -1533,6 +1574,67 @@ export class GameEngine {
         this.audio.hurt();
         this.emit();
       }
+    }
+  }
+
+  private updateSlime(e: Enemy, dt: number, px: number, py: number, index: number) {
+    const slow = e.freeze > 0 ? 0.72 : 1;
+    e.x += e.kvx * dt * slow;
+    e.y += e.kvy * dt * slow;
+    const pad = e.r + 8;
+    if (e.x < pad) {
+      e.x = pad;
+      e.kvx = Math.abs(e.kvx);
+      e.lunging = 0.16;
+    } else if (e.x > ARENA - pad) {
+      e.x = ARENA - pad;
+      e.kvx = -Math.abs(e.kvx);
+      e.lunging = 0.16;
+    }
+    if (e.y < pad) {
+      e.y = pad;
+      e.kvy = Math.abs(e.kvy);
+      e.lunging = 0.16;
+    } else if (e.y > ARENA - pad) {
+      e.y = ARENA - pad;
+      e.kvy = -Math.abs(e.kvy);
+      e.lunging = 0.16;
+    }
+    for (const p of this.props) {
+      if (!circleHit(e.x, e.y, e.r, p.x, p.y, p.r)) continue;
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      e.x = p.x + (dx / d) * (e.r + p.r + 2);
+      e.y = p.y + (dy / d) * (e.r + p.r + 2);
+      const vn = e.kvx * (dx / d) + e.kvy * (dy / d);
+      if (vn < 0) {
+        e.kvx -= 2 * vn * (dx / d);
+        e.kvy -= 2 * vn * (dy / d);
+        e.lunging = 0.16;
+      }
+    }
+    for (let j = 0; j < this.enemies.length; j++) {
+      if (j === index) continue;
+      const o = this.enemies[j]!;
+      if (!o.alive || o.kind === "slime") continue;
+      if (!circleHit(e.x, e.y, e.r, o.x, o.y, o.r)) continue;
+      o.alive = false;
+      this.burstSparks(o.x, o.y, 16, "#7db86a");
+      this.floatAt(o.x, o.y - 16, "splat", "#8ed48a");
+      this.trauma = Math.min(1, this.trauma + 0.12);
+    }
+    if (this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, PLAYER_R)) {
+      this.player.hp -= 36;
+      this.player.invuln = 0.75;
+      const kd = Math.hypot(px - e.x, py - e.y) || 1;
+      this.player.vx += ((px - e.x) / kd) * 340;
+      this.player.vy += ((py - e.y) / kd) * 340;
+      this.markPlayerKnock((px - e.x) / kd, (py - e.y) / kd, 0.36);
+      this.trauma = Math.min(1, this.trauma + 0.55);
+      this.audio.hurt();
+      this.burstSparks(px, py, 10, "#7db86a");
+      this.emit();
     }
   }
 
@@ -1865,6 +1967,10 @@ export class GameEngine {
   }
 
   private drawEnemy(e: Enemy) {
+    if (e.kind === "slime") {
+      this.drawSlime(e);
+      return;
+    }
     const img = this.assets!.wisp[Math.floor(e.frame) % 4]!;
     const s = e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
     if (e.flash > 0) this.ctx.filter = "brightness(2.4)";
@@ -1880,6 +1986,55 @@ export class GameEngine {
     this.ctx.fillRect(e.x - barW / 2, e.y - s * 0.78, barW, 3);
     this.ctx.fillStyle = "#ecece8";
     this.ctx.fillRect(e.x - barW / 2, e.y - s * 0.78, barW * clamp(e.hp / e.maxHp, 0, 1), 3);
+  }
+
+  private drawSlime(e: Enemy) {
+    const ctx = this.ctx;
+    const squash = e.lunging > 0 ? e.lunging / 0.16 : 0;
+    const spd = Math.hypot(e.kvx, e.kvy) || 1;
+    const alongX = e.kvx / spd;
+    const alongY = e.kvy / spd;
+    const stretch = 1 + squash * 0.45;
+    const thin = 1 - squash * 0.28;
+    const wobble = 1 + Math.sin(e.frame * 2.2) * 0.06;
+    const r = e.r * wobble;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.rotate(Math.atan2(alongY, alongX));
+    ctx.scale(stretch, thin);
+    if (e.flash > 0) ctx.globalAlpha = 0.85;
+    const body = ctx.createRadialGradient(-r * 0.25, -r * 0.35, r * 0.1, 0, 0, r);
+    body.addColorStop(0, "#d8f5c8");
+    body.addColorStop(0.35, "#7db86a");
+    body.addColorStop(0.75, "#3d7a45");
+    body.addColorStop(1, "#1e3a24");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, r * 0.88, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#1e3a24";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.fillStyle = "rgba(236,252,220,0.7)";
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.28, -r * 0.32, r * 0.22, r * 0.14, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#0c0d0c";
+    ctx.beginPath();
+    ctx.arc(-r * 0.22, -r * 0.08, 6, 0, Math.PI * 2);
+    ctx.arc(r * 0.18, -r * 0.1, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ecece8";
+    ctx.beginPath();
+    ctx.arc(-r * 0.2, -r * 0.11, 2, 0, Math.PI * 2);
+    ctx.arc(r * 0.2, -r * 0.13, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    const barW = r * 1.6;
+    ctx.fillStyle = "rgba(12,13,12,0.6)";
+    ctx.fillRect(e.x - barW / 2, e.y - r - 16, barW, 5);
+    ctx.fillStyle = "#8ed48a";
+    ctx.fillRect(e.x - barW / 2, e.y - r - 16, barW * clamp(e.hp / e.maxHp, 0, 1), 5);
   }
 
   private drawKnockSprite(

@@ -33,9 +33,7 @@ export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
       className="pointer-events-none text-fg"
       style={{ position: "absolute", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
     >
-      {inRun && (tilt || hud.phase === "book" || hud.phase === "wheel") ? (
-        <NightBar hud={hud} compact={tilt} />
-      ) : null}
+      {inRun && tilt ? <NightBar hud={hud} compact /> : null}
       {hud.phase === "playing" || hud.phase === "paused" ? (
         <Hud engine={engine} hud={hud} tilt={tilt} onTilt={onTilt} />
       ) : null}
@@ -359,19 +357,18 @@ function Title({
           : "absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))] pointer-events-auto"
       }
     >
-      <div className="pointer-events-none shrink-0 text-center">
-        <p className="font-pixel text-pixel-sm text-muted">Max night</p>
-        <p className="mt-1 font-display text-2xl tabular-nums sm:text-3xl">{bestNight}</p>
-      </div>
       <img
         src={titleSrc}
         alt={titleAlt}
         className={
           tilt
-            ? "h-auto w-[min(38vw,14rem)] max-h-[70%] shrink-0 object-contain"
-            : "h-auto w-[min(88vw,20rem)] max-h-[12vh] shrink-0 object-contain"
+            ? "h-auto w-[min(42vw,16rem)] max-h-[64%] shrink-0 object-contain"
+            : "h-auto w-[min(90vw,22rem)] max-h-[22vh] shrink-0 object-contain"
         }
       />
+      <div className="pointer-events-none shrink-0 text-center">
+        <p className="font-pixel text-pixel-sm text-muted">Max night {bestNight}</p>
+      </div>
 
       {menu === "room" && roomCode ? (
           <Lobby
