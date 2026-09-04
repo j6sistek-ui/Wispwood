@@ -851,9 +851,9 @@ export class GameEngine {
       this.spawnShot(this.spell, 0);
       this.audio.fire();
     }
-    this.player.vx -= this.aim.x * (this.spell === "boom" ? 980 : 36);
-    this.player.vy -= this.aim.y * (this.spell === "boom" ? 980 : 36);
-    if (this.spell === "boom") this.markPlayerKnock(-this.aim.x, -this.aim.y, 0.55);
+    this.player.vx -= this.aim.x * (this.spell === "boom" ? 420 : 36);
+    this.player.vy -= this.aim.y * (this.spell === "boom" ? 420 : 36);
+    if (this.spell === "boom") this.markPlayerKnock(-this.aim.x, -this.aim.y, 0.28);
     this.trauma = Math.min(1, this.trauma + (this.spell === "boom" ? 0.42 : 0.08));
   }
 
@@ -1855,7 +1855,7 @@ export class GameEngine {
     const s = 64;
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
-    this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.55);
+    this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
     this.ctx.globalAlpha = 1;
     if (this.spell === "vine") this.drawVineAura(this.player.x, this.player.y);
   }
