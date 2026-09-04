@@ -48,6 +48,7 @@ export type HudState = {
   upgrades: Record<Spell, SpellUpgrades>;
   boltUnlocked: boolean;
   voidUnlocked: boolean;
+  vineUnlocked: boolean;
   crafted: CraftedSpell | null;
 };
 
@@ -239,6 +240,7 @@ export class GameEngine {
   upgrades: Record<Spell, SpellUpgrades> = emptyUpgrades();
   boltUnlocked = false;
   voidUnlocked = false;
+  vineUnlocked = false;
   richRun = false;
   crafted: CraftedSpell | null = null;
   private toSpawn = 0;
@@ -305,6 +307,7 @@ export class GameEngine {
       },
       boltUnlocked: this.boltUnlocked,
       voidUnlocked: this.voidUnlocked,
+      vineUnlocked: this.vineUnlocked,
       crafted: this.crafted ? { ...this.crafted } : null,
     };
   }
@@ -430,6 +433,7 @@ export class GameEngine {
   chooseSpell(spell: Spell) {
     if (spell === "bolt" && !this.boltUnlocked) return;
     if (spell === "void" && !this.voidUnlocked) return;
+    if (spell === "vine" && !this.vineUnlocked) return;
     if (spell === "craft" && !this.crafted) return;
     this.setSpell(spell);
   }
@@ -437,6 +441,7 @@ export class GameEngine {
   setSpell(spell: Spell) {
     if (spell === "bolt" && !this.boltUnlocked) return;
     if (spell === "void" && !this.voidUnlocked) return;
+    if (spell === "vine" && !this.vineUnlocked) return;
     if (spell === "craft" && !this.crafted) return;
     if (this.spell === spell) return;
     this.spell = spell;
@@ -502,9 +507,21 @@ export class GameEngine {
     return true;
   }
 
+  unlockVine(): boolean {
+    if (this.vineUnlocked) return true;
+    if (this.gold < 1777) return false;
+    this.gold -= 1777;
+    this.vineUnlocked = true;
+    this.spell = "vine";
+    this.audio.pickup();
+    this.emit();
+    return true;
+  }
+
   upgradeSpell(spell: Spell, stat: SpellStat): boolean {
     if (spell === "bolt" && !this.boltUnlocked) return false;
     if (spell === "void" && !this.voidUnlocked) return false;
+    if (spell === "vine" && !this.vineUnlocked) return false;
     const cur = this.upgrades[spell][stat];
     if (cur >= MAX_SPELL_UP) return false;
     const cost = upgradeCost(cur);
@@ -568,6 +585,7 @@ export class GameEngine {
     this.upgrades = emptyUpgrades();
     this.boltUnlocked = false;
     this.voidUnlocked = false;
+    this.vineUnlocked = false;
     this.crafted = null;
     this.spell = "ember";
     this.wave = 0;
@@ -712,6 +730,7 @@ export class GameEngine {
   private shoot() {
     if (this.spell === "bolt" && !this.boltUnlocked) return;
     if (this.spell === "void" && !this.voidUnlocked) return;
+    if (this.spell === "vine" && !this.vineUnlocked) return;
     if (this.spell === "craft" && !this.crafted) return;
     const speedUp = this.upgrades[this.spell].speed;
     const baseCd =

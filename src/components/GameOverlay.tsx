@@ -680,6 +680,10 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
       engine?.unlockVoid();
       return;
     }
+    if (spell === "vine" && !hud.vineUnlocked) {
+      engine?.unlockVine();
+      return;
+    }
     const now = performance.now();
     if (now - lastTap.current < 380) {
       lastTap.current = 0;
@@ -702,6 +706,8 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
         ? ["Locked", "300 gold", "This night"]
         : spell === "bolt" && !hud.boltUnlocked
         ? ["Locked", "100 gold", "This night"]
+        : spell === "vine" && !hud.vineUnlocked
+        ? ["Locked", "1777 gold", "This night"]
         : spell === "ember"
           ? [`${dmg} damage`, "Weaves as it flies", "Double-tap to tune"]
           : spell === "frost"
@@ -763,6 +769,13 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
           <div className="w-full max-w-xs">
             <PixelButton primary onClick={() => engine?.unlockVoid()}>
               {hud.gold < 300 ? "Need 300g" : "Buy Void 300g"}
+            </PixelButton>
+          </div>
+        ) : null}
+        {spell === "vine" && !hud.vineUnlocked ? (
+          <div className="w-full max-w-xs">
+            <PixelButton primary onClick={() => engine?.unlockVine()}>
+              {hud.gold < 1777 ? "Need 1777g" : "Buy Vine 1777g"}
             </PixelButton>
           </div>
         ) : null}

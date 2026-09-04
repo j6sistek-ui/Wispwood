@@ -25,6 +25,7 @@ const idleHud: HudState = {
   },
   boltUnlocked: false,
   voidUnlocked: false,
+  vineUnlocked: false,
   crafted: null,
 };
 
