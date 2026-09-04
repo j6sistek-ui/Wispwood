@@ -615,7 +615,9 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
                     {spell.rarity}
                   </span>
                   <span className="mt-1 block text-[8px] leading-relaxed text-muted">
-                    {spell.damage} dmg · {spell.cooldown.toFixed(2)}s
+                    {spell.shots > 1 ? `${spell.shots}-shot ${spell.shape}` : spell.shape}
+                    {" · "}
+                    {spell.damage} dmg
                   </span>
                 </button>
               ))}
@@ -709,7 +711,9 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
       ? [
           `${hud.crafted?.rarity ?? "common"}`,
           `${dmg} damage`,
-          hud.crafted?.shape ?? "single",
+          hud.crafted && hud.crafted.shots > 1
+            ? `${hud.crafted.shots}-shot ${hud.crafted.shape}`
+            : (hud.crafted?.shape ?? "single"),
         ]
       : spell === "void" && !hud.voidUnlocked
         ? ["Locked", "300 gold", "This night"]

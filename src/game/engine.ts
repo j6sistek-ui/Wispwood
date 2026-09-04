@@ -18,6 +18,7 @@ export type CraftedSpell = {
   extra: CraftExtra;
   cooldown: number;
   rarity: SpellRarity;
+  shots: number;
 };
 
 export const MAX_SPELL_UP = 20;
@@ -480,6 +481,7 @@ export class GameEngine {
       extra: spell.extra,
       cooldown: clamp(spell.cooldown, 0.28, 2.2),
       rarity: spell.rarity ?? "common",
+      shots: clamp(Math.round(spell.shots || 1), 1, 10),
     };
     this.upgrades.craft = { speed: 0, damage: 0 };
     this.spell = "craft";
@@ -771,33 +773,36 @@ export class GameEngine {
 
   private shootCraft(craft: CraftedSpell) {
     const form = craft.shape;
+    const n = clamp(Math.round(craft.shots || 1), 1, 10);
     if (form === "nova") {
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
+      const count = n <= 1 ? 8 : n;
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2 + this.animT;
         this.spawnCraftShot(craft, Math.cos(a), Math.sin(a), 0);
       }
       this.audio.wave();
       return;
     }
-    if (form === "shard" || form === "triple") {
-      const n = form === "shard" ? 5 : 3;
-      const spread = form === "shard" ? 0.42 : 0.22;
-      for (let i = 0; i < n; i++) {
-        const t = i / (n - 1) - 0.5;
-        const ang = Math.atan2(this.aim.y, this.aim.x) + t * spread * 2;
-        this.spawnCraftShot(craft, Math.cos(ang), Math.sin(ang), 0);
-      }
-      this.audio.ice();
-      return;
-    }
     if (form === "wave") {
-      for (const side of [-28, -14, 0, 14, 28]) this.spawnCraftShot(craft, this.aim.x, this.aim.y, side);
+      const count = n <= 1 ? 5 : n;
+      const half = (count - 1) / 2;
+      for (let i = 0; i < count; i++) this.spawnCraftShot(craft, this.aim.x, this.aim.y, (i - half) * 12);
       this.audio.ice();
       return;
     }
-    this.spawnCraftShot(craft, this.aim.x, this.aim.y, 0);
-    if (form === "beam") this.audio.bolt();
-    else this.audio.fire();
+    if (n <= 1) {
+      this.spawnCraftShot(craft, this.aim.x, this.aim.y, 0);
+      if (form === "beam") this.audio.bolt();
+      else this.audio.fire();
+      return;
+    }
+    const spread = n >= 8 ? 0.72 : n >= 5 ? 0.48 : 0.26;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1) - 0.5;
+      const ang = Math.atan2(this.aim.y, this.aim.x) + t * spread * 2;
+      this.spawnCraftShot(craft, Math.cos(ang), Math.sin(ang), 0);
+    }
+    this.audio.ice();
   }
 
   private spawnCraftShot(craft: CraftedSpell, dirX: number, dirY: number, side: number) {
