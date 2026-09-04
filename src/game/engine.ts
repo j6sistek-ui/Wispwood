@@ -122,7 +122,7 @@ type Spark = {
   max: number;
   size: number;
   color: string;
-  kind: "dot" | "flake" | "coin";
+  kind: "dot" | "flake" | "coin" | "shard";
 };
 type Floater = { alive: boolean; x: number; y: number; ttl: number; text: string; color: string };
 type Burst = { alive: boolean; x: number; y: number; t: number; spell: Spell };
@@ -874,7 +874,7 @@ export class GameEngine {
     slot.dirX = this.aim.x;
     slot.dirY = this.aim.y;
     slot.t = 0;
-    slot.life = 0.42;
+    slot.life = 0.55;
     const reach = 168;
     const dmg = spellDamage("boom", this.upgrades.boom.damage);
     for (const e of this.enemies) {
@@ -887,23 +887,23 @@ export class GameEngine {
       if (dot < 0.28) continue;
       this.hurtEnemy(e, dmg, this.aim.x, this.aim.y, "boom");
     }
-    const colors = ["#fff4c8", "#f0d24a", "#e08a3c", "#c45a48", "#2a2c28", "#ecece8"];
-    for (let i = 0; i < 36; i++) {
+    const colors = ["#ffffff", "#fff4c8", "#ffe27a", "#f0d24a", "#ff9a3c", "#ff5a2a"];
+    for (let i = 0; i < 72; i++) {
       const s = this.allocSpark();
       if (!s) break;
-      const spread = (Math.random() - 0.5) * 1.15;
+      const spread = (Math.random() - 0.5) * 1.35;
       const ang = Math.atan2(this.aim.y, this.aim.x) + spread;
-      const sp = 80 + Math.random() * 280;
+      const sp = 140 + Math.random() * 420;
       s.alive = true;
-      s.x = ox + (Math.random() - 0.5) * 10;
-      s.y = oy + (Math.random() - 0.5) * 10;
+      s.x = ox + (Math.random() - 0.5) * 8;
+      s.y = oy + (Math.random() - 0.5) * 8;
       s.vx = Math.cos(ang) * sp;
       s.vy = Math.sin(ang) * sp;
-      s.ttl = 0.22 + Math.random() * 0.28;
+      s.ttl = 0.18 + Math.random() * 0.28;
       s.max = s.ttl;
-      s.size = 3 + Math.floor(Math.random() * 6);
+      s.size = 2 + Math.floor(Math.random() * 5);
       s.color = colors[Math.floor(Math.random() * colors.length)]!;
-      s.kind = "dot";
+      s.kind = "shard";
     }
     this.spawnBurst(ox, oy, "boom");
     this.audio.hit();
@@ -1740,7 +1740,7 @@ export class GameEngine {
       if (!s.alive) continue;
       s.x += s.vx * dt;
       s.y += s.vy * dt;
-      s.vy += 40 * dt;
+      if (s.kind !== "shard") s.vy += 40 * dt;
       s.ttl -= dt;
       if (s.ttl <= 0) s.alive = false;
     }
@@ -2145,45 +2145,69 @@ export class GameEngine {
   private drawBlasts() {
     for (const b of this.blasts) {
       if (!b.alive) continue;
-      this.drawBoomBurst(b.x, b.y, 36 + (b.t / b.life) * 120, b.dirX, b.dirY, b.t / b.life);
+      this.drawBoomBurst(b.x, b.y, 48 + (b.t / b.life) * 170, b.dirX, b.dirY, b.t / b.life);
     }
   }
 
   private drawBoomBurst(x: number, y: number, radius: number, dirX = 1, dirY = 0, k = 0.5) {
     const ctx = this.ctx;
     const ang = Math.atan2(dirY, dirX);
+    const fade = 1 - k;
+    const flash = Math.max(0, 1 - k * 3.2);
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(ang);
-    const fade = 1 - k;
-    const palette = ["#fff4c8", "#f0d24a", "#e08a3c", "#c45a48", "#2a1810"];
-    ctx.globalAlpha = 0.55 * fade;
-    ctx.fillStyle = "#fff4c8";
-    ctx.fillRect(-10, -10, 20, 20);
-    ctx.globalAlpha = 0.85 * fade;
-    ctx.fillStyle = "#e08a3c";
-    ctx.fillRect(-6, -6, 12, 12);
-    ctx.fillStyle = "#fffef2";
-    ctx.fillRect(-3, -3, 6, 6);
-    for (let i = 0; i < 18; i++) {
-      const slice = (i / 17 - 0.5) * 1.35;
-      const dist = radius * (0.35 + ((i * 17 + Math.floor(k * 9)) % 7) / 10);
-      const px = Math.cos(slice) * dist;
-      const py = Math.sin(slice) * dist * 0.72;
-      const sz = 4 + ((i * 3) % 6);
-      ctx.globalAlpha = fade * (0.45 + (i % 3) * 0.18);
-      ctx.fillStyle = palette[i % palette.length]!;
-      ctx.fillRect(px - sz / 2, py - sz / 2, sz, sz);
-    }
-    for (let ring = 0; ring < 3; ring++) {
-      const r = radius * (0.4 + ring * 0.22);
-      ctx.globalAlpha = fade * (0.35 - ring * 0.08);
-      ctx.strokeStyle = ring === 0 ? "#fff4c8" : "#c45a48";
-      ctx.lineWidth = 2;
+    ctx.globalAlpha = flash * 0.85;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(0, 0, 10 + flash * 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.7 * fade;
+    const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, radius);
+    glow.addColorStop(0, "rgba(255,255,255,0.95)");
+    glow.addColorStop(0.18, "rgba(255,242,160,0.85)");
+    glow.addColorStop(0.42, "rgba(255,154,60,0.55)");
+    glow.addColorStop(0.72, "rgba(255,70,28,0.22)");
+    glow.addColorStop(1, "rgba(255,70,28,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.95 * fade;
+    ctx.strokeStyle = "#fff4c8";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "#ff9a3c";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.88, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + k * 0.6;
+      const len = radius * (0.55 + (i % 3) * 0.22);
+      ctx.globalAlpha = fade * (0.55 + (i % 2) * 0.3);
+      ctx.strokeStyle = i % 2 === 0 ? "#ffffff" : "#f0d24a";
+      ctx.lineWidth = i % 3 === 0 ? 3 : 1.6;
       ctx.beginPath();
-      ctx.rect(-r * 0.2, -r * 0.55, r * 1.15, r * 1.1);
+      ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
+      ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len);
       ctx.stroke();
     }
+    ctx.fillStyle = "#ffffff";
+    ctx.globalAlpha = fade;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const r = (i % 2 === 0 ? 18 : 8) * (1 + k * 0.4);
+      const px = Math.cos(a) * r;
+      const py = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
     ctx.globalAlpha = 1;
   }
@@ -2289,7 +2313,15 @@ export class GameEngine {
       ctx.globalAlpha = clamp(s.ttl / s.max, 0, 1);
       if (s.kind === "flake") this.drawSnowflake(s.x, s.y, s.size, s.ttl * 8, s.color);
       else if (s.kind === "coin") this.drawCoin(s.x, s.y, s.size, s.color);
-      else {
+      else if (s.kind === "shard") {
+        const ang = Math.atan2(s.vy, s.vx);
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(ang);
+        ctx.fillStyle = s.color;
+        ctx.fillRect(0, -s.size * 0.35, s.size * 3.4, s.size * 0.7);
+        ctx.restore();
+      } else {
         ctx.fillStyle = s.color;
         ctx.fillRect(s.x, s.y, s.size, s.size);
       }
