@@ -4,7 +4,7 @@ import type { HudState } from "@/game/engine";
 import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
-import { generateSpell, wheelChoices } from "@/game/spell-prompt";
+import { wheelChoices } from "@/game/spell-prompt";
 import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -554,10 +554,8 @@ function spellName(spell: Spell, crafted?: CraftedSpell | null) {
 
 function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   const [spinning, setSpinning] = useState(false);
-  const [weaving, setWeaving] = useState(false);
   const [angle, setAngle] = useState(0);
   const [result, setResult] = useState<"idle" | "miss" | "craft" | "poor" | "pick">("idle");
-  const [prompt, setPrompt] = useState("");
   const [made, setMade] = useState("");
   const [picks, setPicks] = useState<CraftedSpell[]>([]);
 
@@ -569,7 +567,7 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
   };
 
   const spin = () => {
-    if (spinning || weaving || result === "craft" || result === "pick") return;
+    if (spinning || result === "craft" || result === "pick") return;
     const rolled = engine?.spinWheel();
     if (!rolled || rolled === "poor") {
       setResult("poor");
@@ -589,12 +587,6 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
       }
       setResult(rolled);
     }, 1400);
-  };
-
-  const weaveSpell = () => {
-    setWeaving(true);
-    takeSpell(generateSpell(prompt));
-    setWeaving(false);
   };
 
   return (
@@ -624,18 +616,6 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
                 </button>
               ))}
             </div>
-            <input
-              value={prompt}
-              maxLength={80}
-              spellCheck={false}
-              autoComplete="off"
-              placeholder="or weave your own"
-              onChange={(e) => setPrompt(e.target.value)}
-              className="h-12 w-full border-2 border-muted bg-surface px-3 text-center font-pixel text-base text-fg outline-none placeholder:text-subtle"
-            />
-            <PixelButton primary onClick={weaveSpell}>
-              {weaving ? "Weaving" : "Weave my own"}
-            </PixelButton>
           </>
         ) : (
           <>
