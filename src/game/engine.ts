@@ -1023,7 +1023,6 @@ export class GameEngine {
       e.stun = 1.25;
       this.floatAt(e.x, e.y - 22, "stun", spell === "craft" ? (this.crafted?.color ?? "#f0d24a") : "#f0d24a");
     }
-    if (spell === "vine") this.wrapEnemy(e);
     const m = Math.hypot(vx, vy) || 1;
     const knock = spell === "void" ? 180 : 10;
     e.x = clamp(e.x + (vx / m) * knock, 40, ARENA - 40);
@@ -1198,8 +1197,8 @@ export class GameEngine {
       e.voidIcd = Math.max(0, e.voidIcd - dt);
       e.vineIcd = Math.max(0, e.vineIcd - dt);
       e.wrapped = Math.max(0, e.wrapped - dt);
-      if (this.spell === "vine" && e.vineIcd <= 0) {
-        const reach = 118 + e.r;
+      if (this.spell === "vine" && e.vineIcd <= 0 && e.wrapped <= 0) {
+        const reach = 72 + e.r;
         if (Math.hypot(e.x - px, e.y - py) < reach) this.wrapEnemy(e);
       }
       if (e.stun <= 0) {
@@ -1829,7 +1828,7 @@ export class GameEngine {
 
   private drawVineAura(x: number, y: number) {
     const ctx = this.ctx;
-    const pulse = 118 + Math.sin(this.animT * 3) * 6;
+    const pulse = 72 + Math.sin(this.animT * 3) * 4;
     ctx.save();
     ctx.strokeStyle = "rgba(111,191,106,0.35)";
     ctx.lineWidth = 2;

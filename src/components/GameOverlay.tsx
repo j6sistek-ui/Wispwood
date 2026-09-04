@@ -708,7 +708,7 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
             : spell === "void"
               ? [`${dmg} damage`, "Orbits you 2s", "2.5s wait"]
               : spell === "vine"
-                ? [`${dmg} damage`, "Wraps foes nearby", "5s no move or hit"]
+                ? [`${dmg} damage`, "Auto-wraps if close", "5s no move or hit"]
               : [`${dmg} damage`, "Yellow stun trail", "1.5s wait"];
 
   return (
