@@ -22,7 +22,7 @@ export class GameAudio {
       this.master.connect(this.ctx.destination);
       this.master.gain.value = this.muted ? 0 : 0.7;
       this.sfx.gain.value = 0.85;
-      this.music.gain.value = this.muted ? 0 : 0.32;
+      this.music.gain.value = this.muted ? 0 : 1.15;
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
   }
@@ -42,7 +42,7 @@ export class GameAudio {
     this.unlock();
     if (!this.ctx || !this.master || !this.music || this.bedOn) return;
     this.bedOn = true;
-    this.music.gain.setTargetAtTime(this.muted ? 0 : 0.32, this.ctx.currentTime, 0.08);
+    this.music.gain.setTargetAtTime(this.muted ? 0 : 1.15, this.ctx.currentTime, 0.08);
 
     const drone = this.ctx.createOscillator();
     drone.type = "sawtooth";
@@ -58,7 +58,7 @@ export class GameAudio {
     lp.frequency.value = 240;
     lp.Q.value = 0.8;
     const dg = this.ctx.createGain();
-    dg.gain.value = 0.16;
+    dg.gain.value = 0.42;
     drone.connect(lp);
     droneB.connect(lp);
     eerie.connect(lp);
@@ -84,7 +84,7 @@ export class GameAudio {
     bp.frequency.value = 720;
     bp.Q.value = 0.6;
     const wg = this.ctx.createGain();
-    wg.gain.value = 0.035;
+    wg.gain.value = 0.09;
     wind.connect(bp);
     bp.connect(wg);
     wg.connect(this.music);
@@ -139,15 +139,15 @@ export class GameAudio {
     const lead = [220, 0, 261.63, 293.66, 349.23, 0, 329.63, 261.63, 293.66, 0, 349.23, 392, 349.23, 329.63, 261.63, 220];
     const b = bass[step] ?? 0;
     const l = lead[step] ?? 0;
-    if (b) this.musicTone(b, 0.22, "square", 0.045, -8, t);
+    if (b) this.musicTone(b, 0.22, "square", 0.13, -8, t);
     if (l) {
-      this.musicTone(l, 0.16, "triangle", 0.038, 12, t);
-      this.musicTone(l * 2, 0.12, "sine", 0.018, 18, t);
+      this.musicTone(l, 0.16, "triangle", 0.11, 12, t);
+      this.musicTone(l * 2, 0.12, "sine", 0.055, 18, t);
     }
-    if (step % 4 === 0) this.musicTone(48, 0.1, "sine", 0.07, -12, t);
-    if (step % 4 === 2) this.musicNoise(0.05, 0.03, t);
-    if (step % 2 === 1) this.musicTone(880 + (step % 8) * 20, 0.04, "square", 0.012, -200, t);
-    if (step === 7 || step === 15) this.musicTone(155.56, 0.28, "sawtooth", 0.03, 40, t);
+    if (step % 4 === 0) this.musicTone(48, 0.1, "sine", 0.18, -12, t);
+    if (step % 4 === 2) this.musicNoise(0.05, 0.08, t);
+    if (step % 2 === 1) this.musicTone(880 + (step % 8) * 20, 0.04, "square", 0.035, -200, t);
+    if (step === 7 || step === 15) this.musicTone(155.56, 0.28, "sawtooth", 0.09, 40, t);
   }
 
   private musicTone(
@@ -303,20 +303,20 @@ export class GameAudio {
     for (let i = 0; i < fanfare.length; i++) {
       const f = fanfare[i]!;
       const t = i * 0.11;
-      this.tone(f, 0.32, "sawtooth", 0.07, 40, t);
-      this.tone(f * 2, 0.26, "triangle", 0.045, 20, t);
-      this.tone(f * 0.5, 0.4, "sine", 0.04, 0, t);
+      this.tone(f, 0.32, "sawtooth", 0.16, 40, t);
+      this.tone(f * 2, 0.26, "triangle", 0.1, 20, t);
+      this.tone(f * 0.5, 0.4, "sine", 0.09, 0, t);
     }
-    this.tone(130.81, 1.8, "sawtooth", 0.055, 8, 0.05);
-    this.tone(164.81, 1.8, "triangle", 0.05, 6, 0.05);
-    this.tone(196, 2.0, "sine", 0.06, 10, 0.12);
-    this.tone(261.63, 1.6, "triangle", 0.05, 12, 0.35);
-    this.tone(329.63, 1.4, "sine", 0.045, 16, 0.55);
-    this.tone(392, 1.5, "sawtooth", 0.05, 20, 0.75);
-    this.tone(523.25, 1.2, "triangle", 0.06, 30, 0.95);
-    this.noise(0.14, 0.09);
-    this.tone(80, 0.18, "square", 0.06, -20, 0.18);
-    this.tone(80, 0.16, "square", 0.07, -20, 0.42);
-    this.tone(80, 0.22, "square", 0.08, -20, 0.88);
+    this.tone(130.81, 1.8, "sawtooth", 0.12, 8, 0.05);
+    this.tone(164.81, 1.8, "triangle", 0.11, 6, 0.05);
+    this.tone(196, 2.0, "sine", 0.13, 10, 0.12);
+    this.tone(261.63, 1.6, "triangle", 0.11, 12, 0.35);
+    this.tone(329.63, 1.4, "sine", 0.1, 16, 0.55);
+    this.tone(392, 1.5, "sawtooth", 0.12, 20, 0.75);
+    this.tone(523.25, 1.2, "triangle", 0.13, 30, 0.95);
+    this.noise(0.14, 0.16);
+    this.tone(80, 0.18, "square", 0.14, -20, 0.18);
+    this.tone(80, 0.16, "square", 0.16, -20, 0.42);
+    this.tone(80, 0.22, "square", 0.18, -20, 0.88);
   }
 }
