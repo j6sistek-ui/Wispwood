@@ -691,6 +691,7 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
 
   const takeJackpot = () => {
     if (!hud.sandbox || spinning) return;
+    engine?.fanfare();
     setSpinning(true);
     setResult("idle");
     setMade("");
@@ -711,6 +712,7 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
       setResult("poor");
       return;
     }
+    if (rolled === "jackpot") engine?.fanfare();
     setSpinning(true);
     setResult("idle");
     setMade("");

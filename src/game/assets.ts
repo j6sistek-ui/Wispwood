@@ -1,11 +1,33 @@
 import { asset } from "./paths";
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
+function placeholder(): HTMLImageElement {
+  const c = document.createElement("canvas");
+  c.width = 8;
+  c.height = 8;
+  const g = c.getContext("2d");
+  if (g) {
+    g.fillStyle = "#1c1e1b";
+    g.fillRect(0, 0, 8, 8);
+  }
+  const img = new Image();
+  img.src = c.toDataURL("image/png");
+  return img;
+}
+
+function loadImage(src: string, ms = 2500): Promise<HTMLImageElement> {
+  return new Promise((resolve) => {
     const img = new Image();
+    let done = false;
+    const finish = (value: HTMLImageElement) => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = window.setTimeout(() => finish(placeholder()), ms);
     img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Failed to load ${src}`));
+    img.onload = () => finish(img);
+    img.onerror = () => finish(placeholder());
     img.src = src;
   });
 }
@@ -35,37 +57,38 @@ const PROP_KEYS = [
 ] as const;
 
 export async function loadAssets(): Promise<GameAssets> {
-  const playerEntries = await Promise.all(
-    DIRS.map(async (dir) => {
-      const frames = await Promise.all(
-        [1, 2, 3, 4].map((i) => loadImage(asset(`game/player/${dir}-${i}.png`))),
-      );
-      return [dir, frames] as const;
-    }),
+  const playerJobs = DIRS.flatMap((dir) =>
+    [1, 2, 3, 4].map((i) => loadImage(asset(`game/player/${dir}-${i}.png`)).then((img) => ({ dir, img }))),
   );
-  const [wisp, projectile, impact, pickup, ground, title, ...propImgs] = await Promise.all([
+  const jobs = await Promise.all([
+    Promise.all(playerJobs),
     Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/wisp/hover-${i}.png`)))),
     Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/projectile/projectile-${i}.png`)))),
     Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/impact/impact-${i}.png`)))),
     Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/pickup/idle-${i}.png`)))),
     loadImage(asset("game/ground.png")),
     loadImage(asset("game/title.jpg")),
-    ...PROP_KEYS.map((k) => loadImage(asset(`game/props/${k}.png`))),
+    Promise.all(PROP_KEYS.map((k) => loadImage(asset(`game/props/${k}.png`)))),
   ]);
-
+  const playerFrames = jobs[0];
+  const player = {
+    down: playerFrames.filter((f) => f.dir === "down").map((f) => f.img),
+    left: playerFrames.filter((f) => f.dir === "left").map((f) => f.img),
+    right: playerFrames.filter((f) => f.dir === "right").map((f) => f.img),
+    up: playerFrames.filter((f) => f.dir === "up").map((f) => f.img),
+  };
   const props: Record<string, HTMLImageElement> = {};
   PROP_KEYS.forEach((k, i) => {
-    props[k] = propImgs[i]!;
+    props[k] = jobs[7][i]!;
   });
-
   return {
-    player: Object.fromEntries(playerEntries) as GameAssets["player"],
-    wisp,
-    projectile,
-    impact,
-    pickup,
+    player,
+    wisp: jobs[1],
+    projectile: jobs[2],
+    impact: jobs[3],
+    pickup: jobs[4],
     props,
-    ground,
-    title,
+    ground: jobs[5],
+    title: jobs[6],
   };
 }

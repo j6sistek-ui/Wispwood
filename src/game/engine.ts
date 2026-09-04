@@ -501,6 +501,11 @@ export class GameEngine {
     return Math.random() < 0.5 ? "craft" : "miss";
   }
 
+  fanfare() {
+    this.audio.unlock();
+    this.audio.jackpot();
+  }
+
   grantJackpot(spell: CraftedSpell): CraftedSpell {
     this.gold += 1000;
     this.crafted = {
@@ -515,7 +520,6 @@ export class GameEngine {
     };
     this.upgrades.craft = { speed: 0, damage: 0 };
     this.spell = "craft";
-    this.audio.jackpot();
     this.emit();
     return this.crafted;
   }

@@ -299,24 +299,37 @@ export class GameAudio {
   }
 
   jackpot() {
+    this.unlock();
+    if (this.ctx?.state === "suspended") void this.ctx.resume();
+    if (!this.ctx || !this.sfx || this.muted) return;
+    if (this.music) {
+      this.music.gain.setTargetAtTime(0.22, this.ctx.currentTime, 0.04);
+      window.setTimeout(() => {
+        if (this.music && this.ctx && this.bedOn) {
+          this.music.gain.setTargetAtTime(1.15, this.ctx.currentTime, 0.12);
+        }
+      }, 2300);
+    }
     const fanfare = [196, 246.94, 293.66, 392, 493.88, 587.33, 784, 987.77];
     for (let i = 0; i < fanfare.length; i++) {
       const f = fanfare[i]!;
       const t = i * 0.11;
-      this.tone(f, 0.32, "sawtooth", 0.16, 40, t);
-      this.tone(f * 2, 0.26, "triangle", 0.1, 20, t);
-      this.tone(f * 0.5, 0.4, "sine", 0.09, 0, t);
+      this.tone(f, 0.36, "sawtooth", 0.22, 40, t);
+      this.tone(f * 2, 0.3, "triangle", 0.14, 20, t);
+      this.tone(f * 0.5, 0.45, "sine", 0.12, 0, t);
+      this.musicTone(f, 0.36, "sawtooth", 0.18, 40, this.ctx.currentTime + t);
+      this.musicTone(f * 2, 0.28, "triangle", 0.1, 20, this.ctx.currentTime + t);
     }
-    this.tone(130.81, 1.8, "sawtooth", 0.12, 8, 0.05);
-    this.tone(164.81, 1.8, "triangle", 0.11, 6, 0.05);
-    this.tone(196, 2.0, "sine", 0.13, 10, 0.12);
-    this.tone(261.63, 1.6, "triangle", 0.11, 12, 0.35);
-    this.tone(329.63, 1.4, "sine", 0.1, 16, 0.55);
-    this.tone(392, 1.5, "sawtooth", 0.12, 20, 0.75);
-    this.tone(523.25, 1.2, "triangle", 0.13, 30, 0.95);
-    this.noise(0.14, 0.16);
-    this.tone(80, 0.18, "square", 0.14, -20, 0.18);
-    this.tone(80, 0.16, "square", 0.16, -20, 0.42);
-    this.tone(80, 0.22, "square", 0.18, -20, 0.88);
+    this.tone(130.81, 1.8, "sawtooth", 0.16, 8, 0.05);
+    this.tone(164.81, 1.8, "triangle", 0.14, 6, 0.05);
+    this.tone(196, 2.0, "sine", 0.16, 10, 0.12);
+    this.tone(261.63, 1.6, "triangle", 0.14, 12, 0.35);
+    this.tone(329.63, 1.4, "sine", 0.13, 16, 0.55);
+    this.tone(392, 1.5, "sawtooth", 0.15, 20, 0.75);
+    this.tone(523.25, 1.2, "triangle", 0.16, 30, 0.95);
+    this.noise(0.16, 0.2);
+    this.tone(80, 0.18, "square", 0.18, -20, 0.18);
+    this.tone(80, 0.16, "square", 0.2, -20, 0.42);
+    this.tone(80, 0.22, "square", 0.22, -20, 0.88);
   }
 }
