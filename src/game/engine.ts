@@ -55,6 +55,7 @@ export type HudState = {
   vineUnlocked: boolean;
   boomUnlocked: boolean;
   crafted: CraftedSpell | null;
+  sandbox: boolean;
 };
 
 type Dir = "down" | "left" | "right" | "up";
@@ -335,6 +336,7 @@ export class GameEngine {
       vineUnlocked: this.vineUnlocked,
       boomUnlocked: this.boomUnlocked,
       crafted: this.crafted ? { ...this.crafted } : null,
+      sandbox: this.richRun,
     };
   }
 

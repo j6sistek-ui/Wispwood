@@ -689,6 +689,21 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
     setPicks([]);
   };
 
+  const takeJackpot = () => {
+    if (!hud.sandbox || spinning) return;
+    setSpinning(true);
+    setResult("idle");
+    setMade("");
+    const extra = 5 + Math.floor(Math.random() * 3);
+    setAngle(360 * extra);
+    window.setTimeout(() => {
+      setSpinning(false);
+      const prize = engine?.grantJackpot(pickLegendary());
+      setMade(prize?.name ?? "Rune");
+      setResult("jackpot");
+    }, 1400);
+  };
+
   const spin = () => {
     if (spinning || result === "craft" || result === "pick" || result === "jackpot") return;
     const rolled = engine?.spinWheel();
@@ -734,6 +749,9 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
             <p className="font-pixel text-base text-gold">{made || "Rune"}</p>
             <p className="font-pixel text-pixel-sm text-gold">+1000g</p>
             <p className="font-pixel text-pixel-sm tabular-nums text-muted">{hud.gold}g</p>
+            {hud.sandbox ? (
+              <PixelButton onClick={() => setResult("idle")}>Once more</PixelButton>
+            ) : null}
           </div>
         ) : result === "craft" ? (
           <p className="font-pixel text-pixel-sm text-gold">Bound {made || "rune"} to the book</p>
@@ -797,6 +815,9 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
             <PixelButton primary onClick={spin}>
               {spinning ? "Spinning" : "Spin"}
             </PixelButton>
+            {hud.sandbox ? (
+              <PixelButton onClick={takeJackpot}>{spinning ? "..." : "Jackpot"}</PixelButton>
+            ) : null}
           </>
         )}
         <PixelButton onClick={() => engine?.closeWheel()}>Back</PixelButton>

@@ -29,6 +29,7 @@ const idleHud: HudState = {
   vineUnlocked: false,
   boomUnlocked: false,
   crafted: null,
+  sandbox: false,
 };
 
 function isChromeTarget(target: EventTarget | null) {
