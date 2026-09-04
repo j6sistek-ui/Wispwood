@@ -386,6 +386,7 @@ export class GameEngine {
     this.running = false;
     cancelAnimationFrame(this.raf);
     this.input.detach();
+    this.audio.stopBed();
   }
 
   resize() {
@@ -416,6 +417,7 @@ export class GameEngine {
     if (rich) this.gold = 99999;
     this.phase = "playing";
     this.beginWave();
+    this.audio.startBed();
     this.emit();
   }
 
@@ -599,6 +601,7 @@ export class GameEngine {
   leaveRun() {
     this.resetRun();
     this.phase = "title";
+    this.audio.stopBed();
     this.emit();
   }
 
