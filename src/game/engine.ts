@@ -740,13 +740,14 @@ export class GameEngine {
 
   private movePlayer(actions: Actions, dt: number) {
     const want = Math.hypot(actions.moveX, actions.moveY);
-    const rate = want > 0.12 ? PLAYER_ACCEL : PLAYER_STOP;
+    const sliding = this.player.knockT > 0.04;
+    const rate = sliding ? 3.2 : want > 0.12 ? PLAYER_ACCEL : PLAYER_STOP;
     const k = 1 - Math.exp(-rate * dt);
-    const tx = actions.moveX * PLAYER_SPEED;
-    const ty = actions.moveY * PLAYER_SPEED;
+    const tx = sliding ? 0 : actions.moveX * PLAYER_SPEED;
+    const ty = sliding ? 0 : actions.moveY * PLAYER_SPEED;
     this.player.vx += (tx - this.player.vx) * k;
     this.player.vy += (ty - this.player.vy) * k;
-    if (Math.hypot(this.player.vx, this.player.vy) < 6 && want < 0.08) {
+    if (!sliding && Math.hypot(this.player.vx, this.player.vy) < 6 && want < 0.08) {
       this.player.vx = 0;
       this.player.vy = 0;
     }
@@ -807,9 +808,9 @@ export class GameEngine {
       this.spawnShot(this.spell, 0);
       this.audio.fire();
     }
-    this.player.vx -= this.aim.x * (this.spell === "boom" ? 420 : 36);
-    this.player.vy -= this.aim.y * (this.spell === "boom" ? 420 : 36);
-    if (this.spell === "boom") this.markPlayerKnock(-this.aim.x, -this.aim.y, 0.42);
+    this.player.vx -= this.aim.x * (this.spell === "boom" ? 980 : 36);
+    this.player.vy -= this.aim.y * (this.spell === "boom" ? 980 : 36);
+    if (this.spell === "boom") this.markPlayerKnock(-this.aim.x, -this.aim.y, 0.55);
     this.trauma = Math.min(1, this.trauma + (this.spell === "boom" ? 0.42 : 0.08));
   }
 
@@ -1811,7 +1812,7 @@ export class GameEngine {
     const s = 64;
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
-    this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.42);
+    this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.55);
     this.ctx.globalAlpha = 1;
     if (this.spell === "vine") this.drawVineAura(this.player.x, this.player.y);
   }
