@@ -2,6 +2,7 @@ import { Input, type Actions } from "./input";
 import { GameAudio } from "./audio";
 import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
+import { pickLegendary } from "./spell-prompt";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
@@ -488,13 +489,33 @@ export class GameEngine {
     this.emit();
   }
 
-  spinWheel(): "poor" | "miss" | "craft" {
+  spinWheel(): "poor" | "miss" | "craft" | "jackpot" {
     if (this.gold < 100) return "poor";
     this.gold -= 100;
-    const won = Math.random() < 0.5;
     this.audio.pickup();
     this.emit();
-    return won ? "craft" : "miss";
+    if (Math.random() < 0.01) return "jackpot";
+    return Math.random() < 0.5 ? "craft" : "miss";
+  }
+
+  grantJackpot(): CraftedSpell {
+    const spell = pickLegendary();
+    this.gold += 1000;
+    this.crafted = {
+      name: spell.name.trim().slice(0, 10) || "Rune",
+      color: spell.color || "#f0d24a",
+      damage: clamp(Math.round(spell.damage), 4, 60),
+      shape: spell.shape,
+      extra: spell.extra,
+      cooldown: clamp(spell.cooldown, 0.28, 2.2),
+      rarity: "legendary",
+      shots: clamp(Math.round(spell.shots || 1), 1, 10),
+    };
+    this.upgrades.craft = { speed: 0, damage: 0 };
+    this.spell = "craft";
+    this.audio.jackpot();
+    this.emit();
+    return this.crafted;
   }
 
   saveCrafted(spell: CraftedSpell) {

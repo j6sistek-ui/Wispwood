@@ -676,7 +676,7 @@ function spellName(spell: Spell, crafted?: CraftedSpell | null) {
 function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   const [spinning, setSpinning] = useState(false);
   const [angle, setAngle] = useState(0);
-  const [result, setResult] = useState<"idle" | "miss" | "craft" | "poor" | "pick">("idle");
+  const [result, setResult] = useState<"idle" | "miss" | "craft" | "poor" | "pick" | "jackpot">("idle");
   const [made, setMade] = useState("");
   const [picks, setPicks] = useState<CraftedSpell[]>([]);
 
@@ -688,7 +688,7 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
   };
 
   const spin = () => {
-    if (spinning || result === "craft" || result === "pick") return;
+    if (spinning || result === "craft" || result === "pick" || result === "jackpot") return;
     const rolled = engine?.spinWheel();
     if (!rolled || rolled === "poor") {
       setResult("poor");
@@ -698,9 +698,21 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
     setResult("idle");
     setMade("");
     const extra = 5 + Math.floor(Math.random() * 3);
-    setAngle(rolled === "craft" ? 360 * extra + 45 : 360 * extra + 225);
+    setAngle(
+      rolled === "jackpot"
+        ? 360 * extra
+        : rolled === "craft"
+          ? 360 * extra + 45
+          : 360 * extra + 225,
+    );
     window.setTimeout(() => {
       setSpinning(false);
+      if (rolled === "jackpot") {
+        const prize = engine?.grantJackpot();
+        setMade(prize?.name ?? "Rune");
+        setResult("jackpot");
+        return;
+      }
       if (rolled === "craft") {
         setPicks(wheelChoices(8));
         setResult("pick");
@@ -713,7 +725,15 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
   return (
     <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-bg/75 px-4 py-6 pointer-events-auto">
       <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-3">
-        {result === "craft" ? (
+        {result === "jackpot" ? (
+          <div className="flex w-full flex-col items-center gap-3 border-4 border-gold bg-surface px-4 py-5 text-center">
+            <p className="font-pixel text-pixel text-gold">JACKPOT</p>
+            <p className="font-pixel text-pixel-sm leading-relaxed text-fg">Legendary bound</p>
+            <p className="font-pixel text-base text-gold">{made || "Rune"}</p>
+            <p className="font-pixel text-pixel-sm text-gold">+1000g</p>
+            <p className="font-pixel text-pixel-sm tabular-nums text-muted">{hud.gold}g</p>
+          </div>
+        ) : result === "craft" ? (
           <p className="font-pixel text-pixel-sm text-gold">Bound {made || "rune"} to the book</p>
         ) : result === "pick" ? (
           <>

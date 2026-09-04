@@ -35,9 +35,10 @@ export class GameAudio {
     type: OscillatorType,
     gain = 0.12,
     slide = 0,
+    delay = 0,
   ) {
     if (!this.ctx || !this.sfx || this.muted) return;
-    const t = this.ctx.currentTime;
+    const t = this.ctx.currentTime + delay;
     const osc = this.ctx.createOscillator();
     const g = this.ctx.createGain();
     osc.type = type;
@@ -120,5 +121,27 @@ export class GameAudio {
   wave() {
     this.tone(392, 0.16, "sine", 0.06, 80);
     this.tone(523, 0.22, "sine", 0.04, 40);
+  }
+
+  jackpot() {
+    const fanfare = [196, 246.94, 293.66, 392, 493.88, 587.33, 784, 987.77];
+    for (let i = 0; i < fanfare.length; i++) {
+      const f = fanfare[i]!;
+      const t = i * 0.11;
+      this.tone(f, 0.32, "sawtooth", 0.07, 40, t);
+      this.tone(f * 2, 0.26, "triangle", 0.045, 20, t);
+      this.tone(f * 0.5, 0.4, "sine", 0.04, 0, t);
+    }
+    this.tone(130.81, 1.8, "sawtooth", 0.055, 8, 0.05);
+    this.tone(164.81, 1.8, "triangle", 0.05, 6, 0.05);
+    this.tone(196, 2.0, "sine", 0.06, 10, 0.12);
+    this.tone(261.63, 1.6, "triangle", 0.05, 12, 0.35);
+    this.tone(329.63, 1.4, "sine", 0.045, 16, 0.55);
+    this.tone(392, 1.5, "sawtooth", 0.05, 20, 0.75);
+    this.tone(523.25, 1.2, "triangle", 0.06, 30, 0.95);
+    this.noise(0.14, 0.09);
+    this.tone(80, 0.18, "square", 0.06, -20, 0.18);
+    this.tone(80, 0.16, "square", 0.07, -20, 0.42);
+    this.tone(80, 0.22, "square", 0.08, -20, 0.88);
   }
 }

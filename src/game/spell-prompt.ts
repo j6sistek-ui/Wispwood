@@ -105,6 +105,11 @@ export function generateSpell(prompt = ""): CraftedSpell {
   return remix(pick);
 }
 
+export function pickLegendary(): CraftedSpell {
+  const pool = CATALOG.filter((s) => s.rarity === "legendary");
+  return { ...(pool[Math.floor(Math.random() * pool.length)] ?? CATALOG[CATALOG.length - 1]!) };
+}
+
 export function wheelChoices(count = 8): CraftedSpell[] {
   const used = new Set<string>();
   const out: CraftedSpell[] = [];
