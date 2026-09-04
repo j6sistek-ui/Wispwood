@@ -877,7 +877,7 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
               : spell === "vine"
                 ? [`${dmg} damage`, "Auto-wraps if close", "Homing per wrap"]
               : spell === "boom"
-                ? [`${dmg} damage`, "Pixel blast knockback", "0.20s wait"]
+                ? [`${dmg} damage`, "Pixel blast knockback", "0.50s wait"]
               : [`${dmg} damage`, "Yellow stun trail", "1.5s wait"];
 
   return (
