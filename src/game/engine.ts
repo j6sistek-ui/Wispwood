@@ -4,7 +4,7 @@ import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
-export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "craft";
+export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
 export type SpellStat = "speed" | "damage";
 export type SpellUpgrades = { speed: number; damage: number };
 export type CraftShape = "single" | "triple" | "weave" | "orb" | "beam" | "nova" | "wave" | "meteor" | "shard" | "homing";
@@ -32,6 +32,7 @@ export function spellDamage(spell: Spell, damageUp: number, crafted?: CraftedSpe
   if (spell === "bolt") return 35 + damageUp * 3;
   if (spell === "void") return 15 + damageUp * 2;
   if (spell === "vine") return 12 + damageUp * 2;
+  if (spell === "boom") return 100 + damageUp * 4;
   if (spell === "craft") return (crafted?.damage ?? 10) + 5 + damageUp * 2;
   return 19 + damageUp * 2;
 }
@@ -118,6 +119,15 @@ type Spark = {
 };
 type Floater = { alive: boolean; x: number; y: number; ttl: number; text: string; color: string };
 type Burst = { alive: boolean; x: number; y: number; t: number; spell: Spell };
+type Blast = {
+  alive: boolean;
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+  t: number;
+  life: number;
+};
 type Arc = { alive: boolean; x: number; y: number; r: number; ttl: number; max: number };
 type Prop = { kind: string; x: number; y: number; r: number; drawW: number; drawH: number };
 
@@ -132,11 +142,12 @@ const BULLET_SPEED = 560;
 const FIRE_CD = 0.5;
 const BOLT_CD = 1.5;
 const VOID_CD = 2.5;
+const BOOM_CD = 0.2;
 const BOLT_SPEED = 1280;
 const MAX_BULLETS = 80;
 const MAX_ENEMIES = 48;
 const MAX_PICKUPS = 16;
-const MAX_SPARKS = 180;
+const MAX_SPARKS = 320;
 const MAX_ARCS = 80;
 
 const PROP_LAYOUT: Array<Omit<Prop, "drawW" | "drawH">> = [
@@ -205,6 +216,7 @@ function emptyUpgrades(): Record<Spell, SpellUpgrades> {
     bolt: { speed: 0, damage: 0 },
     void: { speed: 0, damage: 0 },
     vine: { speed: 0, damage: 0 },
+    boom: { speed: 0, damage: 0 },
     craft: { speed: 0, damage: 0 },
   };
 }
@@ -259,6 +271,7 @@ export class GameEngine {
   private sparks: Spark[] = [];
   private floaters: Floater[] = [];
   private bursts: Burst[] = [];
+  private blasts: Blast[] = [];
   private arcs: Arc[] = [];
   private props: Prop[] = [];
   private view = { w: 800, h: 600 };
@@ -307,6 +320,7 @@ export class GameEngine {
         bolt: { ...this.upgrades.bolt },
         void: { ...this.upgrades.void },
         vine: { ...this.upgrades.vine },
+        boom: { ...this.upgrades.boom },
         craft: { ...this.upgrades.craft },
       },
       boltUnlocked: this.boltUnlocked,
@@ -619,6 +633,8 @@ export class GameEngine {
     this.sparks = [];
     this.floaters = [];
     this.bursts = [];
+    this.blasts = [];
+    this.arcs = [];
     this.arcs = [];
     this.cam.x = this.player.x - this.view.w / 2;
     this.cam.y = this.player.y - this.view.h / 2;
@@ -692,6 +708,7 @@ export class GameEngine {
     if (this.input.has("Digit3") || this.input.has("Numpad3")) this.chooseSpell("bolt");
     if (this.input.has("Digit4") || this.input.has("Numpad4")) this.chooseSpell("void");
     if (this.input.has("Digit5") || this.input.has("Numpad5")) this.chooseSpell("vine");
+    if (this.input.has("Digit6") || this.input.has("Numpad6")) this.chooseSpell("boom");
   }
 
   private aimFrom(actions: Actions) {
@@ -756,10 +773,14 @@ export class GameEngine {
           ? BOLT_CD
           : this.spell === "void"
             ? VOID_CD
+            : this.spell === "boom"
+              ? BOOM_CD
             : FIRE_CD;
     this.fireCd = baseCd * (1 - speedUp * 0.025);
     if (this.spell === "void") {
       this.spawnVoid();
+    } else if (this.spell === "boom") {
+      this.shootBoom();
     } else if (this.spell === "craft" && this.crafted) {
       this.shootCraft(this.crafted);
     } else if (this.spell === "frost") {
@@ -777,9 +798,62 @@ export class GameEngine {
       this.spawnShot(this.spell, 0);
       this.audio.fire();
     }
-    this.player.vx -= this.aim.x * 36;
-    this.player.vy -= this.aim.y * 36;
-    this.trauma = Math.min(1, this.trauma + 0.08);
+    this.player.vx -= this.aim.x * (this.spell === "boom" ? 420 : 36);
+    this.player.vy -= this.aim.y * (this.spell === "boom" ? 420 : 36);
+    this.trauma = Math.min(1, this.trauma + (this.spell === "boom" ? 0.42 : 0.08));
+  }
+
+  private shootBoom() {
+    const ox = this.player.x + this.aim.x * 38;
+    const oy = this.player.y + this.aim.y * 38;
+    const blast = this.blasts.find((b) => !b.alive);
+    const slot =
+      blast ??
+      (() => {
+        const n: Blast = { alive: false, x: 0, y: 0, dirX: 1, dirY: 0, t: 0, life: 0.42 };
+        this.blasts.push(n);
+        return n;
+      })();
+    slot.alive = true;
+    slot.x = ox;
+    slot.y = oy;
+    slot.dirX = this.aim.x;
+    slot.dirY = this.aim.y;
+    slot.t = 0;
+    slot.life = 0.42;
+    const reach = 168;
+    const dmg = spellDamage("boom", this.upgrades.boom.damage);
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const dx = e.x - this.player.x;
+      const dy = e.y - this.player.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      if (dist > reach + e.r) continue;
+      const dot = (dx * this.aim.x + dy * this.aim.y) / dist;
+      if (dot < 0.28) continue;
+      this.hurtEnemy(e, dmg, this.aim.x, this.aim.y, "boom");
+    }
+    const colors = ["#fff4c8", "#f0d24a", "#e08a3c", "#c45a48", "#2a2c28", "#ecece8"];
+    for (let i = 0; i < 36; i++) {
+      const s = this.allocSpark();
+      if (!s) break;
+      const spread = (Math.random() - 0.5) * 1.15;
+      const ang = Math.atan2(this.aim.y, this.aim.x) + spread;
+      const sp = 80 + Math.random() * 280;
+      s.alive = true;
+      s.x = ox + (Math.random() - 0.5) * 10;
+      s.y = oy + (Math.random() - 0.5) * 10;
+      s.vx = Math.cos(ang) * sp;
+      s.vy = Math.sin(ang) * sp;
+      s.ttl = 0.22 + Math.random() * 0.28;
+      s.max = s.ttl;
+      s.size = 3 + Math.floor(Math.random() * 6);
+      s.color = colors[Math.floor(Math.random() * colors.length)]!;
+      s.kind = "dot";
+    }
+    this.spawnBurst(ox, oy, "boom");
+    this.audio.hit();
+    this.audio.fire();
   }
 
   private shootCraft(craft: CraftedSpell) {
@@ -1136,7 +1210,7 @@ export class GameEngine {
       this.floatAt(e.x, e.y - 22, "stun", spell === "craft" ? (this.crafted?.color ?? "#f0d24a") : "#f0d24a");
     }
     const m = Math.hypot(vx, vy) || 1;
-    const knock = spell === "void" ? 180 : 10;
+    const knock = spell === "void" ? 180 : spell === "boom" ? 280 : 10;
     e.x = clamp(e.x + (vx / m) * knock, 40, ARENA - 40);
     e.y = clamp(e.y + (vy / m) * knock, 40, ARENA - 40);
     if (spell === "void") e.stun = Math.max(e.stun, 0.35);
@@ -1570,6 +1644,13 @@ export class GameEngine {
       b.t += dt;
       if (b.t > 0.28) b.alive = false;
     }
+    for (const b of this.blasts) {
+      if (!b.alive) continue;
+      b.t += dt;
+      b.x += b.dirX * 90 * dt;
+      b.y += b.dirY * 90 * dt;
+      if (b.t >= b.life) b.alive = false;
+    }
     for (const a of this.arcs) {
       if (!a.alive) continue;
       a.ttl -= dt;
@@ -1622,6 +1703,7 @@ export class GameEngine {
       drawables.sort((a, b) => a.y - b.y);
       for (const d of drawables) d.draw();
       this.drawBullets();
+      this.drawBlasts();
       this.drawFx();
       if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel") this.drawLight();
     }
@@ -1721,8 +1803,8 @@ export class GameEngine {
         continue;
       }
       const img = this.assets!.projectile[Math.floor(this.animT * 12) % 4]!;
-      const pw = b.spell === "ember" ? 92 : 32;
-      const ph = b.spell === "ember" ? 58 : 20;
+      const pw = 32;
+      const ph = 20;
       ctx.save();
       ctx.translate(b.x, b.y);
       ctx.rotate(ang);
@@ -1896,6 +1978,52 @@ export class GameEngine {
     ctx.restore();
   }
 
+  private drawBlasts() {
+    for (const b of this.blasts) {
+      if (!b.alive) continue;
+      this.drawBoomBurst(b.x, b.y, 36 + (b.t / b.life) * 120, b.dirX, b.dirY, b.t / b.life);
+    }
+  }
+
+  private drawBoomBurst(x: number, y: number, radius: number, dirX = 1, dirY = 0, k = 0.5) {
+    const ctx = this.ctx;
+    const ang = Math.atan2(dirY, dirX);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    const fade = 1 - k;
+    const palette = ["#fff4c8", "#f0d24a", "#e08a3c", "#c45a48", "#2a1810"];
+    ctx.globalAlpha = 0.55 * fade;
+    ctx.fillStyle = "#fff4c8";
+    ctx.fillRect(-10, -10, 20, 20);
+    ctx.globalAlpha = 0.85 * fade;
+    ctx.fillStyle = "#e08a3c";
+    ctx.fillRect(-6, -6, 12, 12);
+    ctx.fillStyle = "#fffef2";
+    ctx.fillRect(-3, -3, 6, 6);
+    for (let i = 0; i < 18; i++) {
+      const slice = (i / 17 - 0.5) * 1.35;
+      const dist = radius * (0.35 + ((i * 17 + Math.floor(k * 9)) % 7) / 10);
+      const px = Math.cos(slice) * dist;
+      const py = Math.sin(slice) * dist * 0.72;
+      const sz = 4 + ((i * 3) % 6);
+      ctx.globalAlpha = fade * (0.45 + (i % 3) * 0.18);
+      ctx.fillStyle = palette[i % palette.length]!;
+      ctx.fillRect(px - sz / 2, py - sz / 2, sz, sz);
+    }
+    for (let ring = 0; ring < 3; ring++) {
+      const r = radius * (0.4 + ring * 0.22);
+      ctx.globalAlpha = fade * (0.35 - ring * 0.08);
+      ctx.strokeStyle = ring === 0 ? "#fff4c8" : "#c45a48";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.rect(-r * 0.2, -r * 0.55, r * 1.15, r * 1.1);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
   private drawVineBolt(x: number, y: number, ang: number) {
     const ctx = this.ctx;
     ctx.save();
@@ -2008,6 +2136,7 @@ export class GameEngine {
       ctx.globalAlpha = 1 - b.t / 0.28;
       if (b.spell === "frost") this.drawIceBurst(b.x, b.y, 20 + b.t * 70);
       else if (b.spell === "bolt") this.drawBoltBurst(b.x, b.y, 18 + b.t * 90);
+      else if (b.spell === "boom") this.drawBoomBurst(b.x, b.y, 28 + b.t * 140);
       else {
         const img = this.assets!.impact[Math.min(3, Math.floor(b.t * 14))]!;
         const s = 36 + b.t * 40;

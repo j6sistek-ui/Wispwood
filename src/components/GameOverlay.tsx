@@ -94,6 +94,8 @@ function Hud({
           ? "Void"
           : hud.spell === "vine"
             ? "Vine"
+            : hud.spell === "boom"
+              ? "Boom"
             : hud.spell === "craft"
               ? (hud.crafted?.name ?? "Rune")
               : "Ember";
@@ -666,6 +668,7 @@ function spellName(spell: Spell, crafted?: CraftedSpell | null) {
   if (spell === "bolt") return "Bolt";
   if (spell === "void") return "Void";
   if (spell === "vine") return "Vine";
+  if (spell === "boom") return "Explosion";
   if (spell === "craft") return crafted?.name || "Rune";
   return "Ember";
 }
@@ -782,8 +785,8 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
 
 function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   const pages: Spell[] = hud.crafted
-    ? ["ember", "frost", "bolt", "void", "vine", "craft"]
-    : ["ember", "frost", "bolt", "void", "vine"];
+    ? ["ember", "frost", "bolt", "void", "vine", "boom", "craft"]
+    : ["ember", "frost", "bolt", "void", "vine", "boom"];
   const [page, setPage] = useState(() => {
     const i = pages.indexOf(hud.spell);
     return i < 0 ? 0 : i;
@@ -847,6 +850,8 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
               ? [`${dmg} damage`, "Orbits you 2s", "2.5s wait"]
               : spell === "vine"
                 ? [`${dmg} damage`, "Auto-wraps if close", "Homing per wrap"]
+              : spell === "boom"
+                ? [`${dmg} damage`, "Pixel blast knockback", "0.20s wait"]
               : [`${dmg} damage`, "Yellow stun trail", "1.5s wait"];
 
   return (
