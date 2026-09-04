@@ -4,7 +4,7 @@ import type { HudState } from "@/game/engine";
 import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
-import { generateSpell } from "@/game/spell-prompt";
+import { generateSpell, wheelChoices } from "@/game/spell-prompt";
 import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -556,12 +556,20 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
   const [spinning, setSpinning] = useState(false);
   const [weaving, setWeaving] = useState(false);
   const [angle, setAngle] = useState(0);
-  const [result, setResult] = useState<"idle" | "miss" | "craft" | "poor">("idle");
+  const [result, setResult] = useState<"idle" | "miss" | "craft" | "poor" | "pick">("idle");
   const [prompt, setPrompt] = useState("");
   const [made, setMade] = useState("");
+  const [picks, setPicks] = useState<CraftedSpell[]>([]);
+
+  const takeSpell = (spell: CraftedSpell) => {
+    engine?.saveCrafted(spell);
+    setMade(spell.name);
+    setResult("craft");
+    setPicks([]);
+  };
 
   const spin = () => {
-    if (spinning || weaving || result === "craft") return;
+    if (spinning || weaving || result === "craft" || result === "pick") return;
     const rolled = engine?.spinWheel();
     if (!rolled || rolled === "poor") {
       setResult("poor");
@@ -575,34 +583,60 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
     window.setTimeout(() => {
       setSpinning(false);
       if (rolled === "craft") {
-        void weaveSpell();
+        setPicks(wheelChoices(8));
+        setResult("pick");
         return;
       }
       setResult(rolled);
     }, 1400);
   };
 
-  const weaveSpell = async () => {
+  const weaveSpell = () => {
     setWeaving(true);
-    setResult("craft");
-    try {
-      const spell = generateSpell(prompt);
-      engine?.saveCrafted(spell);
-      setMade(spell.name);
-    } catch {
-      const spell = generateSpell(prompt);
-      engine?.saveCrafted(spell);
-      setMade(spell.name);
-    } finally {
-      setWeaving(false);
-    }
+    takeSpell(generateSpell(prompt));
+    setWeaving(false);
   };
 
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg/75 px-4 pointer-events-auto">
-      <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-4">
+    <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-bg/75 px-4 py-6 pointer-events-auto">
+      <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-3">
         {result === "craft" ? (
-          <p className="font-pixel text-pixel-sm text-gold">Bound to the book</p>
+          <p className="font-pixel text-pixel-sm text-gold">Bound {made || "rune"} to the book</p>
+        ) : result === "pick" ? (
+          <>
+            <p className="font-pixel text-pixel text-fg">Choose a spell</p>
+            <p className="font-pixel text-pixel-sm text-muted">Eight from the wheel</p>
+            <div className="grid w-full grid-cols-2 gap-2">
+              {picks.map((spell) => (
+                <button
+                  key={spell.name + spell.shape + spell.extra}
+                  type="button"
+                  data-ui
+                  onClick={() => takeSpell(spell)}
+                  className="border-2 border-muted bg-surface px-2 py-3 text-center font-pixel text-pixel-sm text-fg"
+                >
+                  <span className="block" style={{ color: spell.color }}>
+                    {spell.name}
+                  </span>
+                  <span className="mt-1 block text-[8px] leading-relaxed text-muted">
+                    {spell.shape} · {spell.extra === "none" ? "plain" : spell.extra}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <input
+              value={prompt}
+              maxLength={80}
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="or weave your own"
+              onChange={(e) => setPrompt(e.target.value)}
+              className="h-12 w-full border-2 border-muted bg-surface px-3 text-center font-pixel text-base text-fg outline-none placeholder:text-subtle"
+            />
+            <PixelButton primary onClick={weaveSpell}>
+              {weaving ? "Weaving" : "Weave my own"}
+            </PixelButton>
+          </>
         ) : (
           <>
             <p className="font-pixel text-pixel text-fg">Fortune wheel</p>
@@ -631,15 +665,6 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
               <p className="font-pixel text-pixel-sm text-gold">Need 100g</p>
             ) : null}
             <p className="font-pixel text-pixel-sm tabular-nums text-gold">{hud.gold}g</p>
-            <input
-              value={prompt}
-              maxLength={80}
-              spellCheck={false}
-              autoComplete="off"
-              placeholder="hint: ice meteor"
-              onChange={(e) => setPrompt(e.target.value)}
-              className="h-12 w-full border-2 border-muted bg-surface px-3 text-center font-pixel text-base text-fg outline-none placeholder:text-subtle"
-            />
             <PixelButton primary onClick={spin}>
               {spinning ? "Spinning" : "Spin"}
             </PixelButton>
