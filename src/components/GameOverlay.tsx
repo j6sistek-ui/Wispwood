@@ -5,6 +5,7 @@ import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
 import { rarityTint, wheelChoices, pickLegendary } from "@/game/spell-prompt";
+import { BOSSES } from "@/game/bosses";
 import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -18,6 +19,7 @@ type Props = {
 
 export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
   const [coarse, setCoarse] = useState(false);
+  const [spawnOpen, setSpawnOpen] = useState(false);
   useEffect(() => {
     setCoarse(window.matchMedia("(pointer: coarse)").matches);
   }, []);
@@ -35,7 +37,7 @@ export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
     >
       {inRun && tilt ? <NightBar hud={hud} compact /> : null}
       {hud.phase === "playing" || hud.phase === "paused" ? (
-        <Hud engine={engine} hud={hud} tilt={tilt} onTilt={onTilt} />
+        <Hud engine={engine} hud={hud} tilt={tilt} onTilt={onTilt} onSpawn={() => setSpawnOpen(true)} />
       ) : null}
 
       {hud.phase === "boot" || hud.loading ? <Boot /> : null}
@@ -46,6 +48,9 @@ export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
       {hud.phase === "wheel" ? <FortuneWheel engine={engine} hud={hud} /> : null}
       {hud.phase === "dead" ? <Dead engine={engine} hud={hud} /> : null}
+      {spawnOpen && hud.sandbox && (hud.phase === "playing" || hud.phase === "paused") ? (
+        <SpawnMenu engine={engine} onClose={() => setSpawnOpen(false)} />
+      ) : null}
 
       {showSticks ? <TouchSticks engine={engine} compact={tilt} /> : null}
     </div>
@@ -78,11 +83,13 @@ function Hud({
   hud,
   tilt,
   onTilt,
+  onSpawn,
 }: {
   engine: GameEngine | null;
   hud: HudState;
   tilt: boolean;
   onTilt?: (on: boolean) => void;
+  onSpawn?: () => void;
 }) {
   const pct = Math.max(0, hud.hp / hud.maxHp);
   const spellLabel =
@@ -134,6 +141,16 @@ function Hud({
           >
             Wheel
           </button>
+          {hud.sandbox ? (
+            <button
+              type="button"
+              data-ui
+              onClick={() => onSpawn?.()}
+              className="h-9 border-2 border-accent bg-bg px-2 font-pixel text-[8px] text-fg"
+            >
+              Spawn
+            </button>
+          ) : null}
           <button
             type="button"
             data-ui
@@ -200,6 +217,16 @@ function Hud({
           Wheel
           <span className="text-gold">100g</span>
         </button>
+        {hud.sandbox ? (
+          <button
+            type="button"
+            data-ui
+            onClick={() => onSpawn?.()}
+            className="flex h-11 items-center justify-center border-2 border-accent bg-bg px-3 font-pixel text-[10px] text-fg"
+          >
+            Spawn
+          </button>
+        ) : null}
         <button
           type="button"
           data-ui
@@ -594,6 +621,55 @@ function Lobby({
         </p>
       )}
       <PixelButton onClick={onLeave}>Leave</PixelButton>
+    </div>
+  );
+}
+
+function SpawnMenu({ engine, onClose }: { engine: GameEngine | null; onClose: () => void }) {
+  const foes = [
+    { kind: "wisp" as const, label: "Wisp" },
+    { kind: "runner" as const, label: "Runner" },
+    { kind: "brute" as const, label: "Brute" },
+    { kind: "elite" as const, label: "Elite" },
+  ];
+  return (
+    <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-bg/75 px-3 py-6 pointer-events-auto">
+      <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-3 border-2 border-fg bg-surface px-3 py-4">
+        <p className="font-pixel text-pixel text-fg">Spawn</p>
+        <p className="font-pixel text-pixel-sm text-muted">Sandbox is empty until you drop a foe</p>
+        <div className="grid w-full grid-cols-2 gap-2">
+          {foes.map((f) => (
+            <button
+              key={f.kind}
+              type="button"
+              data-ui
+              onClick={() => engine?.spawnFoe(f.kind)}
+              className="h-11 border-2 border-fg bg-bg font-pixel text-[10px] text-fg"
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1 font-pixel text-pixel-sm text-gold">Bosses</p>
+        <div className="grid max-h-56 w-full grid-cols-2 gap-2 overflow-y-auto">
+          {BOSSES.map((b, i) => (
+            <button
+              key={b.name}
+              type="button"
+              data-ui
+              onClick={() => engine?.spawnBoss(i)}
+              className="h-11 border-2 bg-bg px-1 font-pixel text-[9px] text-fg"
+              style={{ borderColor: b.color2 }}
+            >
+              {b.name}
+            </button>
+          ))}
+        </div>
+        <PixelButton onClick={() => engine?.clearFoes()}>Clear all</PixelButton>
+        <PixelButton primary onClick={onClose}>
+          Close
+        </PixelButton>
+      </div>
     </div>
   );
 }

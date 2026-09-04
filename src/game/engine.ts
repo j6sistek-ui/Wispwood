@@ -696,19 +696,34 @@ export class GameEngine {
     this.cam.y = this.player.y - this.view.h / 2;
   }
 
+  spawnFoe(kind: "wisp" | "runner" | "brute" | "elite") {
+    if (this.phase !== "playing" && this.phase !== "paused") return;
+    this.spawnEnemy(kind);
+  }
+
+  spawnBoss(id: number) {
+    if (this.phase !== "playing" && this.phase !== "paused") return;
+    this.placeBoss(id);
+  }
+
+  clearFoes() {
+    for (const e of this.enemies) e.alive = false;
+    this.emit();
+  }
+
   private beginWave() {
     this.wave += 1;
     if (this.wave > this.bestNight) {
       this.bestNight = this.wave;
       this.persist();
     }
-    this.toSpawn = 5 + this.wave * 3;
+    this.toSpawn = this.richRun ? 0 : 5 + this.wave * 3;
     this.spawnT = 0.2;
     this.waveGap = 0;
     this.audio.wave();
-    this.floatAt(this.player.x, this.player.y - 40, `Night ${this.wave}`);
-    if (this.wave % 5 === 0) {
-      this.spawnNightBoss();
+    this.floatAt(this.player.x, this.player.y - 40, this.richRun ? "Sandbox" : `Night ${this.wave}`);
+    if (!this.richRun && this.wave % 5 === 0) {
+      this.placeBoss(BOSSES.indexOf(bossForNight(this.wave)));
       this.toSpawn = 6;
     }
     this.emit();
@@ -1346,6 +1361,7 @@ export class GameEngine {
   }
 
   private spawnFlow(dt: number) {
+    if (this.richRun) return;
     if (this.toSpawn <= 0) {
       const live = this.enemies.some((e) => e.alive);
       if (!live) {
@@ -1365,7 +1381,7 @@ export class GameEngine {
     }
   }
 
-  private spawnEnemy() {
+  private spawnEnemy(kind?: "wisp" | "runner" | "brute" | "elite") {
     const e = this.allocEnemy();
     const edge = Math.floor(Math.random() * 4);
     const t = Math.random();
@@ -1383,7 +1399,7 @@ export class GameEngine {
       e.x = 40;
       e.y = t * ARENA;
     }
-    e.kind = this.pickEnemyKind();
+    e.kind = kind ?? this.pickEnemyKind();
     e.flash = 0;
     e.frame = Math.random() * 4;
     e.contact = 0;
@@ -1422,8 +1438,8 @@ export class GameEngine {
     if (e.kind === "elite") this.floatAt(e.x, e.y - 28, "Nightbound");
   }
 
-  private spawnNightBoss() {
-    const def = bossForNight(this.wave);
+  private placeBoss(id: number) {
+    const def = BOSSES[id] ?? BOSSES[0]!;
     const e = this.allocEnemy();
     e.alive = true;
     e.kind = "boss";
