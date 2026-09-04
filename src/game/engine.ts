@@ -239,6 +239,7 @@ export class GameEngine {
   best = 0;
   bestNight = 0;
   muted = false;
+  tilt = false;
   spell: Spell = "ember";
   upgrades: Record<Spell, SpellUpgrades> = emptyUpgrades();
   boltUnlocked = false;
@@ -551,6 +552,11 @@ export class GameEngine {
     this.emit();
   }
 
+  setTilt(on: boolean) {
+    this.tilt = on;
+    this.resize();
+  }
+
   setTouchMove(x: number, y: number) {
     this.input.touchMove.x = x;
     this.input.touchMove.y = y;
@@ -564,8 +570,13 @@ export class GameEngine {
 
   pointAt(clientX: number, clientY: number, down: boolean, queued: boolean) {
     const rect = this.canvas.getBoundingClientRect();
-    this.input.pointer.x = clientX - rect.left;
-    this.input.pointer.y = clientY - rect.top;
+    if (this.tilt && rect.width > 1 && rect.height > 1) {
+      this.input.pointer.x = ((clientY - rect.top) / rect.height) * this.view.w;
+      this.input.pointer.y = (1 - (clientX - rect.left) / rect.width) * this.view.h;
+    } else {
+      this.input.pointer.x = clientX - rect.left;
+      this.input.pointer.y = clientY - rect.top;
+    }
     this.input.pointer.down = down;
     this.input.pointer.hasPoint = true;
     if (queued && down) this.input.queueShot();

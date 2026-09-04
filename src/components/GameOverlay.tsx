@@ -12,25 +12,33 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 type Props = {
   engine: GameEngine | null;
   hud: HudState;
+  tilt?: boolean;
+  onTilt?: (on: boolean) => void;
 };
 
-export function GameOverlay({ engine, hud }: Props) {
+export function GameOverlay({ engine, hud, tilt = false, onTilt }: Props) {
   const coarse =
     typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
   const showSticks = coarse && hud.phase === "playing";
+  const inRun =
+    hud.phase === "playing" ||
+    hud.phase === "paused" ||
+    hud.phase === "book" ||
+    hud.phase === "wheel";
 
   return (
     <div
       className="pointer-events-none text-fg"
       style={{ position: "fixed", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
     >
+      {inRun ? <NightBar hud={hud} /> : null}
       {hud.phase === "playing" || hud.phase === "paused" ? (
-        <Hud engine={engine} hud={hud} />
+        <Hud engine={engine} hud={hud} tilt={tilt} onTilt={onTilt} />
       ) : null}
 
       {hud.phase === "boot" || hud.loading ? <Boot /> : null}
       {hud.phase === "title" && !hud.loading ? (
-        <Title engine={engine} bestNight={hud.bestNight} />
+        <Title engine={engine} bestNight={hud.bestNight} tilt={tilt} onTilt={onTilt} />
       ) : null}
       {hud.phase === "paused" ? <Pause engine={engine} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
@@ -42,25 +50,44 @@ export function GameOverlay({ engine, hud }: Props) {
   );
 }
 
-function Hud({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
-  const pct = Math.max(0, hud.hp / hud.maxHp);
+function NightBar({ hud }: { hud: HudState }) {
   return (
     <div
-      className="pointer-events-none px-3"
-      style={{ paddingTop: "max(3.25rem, calc(env(safe-area-inset-top, 0px) + 2.25rem))" }}
+      className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-3"
+      style={{ top: "max(0.4rem, env(safe-area-inset-top, 0px))" }}
     >
-      <div className="mx-auto flex max-w-sm items-stretch justify-center gap-2">
-        <div className="flex-1 rounded-xl border-2 border-fg bg-bg/90 px-3 py-2 text-center">
+      <div className="flex w-full max-w-sm items-stretch gap-2">
+        <div className="flex-1 border-2 border-fg bg-bg/95 px-3 py-1.5 text-center">
           <p className="font-pixel text-[8px] tracking-wide text-muted">NIGHT</p>
           <p className="mt-1 font-pixel text-2xl tabular-nums leading-none text-fg">{hud.wave}</p>
         </div>
-        <div className="flex-1 rounded-xl border-2 border-gold bg-bg/90 px-3 py-2 text-center">
+        <div className="flex-1 border-2 border-gold bg-bg/95 px-3 py-1.5 text-center">
           <p className="font-pixel text-[8px] tracking-wide text-gold">MAX NIGHTS</p>
           <p className="mt-1 font-pixel text-2xl tabular-nums leading-none text-gold">{hud.bestNight}</p>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-2 flex items-center justify-between gap-2">
+function Hud({
+  engine,
+  hud,
+  tilt,
+  onTilt,
+}: {
+  engine: GameEngine | null;
+  hud: HudState;
+  tilt: boolean;
+  onTilt?: (on: boolean) => void;
+}) {
+  const pct = Math.max(0, hud.hp / hud.maxHp);
+  return (
+    <div
+      className="pointer-events-none px-3"
+      style={{ paddingTop: "max(5.75rem, calc(env(safe-area-inset-top, 0px) + 4.75rem))" }}
+    >
+      <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 rounded-xl border border-border bg-bg/80 px-2.5 py-1.5">
           <p className="text-[9px] font-medium tracking-[0.16em] text-muted uppercase">Lantern</p>
           <div className="mt-1 h-1.5 w-20 overflow-hidden rounded-full bg-elevated sm:w-32">
@@ -82,7 +109,7 @@ function Hud({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
           type="button"
           data-ui
           onClick={() => engine?.toggleBook()}
-          className="flex h-11 min-w-[7.5rem] items-center justify-center gap-1.5 border-2 border-fg bg-bg px-4 font-pixel text-[10px] text-fg"
+          className="flex h-11 min-w-[6.5rem] items-center justify-center gap-1.5 border-2 border-fg bg-bg px-3 font-pixel text-[10px] text-fg"
         >
           <BookOpen className="size-3.5" strokeWidth={2} />
           Book
@@ -95,19 +122,27 @@ function Hud({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
                   ? "Void"
                   : hud.spell === "vine"
                     ? "Vine"
-                  : hud.spell === "craft"
-                  ? (hud.crafted?.name ?? "Rune")
-                  : "Ember"}
+                    : hud.spell === "craft"
+                      ? (hud.crafted?.name ?? "Rune")
+                      : "Ember"}
           </span>
         </button>
         <button
           type="button"
           data-ui
           onClick={() => engine?.openWheel()}
-          className="flex h-11 min-w-[7.5rem] items-center justify-center gap-1.5 border-2 border-gold bg-bg px-4 font-pixel text-[10px] text-fg"
+          className="flex h-11 min-w-[6.5rem] items-center justify-center gap-1.5 border-2 border-gold bg-bg px-3 font-pixel text-[10px] text-fg"
         >
           Wheel
           <span className="text-gold">100g</span>
+        </button>
+        <button
+          type="button"
+          data-ui
+          onClick={() => onTilt?.(!tilt)}
+          className="flex h-11 items-center justify-center border-2 border-muted bg-bg px-3 font-pixel text-[10px] text-fg"
+        >
+          {tilt ? "Upright" : "Sideways"}
         </button>
       </div>
     </div>
@@ -132,9 +167,13 @@ function makeRoomCode() {
 function Title({
   engine,
   bestNight,
+  tilt = false,
+  onTilt,
 }: {
   engine: GameEngine | null;
   bestNight: number;
+  tilt?: boolean;
+  onTilt?: (on: boolean) => void;
 }) {
   const [menu, setMenu] = useState<"home" | "multiplayer" | "join" | "room" | "name" | "account">("home");
   const [roomCode, setRoomCode] = useState<string | null>(null);
@@ -381,6 +420,7 @@ function Title({
                 <PixelButton onClick={() => setMenu("name")}>Name</PixelButton>
                 <PixelButton onClick={() => setMenu("account")}>Account</PixelButton>
                 <PixelButton onClick={() => void shareGame()}>{shareNote || "Share"}</PixelButton>
+                <PixelButton onClick={() => onTilt?.(!tilt)}>{tilt ? "Upright" : "Sideways"}</PixelButton>
               </>
             )}
           </div>
