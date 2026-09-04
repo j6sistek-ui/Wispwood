@@ -2,7 +2,7 @@ import { Input, type Actions } from "./input";
 import { GameAudio } from "./audio";
 import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
-import { BOSSES, bossForNight, drawBossPixels, type BossDef } from "./bosses";
+import { BOSSES, BOSS_ATTACK, bossForNight, drawBossPixels, type BossDef } from "./bosses";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
@@ -138,6 +138,28 @@ type Blast = {
   life: number;
 };
 type Arc = { alive: boolean; x: number; y: number; r: number; ttl: number; max: number };
+type Hazard = {
+  alive: boolean;
+  x: number;
+  y: number;
+  r: number;
+  ttl: number;
+  max: number;
+  kind: "goo" | "acid" | "web" | "dust" | "spore";
+  color: string;
+};
+type BossShot = {
+  alive: boolean;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  ttl: number;
+  r: number;
+  dmg: number;
+  color: string;
+  kind: string;
+};
 type Prop = { kind: string; x: number; y: number; r: number; drawW: number; drawH: number };
 
 const ARENA = 2200;
@@ -158,6 +180,8 @@ const MAX_ENEMIES = 48;
 const MAX_PICKUPS = 16;
 const MAX_SPARKS = 320;
 const MAX_ARCS = 80;
+const MAX_HAZARDS = 64;
+const MAX_BOSS_SHOTS = 48;
 
 const PROP_LAYOUT: Array<Omit<Prop, "drawW" | "drawH">> = [
   { kind: "stump", x: 480, y: 520, r: 34 },
@@ -282,6 +306,10 @@ export class GameEngine {
   private bursts: Burst[] = [];
   private blasts: Blast[] = [];
   private arcs: Arc[] = [];
+  private hazards: Hazard[] = [];
+  private bossShots: BossShot[] = [];
+  private playerSlow = 0;
+  private playerStun = 0;
   private props: Prop[] = [];
   private view = { w: 800, h: 600 };
 
@@ -680,7 +708,10 @@ export class GameEngine {
     this.bursts = [];
     this.blasts = [];
     this.arcs = [];
-    this.arcs = [];
+    this.hazards = [];
+    this.bossShots = [];
+    this.playerSlow = 0;
+    this.playerStun = 0;
     this.cam.x = this.player.x - this.view.w / 2;
     this.cam.y = this.player.y - this.view.h / 2;
   }
@@ -756,6 +787,8 @@ export class GameEngine {
     this.fireCd = Math.max(0, this.fireCd - dt);
     this.player.invuln = Math.max(0, this.player.invuln - dt);
     this.player.knockT = Math.max(0, this.player.knockT - dt);
+    this.playerSlow = Math.max(0, this.playerSlow - dt);
+    this.playerStun = Math.max(0, this.playerStun - dt);
     this.trauma = Math.max(0, this.trauma - dt * 1.8);
     const actions = this.input.poll();
     this.aimFrom(actions);
@@ -763,6 +796,8 @@ export class GameEngine {
     if (actions.fire && this.fireCd <= 0) this.shoot();
     this.updateBullets(dt);
     this.updateEnemies(dt);
+    this.updateBossShots(dt);
+    this.updateHazards(dt);
     this.updatePickups(dt);
     this.updateBurns(dt);
     this.updateFx(dt);
@@ -817,8 +852,9 @@ export class GameEngine {
     const sliding = this.player.knockT > 0.04;
     const rate = sliding ? 3.2 : want > 0.12 ? PLAYER_ACCEL : PLAYER_STOP;
     const k = 1 - Math.exp(-rate * dt);
-    const tx = sliding ? 0 : actions.moveX * PLAYER_SPEED;
-    const ty = sliding ? 0 : actions.moveY * PLAYER_SPEED;
+    const stunned = this.playerStun > 0;
+    const tx = sliding || stunned ? 0 : actions.moveX * PLAYER_SPEED * (this.playerSlow > 0 ? 0.42 : 1);
+    const ty = sliding || stunned ? 0 : actions.moveY * PLAYER_SPEED * (this.playerSlow > 0 ? 0.42 : 1);
     this.player.vx += (tx - this.player.vx) * k;
     this.player.vy += (ty - this.player.vy) * k;
     if (!sliding && Math.hypot(this.player.vx, this.player.vy) < 6 && want < 0.08) {
@@ -1723,6 +1759,16 @@ export class GameEngine {
         e.lunging = 0.16;
       }
     }
+    const atk = BOSS_ATTACK[def.name] ?? "slam";
+    if ((atk === "drip" || atk === "acid" || atk === "dust") && e.vineIcd <= 0) {
+      this.dropHazard(e.x, e.y, atk === "acid" ? "acid" : atk === "dust" ? "dust" : "goo", def.color2, atk === "dust" ? 46 : 28);
+      e.vineIcd = atk === "dust" ? 0.45 : 0.28;
+    }
+    if (e.voidIcd <= 0) {
+      this.bossCast(e, def, atk, px, py);
+      e.voidIcd = atk === "blink" ? 2.2 : atk === "curl" || atk === "ram" ? 1.8 : 1.45;
+      e.lunging = 0.38;
+    }
     if (def.smash) {
       for (let j = 0; j < this.enemies.length; j++) {
         if (j === index) continue;
@@ -1735,18 +1781,192 @@ export class GameEngine {
         this.trauma = Math.min(1, this.trauma + 0.1);
       }
     }
-    if (this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, PLAYER_R)) {
-      this.player.hp -= def.hit;
-      this.player.invuln = 0.75;
+    if (this.player.invuln <= 0 && circleHit(e.x, e.y, e.r * (atk === "bite" && e.lunging > 0 ? 1.35 : 1), px, py, PLAYER_R)) {
+      this.hurtLantern(def.hit + (atk === "bite" && e.lunging > 0 ? 12 : 0), px - e.x, py - e.y, 300);
       if (def.name === "VAMPIRE") e.hp = Math.min(e.maxHp, e.hp + 48);
-      const kd = Math.hypot(px - e.x, py - e.y) || 1;
-      this.player.vx += ((px - e.x) / kd) * 320;
-      this.player.vy += ((py - e.y) / kd) * 320;
-      this.markPlayerKnock((px - e.x) / kd, (py - e.y) / kd, 0.34);
-      this.trauma = Math.min(1, this.trauma + 0.5);
-      this.audio.hurt();
-      this.burstSparks(px, py, 10, def.color2);
-      this.emit();
+    }
+  }
+
+  private bossCast(e: Enemy, def: BossDef, atk: string, px: number, py: number) {
+    const dx = px - e.x;
+    const dy = py - e.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const ux = dx / d;
+    const uy = dy / d;
+    if (atk === "lunge") {
+      e.kvx = ux * def.speed * 2.2;
+      e.kvy = uy * def.speed * 2.2;
+      this.spawnBossShot(e.x, e.y, -uy * 90, ux * 90, def.color2, 10, "bat");
+      this.spawnBossShot(e.x, e.y, uy * 90, -ux * 90, def.color2, 10, "bat");
+    } else if (atk === "blink") {
+      e.x = clamp(px - ux * 70, 80, ARENA - 80);
+      e.y = clamp(py - uy * 70, 80, ARENA - 80);
+      this.burstSparks(e.x, e.y, 18, def.color2);
+    } else if (atk === "curl" || atk === "dive" || atk === "ram" || atk === "bite") {
+      e.kvx = ux * def.speed * (atk === "dive" ? 2.6 : 2.3);
+      e.kvy = uy * def.speed * (atk === "dive" ? 2.6 : 2.3);
+    } else if (atk === "slam") {
+      this.radialHurt(e.x, e.y, 88, Math.floor(def.hit * 0.7));
+    } else if (atk === "tongue") {
+      if (d < 130) this.hurtLantern(def.hit + 6, ux, uy, 240);
+    } else if (atk === "stomp") {
+      this.radialHurt(e.x, e.y, 110, def.hit);
+      this.trauma = Math.min(1, this.trauma + 0.35);
+    } else if (atk === "wave") {
+      this.radialHurt(e.x, e.y, 96, Math.floor(def.hit * 0.8));
+      this.dropHazard(e.x, e.y, "goo", def.color2, 40);
+    } else if (atk === "thorns") {
+      for (let i = -2; i <= 2; i++) {
+        const a = Math.atan2(uy, ux) + i * 0.28;
+        this.spawnBossShot(e.x, e.y, Math.cos(a) * 260, Math.sin(a) * 260, def.color2, 12, "thorn");
+      }
+    } else if (atk === "spores") {
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + this.animT;
+        this.spawnBossShot(e.x, e.y, Math.cos(a) * 90, Math.sin(a) * 90, def.color2, 14, "spore");
+      }
+    } else if (atk === "web") {
+      this.dropHazard(px, py, "web", def.color2, 42);
+    } else if (atk === "nova" || atk === "pulse") {
+      this.radialHurt(e.x, e.y, atk === "pulse" ? 130 : 120, Math.floor(def.hit * 0.9));
+    } else if (atk === "scream") {
+      if (d < 150) {
+        this.playerStun = 0.85;
+        this.hurtLantern(Math.floor(def.hit * 0.6), ux, uy, 160);
+      }
+    } else if (atk === "beam") {
+      const reach = 220;
+      const closest = (px - e.x) * ux + (py - e.y) * uy;
+      const cx = e.x + ux * clamp(closest, 0, reach);
+      const cy = e.y + uy * clamp(closest, 0, reach);
+      if (Math.hypot(px - cx, py - cy) < 22) this.hurtLantern(def.hit + 8, ux, uy, 200);
+    } else if (atk === "dust") {
+      this.dropHazard(e.x + ux * 30, e.y + uy * 30, "dust", def.color2, 50);
+    }
+    this.audio.hit();
+  }
+
+  private hurtLantern(amount: number, kx: number, ky: number, knock: number) {
+    if (this.player.invuln > 0) return;
+    const m = Math.hypot(kx, ky) || 1;
+    this.player.hp -= amount;
+    this.player.invuln = 0.7;
+    this.player.vx += (kx / m) * knock;
+    this.player.vy += (ky / m) * knock;
+    this.markPlayerKnock(kx / m, ky / m, 0.3);
+    this.trauma = Math.min(1, this.trauma + 0.4);
+    this.audio.hurt();
+    this.emit();
+  }
+
+  private radialHurt(x: number, y: number, r: number, dmg: number) {
+    if (Math.hypot(this.player.x - x, this.player.y - y) < r + PLAYER_R) {
+      this.hurtLantern(dmg, this.player.x - x, this.player.y - y, 260);
+    }
+  }
+
+  private spawnBossShot(x: number, y: number, vx: number, vy: number, color: string, dmg: number, kind: string) {
+    const dead = this.bossShots.find((s) => !s.alive);
+    const s =
+      dead ??
+      (this.bossShots.length < MAX_BOSS_SHOTS
+        ? (() => {
+            const n: BossShot = { alive: false, x: 0, y: 0, vx: 0, vy: 0, ttl: 0, r: 6, dmg: 0, color: "#fff", kind: "thorn" };
+            this.bossShots.push(n);
+            return n;
+          })()
+        : null);
+    if (!s) return;
+    s.alive = true;
+    s.x = x;
+    s.y = y;
+    s.vx = vx;
+    s.vy = vy;
+    s.ttl = 1.6;
+    s.r = kind === "spore" ? 9 : 6;
+    s.dmg = dmg;
+    s.color = color;
+    s.kind = kind;
+  }
+
+  private dropHazard(x: number, y: number, kind: Hazard["kind"], color: string, r: number) {
+    const dead = this.hazards.find((h) => !h.alive);
+    const h =
+      dead ??
+      (this.hazards.length < MAX_HAZARDS
+        ? (() => {
+            const n: Hazard = { alive: false, x: 0, y: 0, r: 20, ttl: 0, max: 1, kind: "goo", color: "#fff" };
+            this.hazards.push(n);
+            return n;
+          })()
+        : null);
+    if (!h) return;
+    h.alive = true;
+    h.x = x;
+    h.y = y;
+    h.r = r;
+    h.ttl = kind === "web" ? 2.4 : kind === "dust" ? 1.6 : 2.8;
+    h.max = h.ttl;
+    h.kind = kind;
+    h.color = color;
+  }
+
+  private updateBossShots(dt: number) {
+    for (const s of this.bossShots) {
+      if (!s.alive) continue;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.ttl -= dt;
+      if (s.kind === "spore") {
+        s.vx *= Math.exp(-0.6 * dt);
+        s.vy *= Math.exp(-0.6 * dt);
+      }
+      if (s.ttl <= 0) {
+        if (s.kind === "spore") this.dropHazard(s.x, s.y, "spore", s.color, 36);
+        s.alive = false;
+        continue;
+      }
+      if (this.player.invuln <= 0 && circleHit(s.x, s.y, s.r, this.player.x, this.player.y, PLAYER_R)) {
+        this.hurtLantern(s.dmg, s.vx, s.vy, 180);
+        s.alive = false;
+      }
+    }
+  }
+
+  private updateHazards(dt: number) {
+    for (const h of this.hazards) {
+      if (!h.alive) continue;
+      h.ttl -= dt;
+      if (h.ttl <= 0) {
+        h.alive = false;
+        continue;
+      }
+      if (!circleHit(h.x, h.y, h.r, this.player.x, this.player.y, PLAYER_R)) continue;
+      if (h.kind === "goo" || h.kind === "dust") this.playerSlow = Math.max(this.playerSlow, 0.55);
+      if (h.kind === "web") this.playerStun = Math.max(this.playerStun, 0.7);
+      if ((h.kind === "acid" || h.kind === "spore") && this.player.invuln <= 0) {
+        this.hurtLantern(h.kind === "acid" ? 10 : 12, this.player.x - h.x, this.player.y - h.y, 80);
+      }
+    }
+  }
+
+  private drawBossShots() {
+    const ctx = this.ctx;
+    for (const s of this.bossShots) {
+      if (!s.alive) continue;
+      ctx.fillStyle = s.color;
+      ctx.fillRect(Math.round(s.x) - s.r, Math.round(s.y) - s.r, s.r * 2, s.r * 2);
+    }
+  }
+
+  private drawHazards() {
+    const ctx = this.ctx;
+    for (const h of this.hazards) {
+      if (!h.alive) continue;
+      ctx.globalAlpha = 0.25 + (h.ttl / h.max) * 0.35;
+      ctx.fillStyle = h.color;
+      ctx.fillRect(Math.round(h.x - h.r), Math.round(h.y - h.r * 0.5), Math.round(h.r * 2), Math.round(h.r));
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -2033,6 +2253,8 @@ export class GameEngine {
       for (const d of drawables) d.draw();
       this.drawBullets();
       this.drawBlasts();
+      this.drawBossShots();
+      this.drawHazards();
       this.drawFx();
       if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel") this.drawLight();
     }
@@ -2105,7 +2327,35 @@ export class GameEngine {
     const ctx = this.ctx;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    drawBossPixels(ctx, def, e.x, e.y, e.r, e.flash > 0);
+    drawBossPixels(ctx, def, e.x, e.y, e.r, e.flash > 0, e.frame, e.lunging);
+    if (BOSS_ATTACK[def.name] === "tongue" && e.lunging > 0) {
+      const ang = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+      ctx.strokeStyle = "#8ed48a";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(e.x, e.y);
+      ctx.lineTo(e.x + Math.cos(ang) * 120, e.y + Math.sin(ang) * 120);
+      ctx.stroke();
+      ctx.strokeStyle = "#d8f5c8";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    if (BOSS_ATTACK[def.name] === "beam" && e.lunging > 0) {
+      const ang = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+      ctx.strokeStyle = "#f0d24a";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(e.x, e.y);
+      ctx.lineTo(e.x + Math.cos(ang) * 220, e.y + Math.sin(ang) * 220);
+      ctx.stroke();
+    }
+    if ((BOSS_ATTACK[def.name] === "nova" || BOSS_ATTACK[def.name] === "pulse" || BOSS_ATTACK[def.name] === "stomp" || BOSS_ATTACK[def.name] === "scream") && e.lunging > 0) {
+      ctx.strokeStyle = def.color2;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 40 + (0.4 - e.lunging) * 180, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
     const barW = e.r * 1.6;
     ctx.fillStyle = "rgba(12,13,12,0.7)";

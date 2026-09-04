@@ -250,6 +250,51 @@ export function bossForNight(wave: number): BossDef {
   return BOSSES[i % BOSSES.length]!;
 }
 
+export type BossAttack =
+  | "slam"
+  | "lunge"
+  | "drip"
+  | "dust"
+  | "acid"
+  | "blink"
+  | "curl"
+  | "dive"
+  | "tongue"
+  | "stomp"
+  | "wave"
+  | "thorns"
+  | "bite"
+  | "spores"
+  | "web"
+  | "nova"
+  | "scream"
+  | "ram"
+  | "pulse"
+  | "beam";
+
+export const BOSS_ATTACK: Record<string, BossAttack> = {
+  SLIME: "slam",
+  VAMPIRE: "lunge",
+  GOO: "drip",
+  MOTH: "dust",
+  SLUG: "acid",
+  WIGHT: "blink",
+  BEETLE: "curl",
+  CROWKING: "dive",
+  TOAD: "tongue",
+  HUSK: "stomp",
+  DROWNED: "wave",
+  BRIAR: "thorns",
+  FANG: "bite",
+  SPORE: "spores",
+  SILK: "web",
+  EMBERKIN: "nova",
+  HOLLOW: "scream",
+  NIGHTGOAT: "ram",
+  MOONJELLY: "pulse",
+  LANTERN: "beam",
+};
+
 export function drawBossPixels(
   ctx: CanvasRenderingContext2D,
   def: BossDef,
@@ -257,16 +302,45 @@ export function drawBossPixels(
   y: number,
   r: number,
   flash: boolean,
+  t = 0,
+  pose = 0,
 ) {
   const rows = def.sprite;
   const w = Math.max(...rows.map((row) => row.length));
   const h = rows.length;
   const s = Math.max(3, Math.round((r * 2) / Math.max(w, h)));
-  const ox = Math.round(x - (w * s) / 2);
-  const oy = Math.round(y - (h * s) * 0.78);
+  const beat = Math.sin(t * 7);
+  let sx = 1;
+  let sy = 1;
+  if (def.name === "SLIME" || def.name === "GOO" || def.name === "TOAD") {
+    sx = 1 + beat * 0.14;
+    sy = 1 - beat * 0.12;
+  } else if (def.name === "MOONJELLY" || def.name === "SPORE") {
+    sx = sy = 1 + Math.sin(t * 5) * 0.1;
+  } else if (def.name === "EMBERKIN") {
+    sx = 1 + Math.abs(beat) * 0.08;
+  } else if (def.name === "HUSK") {
+    x += Math.sin(t * 14) * 2;
+  } else if (def.name === "HOLLOW") {
+    x += Math.sin(t * 22) * (0.6 + pose * 4);
+  }
+  if (pose > 0.04) {
+    sx *= 1.18;
+    sy *= 0.82;
+  }
+  const ox0 = Math.round(x - (w * s) / 2);
+  const oy0 = Math.round(y - (h * s) * 0.78);
+  ctx.save();
   ctx.imageSmoothingEnabled = false;
+  if (def.name === "WIGHT") ctx.globalAlpha = 0.45 + Math.abs(Math.sin(t * 3)) * 0.55;
+  ctx.translate(x, y);
+  ctx.scale(sx, sy);
+  ctx.translate(-x, -y);
+  const flap = (def.name === "MOTH" || def.name === "CROWKING" ? Math.sin(t * 14) : 0) * s;
+  const crawl = def.name === "SLUG" ? Math.sin(t * 6) : 0;
   for (let j = 0; j < h; j++) {
     const row = rows[j] ?? "";
+    const wave = def.name === "SLUG" ? Math.round(Math.sin(j * 0.8 + t * 8) * s * 0.4) : 0;
     for (let i = 0; i < row.length; i++) {
       const ch = row[i]!;
       if (ch === " ") continue;
@@ -274,15 +348,60 @@ export function drawBossPixels(
       if (ch === ":") c = def.color2;
       else if (ch === "#") c = "#0c0d0c";
       else if (ch === "e") c = "#0c0d0c";
-      else if (ch === "o") c = "#ecece8";
       else if (ch === "x") c = flash ? "#fff4c8" : mixHex(def.color, def.color2);
       else if (ch === ".") c = def.color;
-      ctx.fillStyle = flash ? "#fff4c8" : c;
+      ctx.fillStyle = flash && ch !== "e" && ch !== "#" ? "#fff4c8" : c;
       if (ch === "e") ctx.fillStyle = "#0c0d0c";
-      if (ch === ":" && flash) ctx.fillStyle = "#ffffff";
-      ctx.fillRect(ox + i * s, oy + j * s, s, s);
+      let px = ox0 + i * s + wave;
+      if (flap) px += i < w / 2 ? -flap : flap;
+      if (crawl) px += Math.round(crawl * s * 0.2);
+      ctx.fillRect(px, oy0 + j * s, s, s);
     }
   }
+  if (def.name === "VAMPIRE") {
+    ctx.fillStyle = "#1a080c";
+    const sway = Math.round(Math.sin(t * 5) * s);
+    ctx.fillRect(ox0 - s + sway, oy0 + h * s - s, s * 3, s * 2);
+    ctx.fillRect(ox0 + w * s - s * 2 - sway, oy0 + h * s - s, s * 3, s * 2);
+  }
+  if (def.name === "GOO" || def.name === "DROWNED" || def.name === "SLUG") {
+    ctx.fillStyle = def.color2;
+    const drip = Math.round((t * 40) % (s * 6));
+    ctx.fillRect(Math.round(x) - s, oy0 + h * s + drip, s, s);
+    ctx.fillRect(Math.round(x) + s * 2, oy0 + h * s + ((drip + 8) % (s * 6)), s, s);
+  }
+  if (def.name === "LANTERN") {
+    ctx.globalAlpha = 0.35 + Math.abs(Math.sin(t * 6)) * 0.4;
+    ctx.fillStyle = "#f0d24a";
+    ctx.fillRect(Math.round(x) - s * 3, oy0 - s, s * 6, s);
+    ctx.fillRect(Math.round(x) - s, oy0 - s * 2, s * 2, s);
+  }
+  if (def.name === "EMBERKIN") {
+    ctx.fillStyle = "#ffe27a";
+    for (let k = 0; k < 4; k++) {
+      const a = t * 6 + k * 1.7;
+      ctx.fillRect(Math.round(x + Math.cos(a) * r * 0.7) - 2, Math.round(y + Math.sin(a) * r * 0.5) - 2, s, s);
+    }
+  }
+  if (def.name === "SILK") {
+    ctx.strokeStyle = def.color2;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, oy0);
+    ctx.lineTo(x + Math.sin(t * 4) * 10, oy0 - s * 4);
+    ctx.stroke();
+  }
+  if (def.name === "FANG" && pose > 0.05) {
+    ctx.fillStyle = "#ecece8";
+    ctx.fillRect(Math.round(x) - s, oy0 + h * s, s, s * 2);
+    ctx.fillRect(Math.round(x) + s, oy0 + h * s, s, s * 2);
+  }
+  if (def.name === "NIGHTGOAT" && pose > 0.05) {
+    ctx.fillStyle = def.color2;
+    ctx.fillRect(ox0 - s, oy0 + s * 2, s * 2, s);
+    ctx.fillRect(ox0 + w * s - s, oy0 + s * 2, s * 2, s);
+  }
+  ctx.restore();
 }
 
 function mixHex(a: string, b: string) {
