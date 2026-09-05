@@ -212,7 +212,7 @@ const BOLT_CD = 1.5;
 const VOID_CD = 2.5;
 const BOOM_CD = 0.5;
 const BOLT_SPEED = 1280;
-const MAX_BULLETS = 80;
+const MAX_BULLETS = 140;
 const MAX_ENEMIES = 48;
 const MAX_PICKUPS = 16;
 const MAX_SPARKS = 320;
@@ -1036,6 +1036,7 @@ export class GameEngine {
         this.spawnCraftShot(craft, Math.cos(a), Math.sin(a), 0, { orbit: true, ang: a });
       }
       this.audio.wave();
+      this.forkCraft(craft);
       return;
     }
     if (craft.ability === "rain") {
@@ -1046,6 +1047,7 @@ export class GameEngine {
         this.spawnCraftShot(craft, 0.12, 1, 0, { x: ox, y: oy });
       }
       this.audio.ice();
+      this.forkCraft(craft);
       return;
     }
     if (form === "nova") {
@@ -1055,6 +1057,7 @@ export class GameEngine {
         this.spawnCraftShot(craft, Math.cos(a), Math.sin(a), 0);
       }
       this.audio.wave();
+      this.forkCraft(craft);
       return;
     }
     if (form === "wave") {
@@ -1062,16 +1065,14 @@ export class GameEngine {
       const half = (count - 1) / 2;
       for (let i = 0; i < count; i++) this.spawnCraftShot(craft, this.aim.x, this.aim.y, (i - half) * 12);
       this.audio.ice();
+      this.forkCraft(craft);
       return;
     }
     if (n <= 1) {
       this.spawnCraftShot(craft, this.aim.x, this.aim.y, 0);
-      if (craft.ability === "fork") {
-        this.spawnCraftShot(craft, this.aim.x, this.aim.y, -14);
-        this.spawnCraftShot(craft, this.aim.x, this.aim.y, 14);
-      }
       if (form === "beam") this.audio.bolt();
       else this.audio.fire();
+      this.forkCraft(craft);
       return;
     }
     const spread = n >= 8 ? 0.72 : n >= 5 ? 0.48 : 0.26;
@@ -1081,6 +1082,13 @@ export class GameEngine {
       this.spawnCraftShot(craft, Math.cos(ang), Math.sin(ang), 0);
     }
     this.audio.ice();
+    this.forkCraft(craft);
+  }
+
+  private forkCraft(craft: CraftedSpell) {
+    if (craft.ability !== "fork") return;
+    this.spawnCraftShot(craft, this.aim.x, this.aim.y, -16, { ability: "pierce", ttl: 0.55 });
+    this.spawnCraftShot(craft, this.aim.x, this.aim.y, 16, { ability: "pierce", ttl: 0.55 });
   }
 
   private spawnCraftShot(
@@ -1148,6 +1156,8 @@ export class GameEngine {
     b.dirY = Math.sin(b.ang);
     b.form = "orb";
     b.color = "#6b3aa8";
+    b.ability = "seek";
+    b.hits = 0;
     this.audio.bolt();
     this.burstSparks(b.x, b.y, 8, "#4a2068");
   }
@@ -1225,8 +1235,23 @@ export class GameEngine {
 
   private allocBullet(): Bullet {
     const dead = this.bullets.find((b) => !b.alive);
-    if (dead) return dead;
-    if (this.bullets.length >= MAX_BULLETS) return this.bullets[0]!;
+    if (dead) {
+      dead.ability = "seek";
+      dead.hits = 0;
+      dead.home = null;
+      dead.orbit = 0;
+      dead.form = "single";
+      return dead;
+    }
+    if (this.bullets.length >= MAX_BULLETS) {
+      const oldest = this.bullets.reduce((a, b) => (a.ttl < b.ttl ? a : b));
+      oldest.alive = false;
+      oldest.ability = "seek";
+      oldest.hits = 0;
+      oldest.home = null;
+      oldest.orbit = 0;
+      return oldest;
+    }
     const b: Bullet = {
       alive: false,
       x: 0,
@@ -1515,7 +1540,7 @@ export class GameEngine {
       e.kvy = (dy / dm) * 700;
       e.knockT = 0.28;
     }
-    if (a === "explode" || a === "shatter") this.detonateCraft(b);
+    if (a === "explode" || a === "shatter" || a === "bloom") this.detonateCraft(b);
     if (a === "mist" || a === "howl") this.ringCraft(b.x, b.y, a === "howl" ? 110 : 70, a);
     if (a === "spore") this.dropHazard(b.x, b.y, "dust", b.color, 36);
     if (a === "split" && b.hits < 1 && craft) {
@@ -1572,6 +1597,8 @@ export class GameEngine {
   }
 
   private detonateCraft(b: Bullet) {
+    if (b.hits >= 90) return;
+    b.hits = 90;
     const r = b.ability === "shatter" ? 70 : 56;
     const dmg = Math.max(6, Math.round(spellDamage("craft", this.upgrades.craft.damage, this.crafted) * 0.55));
     for (const e of this.enemies) {
