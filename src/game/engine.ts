@@ -3,6 +3,7 @@ import { GameAudio } from "./audio";
 import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
+import { drawCraftSigil } from "./craft-sprites";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
@@ -10,6 +11,39 @@ export type SpellStat = "speed" | "damage";
 export type SpellUpgrades = { speed: number; damage: number };
 export type CraftShape = "single" | "triple" | "weave" | "orb" | "beam" | "nova" | "wave" | "meteor" | "shard" | "homing";
 export type CraftExtra = "none" | "burn" | "slow" | "stun";
+export type CraftAbility =
+  | "pierce"
+  | "split"
+  | "bounce"
+  | "chain"
+  | "explode"
+  | "orbit"
+  | "rain"
+  | "pull"
+  | "leech"
+  | "trail"
+  | "grow"
+  | "freeze"
+  | "shock"
+  | "ricochet"
+  | "spore"
+  | "hook"
+  | "bloom"
+  | "curse"
+  | "tide"
+  | "trap"
+  | "seek"
+  | "pulse"
+  | "dash"
+  | "magnet"
+  | "ignite"
+  | "mist"
+  | "thorn"
+  | "grav"
+  | "shatter"
+  | "fork"
+  | "veil"
+  | "howl";
 export type SpellRarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
 export type CraftedSpell = {
   name: string;
@@ -20,6 +54,7 @@ export type CraftedSpell = {
   cooldown: number;
   rarity: SpellRarity;
   shots: number;
+  ability: CraftAbility;
 };
 
 export const MAX_SPELL_UP = 20;
@@ -83,6 +118,8 @@ type Bullet = {
   ang: number;
   orbit: number;
   home: Enemy | null;
+  ability: CraftAbility;
+  hits: number;
 };
 
 type Enemy = {
@@ -546,6 +583,7 @@ export class GameEngine {
       cooldown: clamp(spell.cooldown, 0.28, 2.2),
       rarity: "legendary",
       shots: clamp(Math.round(spell.shots || 1), 1, 10),
+      ability: spell.ability ?? "seek",
     };
     this.upgrades.craft = { speed: 0, damage: 0 };
     this.spell = "craft";
@@ -563,6 +601,7 @@ export class GameEngine {
       cooldown: clamp(spell.cooldown, 0.28, 2.2),
       rarity: spell.rarity ?? "common",
       shots: clamp(Math.round(spell.shots || 1), 1, 10),
+      ability: spell.ability ?? "seek",
     };
     this.upgrades.craft = { speed: 0, damage: 0 };
     this.spell = "craft";
@@ -907,6 +946,12 @@ export class GameEngine {
       this.shootBoom();
     } else if (this.spell === "craft" && this.crafted) {
       this.shootCraft(this.crafted);
+      if (this.crafted.ability === "dash") {
+        this.player.vx += this.aim.x * 280;
+        this.player.vy += this.aim.y * 280;
+        this.markPlayerKnock(this.aim.x, this.aim.y, 0.18);
+      }
+      if (this.crafted.ability === "veil") this.player.invuln = Math.max(this.player.invuln, 0.35);
     } else if (this.spell === "frost") {
       this.spawnShot(this.spell, -16);
       this.spawnShot(this.spell, 0);
@@ -984,6 +1029,25 @@ export class GameEngine {
   private shootCraft(craft: CraftedSpell) {
     const form = craft.shape;
     const n = clamp(Math.round(craft.shots || 1), 1, 10);
+    if (craft.ability === "orbit") {
+      const count = Math.max(1, n);
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2;
+        this.spawnCraftShot(craft, Math.cos(a), Math.sin(a), 0, { orbit: true, ang: a });
+      }
+      this.audio.wave();
+      return;
+    }
+    if (craft.ability === "rain") {
+      const count = Math.max(1, n);
+      for (let i = 0; i < count; i++) {
+        const ox = this.player.x + this.aim.x * (40 + i * 18) + (i - (count - 1) / 2) * 22;
+        const oy = this.player.y + this.aim.y * 20 - 160 - i * 12;
+        this.spawnCraftShot(craft, 0.12, 1, 0, { x: ox, y: oy });
+      }
+      this.audio.ice();
+      return;
+    }
     if (form === "nova") {
       const count = n <= 1 ? 8 : n;
       for (let i = 0; i < count; i++) {
@@ -1002,6 +1066,10 @@ export class GameEngine {
     }
     if (n <= 1) {
       this.spawnCraftShot(craft, this.aim.x, this.aim.y, 0);
+      if (craft.ability === "fork") {
+        this.spawnCraftShot(craft, this.aim.x, this.aim.y, -14);
+        this.spawnCraftShot(craft, this.aim.x, this.aim.y, 14);
+      }
       if (form === "beam") this.audio.bolt();
       else this.audio.fire();
       return;
@@ -1015,7 +1083,13 @@ export class GameEngine {
     this.audio.ice();
   }
 
-  private spawnCraftShot(craft: CraftedSpell, dirX: number, dirY: number, side: number) {
+  private spawnCraftShot(
+    craft: CraftedSpell,
+    dirX: number,
+    dirY: number,
+    side: number,
+    opts?: { orbit?: boolean; ang?: number; x?: number; y?: number; ability?: CraftAbility; ttl?: number },
+  ) {
     const m = Math.hypot(dirX, dirY) || 1;
     dirX /= m;
     dirY /= m;
@@ -1027,11 +1101,14 @@ export class GameEngine {
     const speed = base * (1 + this.upgrades.craft.speed * 0.04);
     const b = this.allocBullet();
     b.alive = true;
-    b.x = this.player.x + dirX * 22 + px * side;
-    b.y = this.player.y + dirY * 18 + py * side;
+    b.x = opts?.x ?? this.player.x + dirX * 22 + px * side;
+    b.y = opts?.y ?? this.player.y + dirY * 18 + py * side;
     b.vx = dirX * speed;
     b.vy = dirY * speed;
-    b.ttl = form === "beam" ? 0.28 : form === "meteor" ? 1.4 : form === "orb" ? 1.6 : form === "nova" ? 0.7 : 0.95;
+    b.ttl = opts?.ttl ?? (form === "beam" ? 0.28 : form === "meteor" ? 1.4 : form === "orb" ? 1.6 : form === "nova" ? 0.7 : 0.95);
+    if (opts?.orbit) b.ttl = 2.1;
+    if (craft.ability === "rain") b.ttl = 1.35;
+    if (craft.ability === "bloom") b.ttl = Math.max(b.ttl, 0.85);
     b.r = form === "orb" ? 18 : form === "meteor" ? 22 : form === "beam" ? 10 : form === "wave" ? 14 : form === "shard" ? 7 : 9;
     b.spell = "craft";
     b.trail = 0;
@@ -1040,9 +1117,13 @@ export class GameEngine {
     b.dist = 0;
     b.dirX = dirX;
     b.dirY = dirY;
-    b.speed = speed;
+    b.speed = opts?.orbit ? 9 + this.upgrades.craft.speed * 0.3 : speed;
     b.form = form;
     b.color = craft.color;
+    b.ability = opts?.ability ?? craft.ability;
+    b.hits = 0;
+    b.ang = opts?.ang ?? Math.atan2(dirY, dirX);
+    b.orbit = opts?.orbit ? 70 + (craft.shots > 3 ? 18 : 0) : 0;
     this.burstSparks(b.x, b.y, form === "meteor" || form === "orb" ? 8 : 3, craft.color);
   }
 
@@ -1093,6 +1174,9 @@ export class GameEngine {
     b.dirY = this.aim.y;
     b.speed = speed;
     b.home = null;
+    b.ability = "seek";
+    b.hits = 0;
+    b.form = "single";
     this.burstSparks(b.x, b.y, 3, spell === "frost" ? "#c5eaf6" : spell === "bolt" ? "#f0d24a" : spell === "vine" ? "#6fbf6a" : "#e8c070");
     if (spell === "frost") this.spawnFlake(b.x, b.y, true);
     if (spell === "vine") this.burstSparks(b.x, b.y, 2, "#3d7a45");
@@ -1164,6 +1248,8 @@ export class GameEngine {
       ang: 0,
       orbit: 0,
       home: null,
+      ability: "seek",
+      hits: 0,
     };
     this.bullets.push(b);
     return b;
@@ -1222,9 +1308,9 @@ export class GameEngine {
         }
         continue;
       }
-      if (b.spell === "ember" || (b.spell === "craft" && b.form === "weave")) {
+      if (b.spell === "ember" || (b.spell === "craft" && (b.form === "weave" || b.ability === "trail"))) {
         b.dist += b.speed * dt;
-        const wave = Math.sin(b.dist * 0.038) * 30;
+        const wave = Math.sin(b.dist * 0.038) * (b.ability === "trail" ? 18 : 30);
         b.x = b.ox + b.dirX * b.dist + -b.dirY * wave;
         b.y = b.oy + b.dirY * b.dist + b.dirX * wave;
         b.trail += dt;
@@ -1232,15 +1318,27 @@ export class GameEngine {
           b.trail = 0;
           this.burstSparks(b.x, b.y, 1, b.spell === "craft" ? b.color : "#e8c070");
         }
+      } else if (b.spell === "craft" && b.ability === "orbit") {
+        b.ang += b.speed * dt;
+        b.x = this.player.x + Math.cos(b.ang) * (b.orbit || 80);
+        b.y = this.player.y + Math.sin(b.ang) * (b.orbit || 80);
+        b.dirX = Math.cos(b.ang);
+        b.dirY = Math.sin(b.ang);
+        b.trail += dt;
+        if (b.trail >= 0.03) {
+          b.trail = 0;
+          this.burstSparks(b.x, b.y, 1, b.color);
+        }
       } else {
-        if (b.spell === "craft" && b.form === "homing") {
+        if (b.spell === "craft" && (b.form === "homing" || b.ability === "seek" || b.ability === "magnet" || b.ability === "hook")) {
           const t = this.nearestEnemy(b.x, b.y);
           if (t) {
             const dx = t.x - b.x;
             const dy = t.y - b.y;
             const dm = Math.hypot(dx, dy) || 1;
-            b.dirX += (dx / dm) * 4 * dt;
-            b.dirY += (dy / dm) * 4 * dt;
+            const turn = b.ability === "magnet" ? 7 : b.ability === "hook" ? 9 : 4;
+            b.dirX += (dx / dm) * turn * dt;
+            b.dirY += (dy / dm) * turn * dt;
             const nm = Math.hypot(b.dirX, b.dirY) || 1;
             b.dirX /= nm;
             b.dirY /= nm;
@@ -1276,6 +1374,14 @@ export class GameEngine {
             b.trail = 0;
             this.burstSparks(b.x, b.y, 1, b.color);
           }
+          if (b.ability === "grow") b.r = Math.min(28, b.r + 12 * dt);
+          if (b.ability === "pulse") {
+            b.orbit += dt;
+            if (b.orbit >= 0.22) {
+              b.orbit = 0;
+              this.pulseCraft(b, 48);
+            }
+          }
         } else if (b.spell === "bolt") {
           b.trail += dt;
           if (b.trail >= 0.012) {
@@ -1294,8 +1400,23 @@ export class GameEngine {
         }
       }
       if (b.ttl <= 0 || b.x < 0 || b.y < 0 || b.x > ARENA || b.y > ARENA) {
-        b.alive = false;
-        continue;
+        if (b.spell === "craft" && b.ability === "bloom") this.detonateCraft(b);
+        if (b.spell === "craft" && b.ability === "ricochet" && b.hits < 4 && (b.x < 0 || b.x > ARENA || b.y < 0 || b.y > ARENA)) {
+          if (b.x < 0 || b.x > ARENA) b.vx *= -1;
+          if (b.y < 0 || b.y > ARENA) b.vy *= -1;
+          b.dirX = b.vx;
+          b.dirY = b.vy;
+          const nm = Math.hypot(b.dirX, b.dirY) || 1;
+          b.dirX /= nm;
+          b.dirY /= nm;
+          b.x = clamp(b.x, 8, ARENA - 8);
+          b.y = clamp(b.y, 8, ARENA - 8);
+          b.hits += 1;
+          b.ttl = Math.max(b.ttl, 0.35);
+        } else {
+          b.alive = false;
+        }
+        if (!b.alive) continue;
       }
       let blocked = false;
       for (const p of this.props) {
@@ -1305,16 +1426,30 @@ export class GameEngine {
         }
       }
       if (blocked) {
-        b.alive = false;
-        this.spawnBurst(b.x, b.y, b.spell);
-        continue;
+        if (b.spell === "craft" && (b.ability === "ricochet" || b.ability === "bounce") && b.hits < 3) {
+          b.vx *= -1;
+          b.vy *= -1;
+          b.dirX = b.vx;
+          b.dirY = b.vy;
+          b.hits += 1;
+        } else {
+          if (b.spell === "craft" && b.ability === "bloom") this.detonateCraft(b);
+          b.alive = false;
+          this.spawnBurst(b.x, b.y, b.spell);
+          continue;
+        }
       }
       for (const e of this.enemies) {
         if (!e.alive) continue;
         if (circleHit(b.x, b.y, b.r, e.x, e.y, e.r)) {
-          b.alive = false;
-          this.hurtEnemy(e, spellDamage(b.spell, this.upgrades[b.spell].damage, this.crafted), b.vx, b.vy, b.spell);
-          break;
+          if (b.spell === "craft") {
+            this.onCraftHit(b, e);
+            if (!b.alive) break;
+          } else {
+            b.alive = false;
+            this.hurtEnemy(e, spellDamage(b.spell, this.upgrades[b.spell].damage, this.crafted), b.vx, b.vy, b.spell);
+            break;
+          }
         }
       }
     }
@@ -1350,6 +1485,138 @@ export class GameEngine {
     this.audio.hit();
     this.spawnBurst(e.x, e.y, spell);
     if (e.hp <= 0) this.killEnemy(e);
+  }
+
+  private onCraftHit(b: Bullet, e: Enemy) {
+    if (b.ability === "orbit" && e.voidIcd > 0) return;
+    const craft = this.crafted;
+    const dmg = spellDamage("craft", this.upgrades.craft.damage, craft);
+    this.hurtEnemy(e, dmg, b.vx, b.vy, "craft");
+    const a = b.ability;
+    if (a === "leech") this.player.hp = Math.min(this.player.maxHp, this.player.hp + 4);
+    if (a === "ignite") e.burn = Math.max(e.burn, 5);
+    if (a === "curse") {
+      e.burn = Math.max(e.burn, 3);
+      e.freeze = Math.max(e.freeze, 1.4);
+    }
+    if (a === "freeze") e.freeze = Math.max(e.freeze, 2);
+    if (a === "shock") e.stun = Math.max(e.stun, 1.4);
+    if (a === "trap" || a === "thorn") this.wrapEnemy(e);
+    if (a === "tide") {
+      e.kvx = b.dirX * 900;
+      e.kvy = b.dirY * 900;
+      e.knockT = 0.32;
+    }
+    if (a === "pull" || a === "hook" || a === "grav") {
+      const dx = this.player.x - e.x;
+      const dy = this.player.y - e.y;
+      const dm = Math.hypot(dx, dy) || 1;
+      e.kvx = (dx / dm) * 700;
+      e.kvy = (dy / dm) * 700;
+      e.knockT = 0.28;
+    }
+    if (a === "explode" || a === "shatter") this.detonateCraft(b);
+    if (a === "mist" || a === "howl") this.ringCraft(b.x, b.y, a === "howl" ? 110 : 70, a);
+    if (a === "spore") this.dropHazard(b.x, b.y, "dust", b.color, 36);
+    if (a === "split" && b.hits < 1 && craft) {
+      const ang = Math.atan2(b.dirY, b.dirX);
+      this.spawnCraftShot(craft, Math.cos(ang + 0.7), Math.sin(ang + 0.7), 0, { ability: "pierce", ttl: 0.4 });
+      this.spawnCraftShot(craft, Math.cos(ang - 0.7), Math.sin(ang - 0.7), 0, { ability: "pierce", ttl: 0.4 });
+    }
+    if (a === "pierce" && b.hits < 3) {
+      b.hits += 1;
+      return;
+    }
+    if (a === "bounce" && b.hits < 2) {
+      b.vx *= -1;
+      b.vy *= -1;
+      b.dirX = b.vx;
+      b.dirY = b.vy;
+      b.hits += 1;
+      return;
+    }
+    if (a === "chain" && b.hits < 3) {
+      const next = this.nearestEnemyExcept(b.x, b.y, e);
+      if (next) {
+        const dx = next.x - b.x;
+        const dy = next.y - b.y;
+        const dm = Math.hypot(dx, dy) || 1;
+        b.dirX = dx / dm;
+        b.dirY = dy / dm;
+        b.vx = b.dirX * b.speed;
+        b.vy = b.dirY * b.speed;
+        b.hits += 1;
+        b.ttl = Math.max(b.ttl, 0.4);
+        return;
+      }
+    }
+    if (a === "orbit") {
+      e.voidIcd = 0.22;
+      return;
+    }
+    b.alive = false;
+  }
+
+  private nearestEnemyExcept(x: number, y: number, skip: Enemy) {
+    let best: Enemy | null = null;
+    let bestD = 999999;
+    for (const e of this.enemies) {
+      if (!e.alive || e === skip) continue;
+      const d = (e.x - x) * (e.x - x) + (e.y - y) * (e.y - y);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+    return best;
+  }
+
+  private detonateCraft(b: Bullet) {
+    const r = b.ability === "shatter" ? 70 : 56;
+    const dmg = Math.max(6, Math.round(spellDamage("craft", this.upgrades.craft.damage, this.crafted) * 0.55));
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (Math.hypot(e.x - b.x, e.y - b.y) <= r + e.r) this.hurtEnemy(e, dmg, e.x - b.x, e.y - b.y, "craft");
+    }
+    this.spawnBurst(b.x, b.y, "craft");
+    this.burstSparks(b.x, b.y, 10, b.color);
+    if (b.ability === "shatter" && this.crafted) {
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        this.spawnCraftShot(this.crafted, Math.cos(a), Math.sin(a), 0, { ability: "pierce", ttl: 0.28 });
+      }
+    }
+  }
+
+  private pulseCraft(b: Bullet, r: number) {
+    const dmg = 4;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (Math.hypot(e.x - b.x, e.y - b.y) <= r + e.r) {
+        e.hp -= dmg;
+        e.flash = 0.06;
+        if (e.hp <= 0) this.killEnemy(e);
+      }
+    }
+    this.burstSparks(b.x, b.y, 4, b.color);
+  }
+
+  private ringCraft(x: number, y: number, r: number, a: CraftAbility) {
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (Math.hypot(e.x - x, e.y - y) > r + e.r) continue;
+      if (a === "howl") e.stun = Math.max(e.stun, 1.1);
+      if (a === "mist") e.freeze = Math.max(e.freeze, 1.4);
+      if (a === "grav") {
+        const dx = x - e.x;
+        const dy = y - e.y;
+        const dm = Math.hypot(dx, dy) || 1;
+        e.kvx = (dx / dm) * 500;
+        e.kvy = (dy / dm) * 500;
+        e.knockT = 0.24;
+      }
+    }
+    this.burstSparks(x, y, 8, "#ecece8");
   }
 
   private wrapEnemy(e: Enemy) {
@@ -2553,30 +2820,10 @@ export class GameEngine {
   }
 
   private drawCraftBolt(b: Bullet) {
-    const ang = Math.atan2(b.dirY, b.dirX);
-    const c = b.color;
-    if (b.form === "orb") {
-      this.drawGlow(b.x, b.y, 26, c);
-      this.drawTinted(this.impactFrame(this.animT), b.x, b.y, 40, 40, this.animT * 3, c);
-      this.drawTinted(this.projFrame(), b.x, b.y, 28, 18, ang, c);
-    } else if (b.form === "meteor") {
-      this.drawTinted(this.impactFrame(this.animT), b.x, b.y, 48, 48, ang, c);
-      this.drawTinted(this.projFrame(), b.x, b.y, 36, 22, ang, c);
-    } else if (b.form === "beam") {
-      this.drawTinted(this.projFrame(), b.x, b.y, 88, 26, ang, c);
-    } else if (b.form === "wave") {
-      this.drawTinted(this.projFrame(), b.x, b.y, 42, 28, ang, c);
-      this.drawTinted(this.projFrame(), b.x + Math.cos(ang) * 8, b.y + Math.sin(ang) * 8, 28, 16, ang + 0.4, c);
-    } else if (b.form === "homing") {
-      this.drawGlow(b.x, b.y, 16, c);
-      this.drawTinted(this.projFrame(), b.x, b.y, 30, 18, ang, c);
-    } else if (b.form === "nova" || b.form === "shard") {
-      this.drawTinted(this.projFrame(), b.x, b.y, 30, 16, ang, c);
-    } else if (b.form === "weave") {
-      this.drawTinted(this.projFrame(), b.x, b.y, 34, 18, ang, c);
-    } else {
-      this.drawTinted(this.projFrame(), b.x, b.y, 34, 20, ang, c);
-    }
+    const ang = Math.atan2(b.dirY || b.vy, b.dirX || b.vx);
+    const name = this.crafted?.name ?? "Rune";
+    this.drawGlow(b.x, b.y, Math.max(12, b.r), b.color);
+    drawCraftSigil(this.ctx, name, b.color, b.x, b.y, ang, this.animT + b.dist * 0.01, b.ability);
   }
 
   private drawLightning(x: number, y: number, dx: number, dy: number) {

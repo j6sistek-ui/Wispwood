@@ -1,9 +1,10 @@
-import type { CraftedSpell, CraftShape, GameEngine, Spell, SpellStat } from "@/game/engine";
+import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
 import type { HudState } from "@/game/engine";
 import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
 import { rarityTint, wheelChoices, pickLegendary, spellFlavor } from "@/game/spell-prompt";
+import { glyphFor } from "@/game/craft-sprites";
 import { BOSSES } from "@/game/bosses";
 import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
@@ -547,37 +548,22 @@ function SpawnMenu({ engine, onClose }: { engine: GameEngine | null; onClose: ()
   );
 }
 
-function SpellGlyph({ color, shape }: { color: string; shape: CraftShape }) {
-  const box = (x: number, y: number, w = 3, h = 3) => (
-    <span
-      key={`${x}-${y}-${w}-${h}`}
-      className="absolute"
-      style={{ left: x, top: y, width: w, height: h, background: color }}
-    />
-  );
-  const marks: Array<[number, number, number?, number?]> =
-    shape === "nova"
-      ? [[6, 0], [12, 6], [6, 12], [0, 6], [6, 6]]
-      : shape === "wave"
-        ? [[0, 8, 4, 2], [4, 4, 4, 2], [8, 2, 4, 2], [12, 6, 4, 2]]
-        : shape === "shard"
-          ? [[7, 0, 2, 14], [2, 4, 12, 2], [4, 8, 8, 2]]
-          : shape === "homing"
-            ? [[2, 2, 4, 4], [8, 6, 6, 6], [4, 10, 3, 3]]
-            : shape === "orb"
-              ? [[3, 3, 10, 10]]
-              : shape === "beam"
-                ? [[0, 6, 16, 3], [12, 3, 3, 9]]
-                : shape === "meteor"
-                  ? [[8, 1, 6, 6], [4, 6, 4, 4], [1, 10, 3, 3]]
-                  : shape === "weave"
-                    ? [[1, 2, 3, 3], [6, 6, 3, 3], [11, 3, 3, 3], [8, 11, 3, 3]]
-                    : shape === "triple"
-                      ? [[1, 6, 4, 4], [6, 2, 4, 4], [11, 6, 4, 4]]
-                      : [[6, 4, 5, 8]];
+function SpellGlyph({ color, name }: { color: string; name: string }) {
+  const rows = glyphFor(name);
   return (
-    <span className="relative block size-4">
-      {marks.map(([x, y, w, h]) => box(x, y, w, h))}
+    <span className="inline-grid" style={{ gridTemplateColumns: "repeat(8, 2px)" }}>
+      {rows.flatMap((row, y) =>
+        [...row].map((ch, x) => (
+          <span
+            key={`${x}-${y}`}
+            style={{
+              width: 2,
+              height: 2,
+              background: ch === "." ? "transparent" : ch === "+" ? "#fff" : color,
+            }}
+          />
+        )),
+      )}
     </span>
   );
 }
@@ -753,7 +739,7 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
                     </span>
                   </span>
                   <span className="flex w-10 shrink-0 items-center justify-center">
-                    <SpellGlyph color={spell.color} shape={spell.shape} />
+                    <SpellGlyph color={spell.color} name={spell.name} />
                   </span>
                 </button>
               ))}

@@ -72,6 +72,7 @@ export const inventSpell = createServerFn({ method: "POST" })
         cooldown,
         rarity: damage >= 24 ? "legendary" : damage >= 20 ? "epic" : damage >= 16 ? "rare" : damage >= 12 ? "uncommon" : "common",
         shots: Math.max(1, Math.min(10, Math.round(Number(parsed.shots) || 1))),
+        ability: "seek",
       },
     };
   });
