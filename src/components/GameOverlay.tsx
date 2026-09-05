@@ -1,9 +1,9 @@
-import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
+import type { CraftedSpell, CraftShape, GameEngine, Spell, SpellStat } from "@/game/engine";
 import type { HudState } from "@/game/engine";
 import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
-import { rarityTint, wheelChoices, pickLegendary } from "@/game/spell-prompt";
+import { rarityTint, wheelChoices, pickLegendary, spellFlavor } from "@/game/spell-prompt";
 import { BOSSES } from "@/game/bosses";
 import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
@@ -547,6 +547,41 @@ function SpawnMenu({ engine, onClose }: { engine: GameEngine | null; onClose: ()
   );
 }
 
+function SpellGlyph({ color, shape }: { color: string; shape: CraftShape }) {
+  const box = (x: number, y: number, w = 3, h = 3) => (
+    <span
+      key={`${x}-${y}-${w}-${h}`}
+      className="absolute"
+      style={{ left: x, top: y, width: w, height: h, background: color }}
+    />
+  );
+  const marks: Array<[number, number, number?, number?]> =
+    shape === "nova"
+      ? [[6, 0], [12, 6], [6, 12], [0, 6], [6, 6]]
+      : shape === "wave"
+        ? [[0, 8, 4, 2], [4, 4, 4, 2], [8, 2, 4, 2], [12, 6, 4, 2]]
+        : shape === "shard"
+          ? [[7, 0, 2, 14], [2, 4, 12, 2], [4, 8, 8, 2]]
+          : shape === "homing"
+            ? [[2, 2, 4, 4], [8, 6, 6, 6], [4, 10, 3, 3]]
+            : shape === "orb"
+              ? [[3, 3, 10, 10]]
+              : shape === "beam"
+                ? [[0, 6, 16, 3], [12, 3, 3, 9]]
+                : shape === "meteor"
+                  ? [[8, 1, 6, 6], [4, 6, 4, 4], [1, 10, 3, 3]]
+                  : shape === "weave"
+                    ? [[1, 2, 3, 3], [6, 6, 3, 3], [11, 3, 3, 3], [8, 11, 3, 3]]
+                    : shape === "triple"
+                      ? [[1, 6, 4, 4], [6, 2, 4, 4], [11, 6, 4, 4]]
+                      : [[6, 4, 5, 8]];
+  return (
+    <span className="relative block size-4">
+      {marks.map(([x, y, w, h]) => box(x, y, w, h))}
+    </span>
+  );
+}
+
 function PixelButton({
   children,
   onClick,
@@ -678,7 +713,7 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
         {result === "jackpot" ? (
           <div className="flex w-full flex-col items-center gap-3 border-4 border-gold bg-surface px-4 py-5 text-center">
             <p className="font-pixel text-pixel text-gold">JACKPOT</p>
-            <p className="font-pixel text-pixel-sm leading-relaxed text-fg">Legendary bound</p>
+            <p className="font-pixel text-pixel-sm leading-relaxed text-fg">A legendary binds to the book</p>
             <p className="font-pixel text-base text-gold">{made || "Rune"}</p>
             <p className="font-pixel text-pixel-sm text-gold">+1000g</p>
             <p className="font-pixel text-pixel-sm tabular-nums text-muted">{hud.gold}g</p>
@@ -690,28 +725,35 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
           <p className="font-pixel text-pixel-sm text-gold">Bound {made || "rune"} to the book</p>
         ) : result === "pick" ? (
           <>
-            <p className="font-pixel text-pixel text-fg">Choose a spell</p>
-            <p className="font-pixel text-pixel-sm text-muted">Common to legendary</p>
-            <div className="grid w-full grid-cols-2 gap-2">
+            <p className="font-pixel text-pixel text-fg">A spell answers</p>
+            <p className="font-pixel text-pixel-sm text-muted">Each one is unique. Pick one.</p>
+            <div className="flex w-full flex-col gap-2">
               {picks.map((spell) => (
                 <button
                   key={spell.name + spell.rarity}
                   type="button"
                   data-ui
                   onClick={() => takeSpell(spell)}
-                  className="border-2 bg-surface px-2 py-3 text-center font-pixel text-pixel-sm text-fg"
+                  className="flex items-stretch gap-2 border-2 bg-surface text-left"
                   style={{ borderColor: rarityTint(spell.rarity) }}
                 >
-                  <span className="block" style={{ color: spell.color }}>
-                    {spell.name}
+                  <span className="w-2 shrink-0" style={{ background: spell.color }} />
+                  <span className="flex min-w-0 flex-1 flex-col gap-1 px-2 py-2">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="font-pixel text-[10px]" style={{ color: spell.color }}>
+                        {spell.name}
+                      </span>
+                      <span className="font-pixel text-[7px]" style={{ color: rarityTint(spell.rarity) }}>
+                        {spell.rarity}
+                      </span>
+                    </span>
+                    <span className="font-pixel text-[8px] leading-relaxed text-fg">{spellFlavor(spell)}</span>
+                    <span className="font-pixel text-[7px] text-muted">
+                      {spell.damage} dmg · {spell.cooldown.toFixed(2)}s
+                    </span>
                   </span>
-                  <span className="mt-1 block text-[8px] leading-relaxed" style={{ color: rarityTint(spell.rarity) }}>
-                    {spell.rarity}
-                  </span>
-                  <span className="mt-1 block text-[8px] leading-relaxed text-muted">
-                    {spell.shots > 1 ? `${spell.shots}-shot ${spell.shape}` : spell.shape}
-                    {" · "}
-                    {spell.damage} dmg
+                  <span className="flex w-10 shrink-0 items-center justify-center">
+                    <SpellGlyph color={spell.color} shape={spell.shape} />
                   </span>
                 </button>
               ))}
@@ -719,27 +761,28 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
           </>
         ) : (
           <>
-            <p className="font-pixel text-pixel text-fg">Fortune wheel</p>
-            <p className="font-pixel text-pixel-sm text-gold">100g to spin</p>
+            <p className="font-pixel text-pixel text-fg">Wyrd wheel</p>
+            <p className="font-pixel text-pixel-sm text-gold">100g to spin a custom spell</p>
             <div className="relative size-52">
               <div
                 className="size-52 overflow-hidden rounded-full border-4 border-fg"
                 style={{
                   transform: `rotate(${angle}deg)`,
                   transition: spinning ? "transform 1.35s cubic-bezier(0.12, 0.7, 0.2, 1)" : "none",
-                  background: "conic-gradient(#c8ccd4 0deg 180deg, #2a2c28 180deg 360deg)",
+                  background:
+                    "conic-gradient(#3d7a45 0deg 160deg, #f0d24a 160deg 180deg, #1c1e1b 180deg 340deg, #c45a48 340deg 360deg)",
                 }}
               />
               <div className="absolute top-[-6px] left-1/2 -translate-x-1/2 border-x-8 border-t-[14px] border-x-transparent border-t-gold" />
-              <p className="pointer-events-none absolute top-10 left-1/2 -translate-x-1/2 font-pixel text-pixel-sm text-accent-fg">
+              <p className="pointer-events-none absolute top-10 left-1/2 -translate-x-1/2 font-pixel text-[8px] text-fg">
                 SPELL
               </p>
-              <p className="pointer-events-none absolute bottom-10 left-1/2 -translate-x-1/2 font-pixel text-pixel-sm text-muted">
+              <p className="pointer-events-none absolute bottom-10 left-1/2 -translate-x-1/2 font-pixel text-[8px] text-muted">
                 NONE
               </p>
             </div>
             {result === "miss" ? (
-              <p className="font-pixel text-pixel-sm text-muted">The wheel is quiet</p>
+              <p className="font-pixel text-pixel-sm text-muted">The clearing stays quiet</p>
             ) : null}
             {result === "poor" ? (
               <p className="font-pixel text-pixel-sm text-gold">Need 100g</p>
@@ -800,9 +843,7 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
       ? [
           `${hud.crafted?.rarity ?? "common"}`,
           `${dmg} damage`,
-          hud.crafted && hud.crafted.shots > 1
-            ? `${hud.crafted.shots}-shot ${hud.crafted.shape}`
-            : (hud.crafted?.shape ?? "single"),
+          hud.crafted ? spellFlavor(hud.crafted) : "a bolt",
         ]
       : spell === "void" && !hud.voidUnlocked
         ? ["Locked", "300 gold", "This night"]
