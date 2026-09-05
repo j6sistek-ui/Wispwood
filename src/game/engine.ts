@@ -2479,10 +2479,6 @@ export class GameEngine {
     return this.assets!.projectile[Math.floor(this.animT * 14) % 4]!;
   }
 
-  private wispFrame() {
-    return this.assets!.wisp[Math.floor(this.animT * 8) % 4]!;
-  }
-
   private impactFrame(t: number) {
     return this.assets!.impact[Math.min(3, Math.max(0, Math.floor(t * 4)))]!;
   }
@@ -2526,24 +2522,33 @@ export class GameEngine {
     ctx.restore();
   }
 
+  private drawGlow(x: number, y: number, r: number, color: string) {
+    const ctx = this.ctx;
+    ctx.save();
+    const g = ctx.createRadialGradient(x, y, r * 0.12, x, y, r);
+    g.addColorStop(0, color);
+    g.addColorStop(0.45, color);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   private drawVoidOrb(b: Bullet) {
     const spin = b.ang * 2.4;
-    const r = 118 + Math.sin(this.animT * 14) * 6;
-    this.ctx.save();
-    this.ctx.globalAlpha = 0.55;
-    this.ctx.fillStyle = "#2a1038";
-    this.ctx.beginPath();
-    this.ctx.arc(b.x, b.y, r * 0.42, 0, Math.PI * 2);
-    this.ctx.fill();
-    this.ctx.restore();
-    this.drawTinted(this.wispFrame(), b.x, b.y, r, r, spin, "#7a48b8");
-    this.drawTinted(this.projFrame(), b.x, b.y, 44, 28, spin + 0.6, "#d8c4f0");
+    const r = 70 + Math.sin(this.animT * 14) * 5;
+    this.drawGlow(b.x, b.y, r, "#4a2068");
+    this.drawTinted(this.impactFrame(this.animT), b.x, b.y, r * 1.1, r * 1.1, spin, "#7a48b8");
+    this.drawTinted(this.projFrame(), b.x, b.y, 48, 28, spin + 0.6, "#d8c4f0");
   }
 
   private drawEmberOrb(b: Bullet) {
     const ang = Math.atan2(b.vy, b.vx);
-    const pulse = 52 + Math.sin(this.animT * 14 + b.dist * 0.05) * 6;
-    this.drawTinted(this.wispFrame(), b.x, b.y, pulse, pulse, this.animT * 2, "#e08a3c");
+    this.drawGlow(b.x, b.y, 28, "#e08a3c");
+    this.drawTinted(this.impactFrame(this.animT), b.x, b.y, 34, 34, ang, "#c45a48");
     this.drawTinted(this.projFrame(), b.x, b.y, 40, 24, ang, "#f0d24a");
   }
 
@@ -2551,7 +2556,8 @@ export class GameEngine {
     const ang = Math.atan2(b.dirY, b.dirX);
     const c = b.color;
     if (b.form === "orb") {
-      this.drawTinted(this.wispFrame(), b.x, b.y, 56, 56, this.animT * 3, c);
+      this.drawGlow(b.x, b.y, 26, c);
+      this.drawTinted(this.impactFrame(this.animT), b.x, b.y, 40, 40, this.animT * 3, c);
       this.drawTinted(this.projFrame(), b.x, b.y, 28, 18, ang, c);
     } else if (b.form === "meteor") {
       this.drawTinted(this.impactFrame(this.animT), b.x, b.y, 48, 48, ang, c);
@@ -2562,12 +2568,11 @@ export class GameEngine {
       this.drawTinted(this.projFrame(), b.x, b.y, 42, 28, ang, c);
       this.drawTinted(this.projFrame(), b.x + Math.cos(ang) * 8, b.y + Math.sin(ang) * 8, 28, 16, ang + 0.4, c);
     } else if (b.form === "homing") {
-      this.drawTinted(this.wispFrame(), b.x, b.y, 36, 36, this.animT * 5, c);
-      this.drawTinted(this.projFrame(), b.x, b.y, 26, 16, ang, c);
+      this.drawGlow(b.x, b.y, 16, c);
+      this.drawTinted(this.projFrame(), b.x, b.y, 30, 18, ang, c);
     } else if (b.form === "nova" || b.form === "shard") {
       this.drawTinted(this.projFrame(), b.x, b.y, 30, 16, ang, c);
     } else if (b.form === "weave") {
-      this.drawTinted(this.wispFrame(), b.x, b.y, 28, 28, ang, c);
       this.drawTinted(this.projFrame(), b.x, b.y, 34, 18, ang, c);
     } else {
       this.drawTinted(this.projFrame(), b.x, b.y, 34, 20, ang, c);
@@ -2617,14 +2622,12 @@ export class GameEngine {
     ctx.drawImage(boom, -s / 2, -s / 2, s, s);
     ctx.drawImage(this.projFrame(), -s * 0.2, -10, s * 0.7, 20);
     ctx.restore();
-    ctx.globalAlpha = fade * 0.85;
-    this.drawTinted(this.wispFrame(), x, y, 28 + fade * 20, 28 + fade * 20, this.animT, "#f0d24a");
     ctx.globalAlpha = 1;
   }
 
   private drawVineBolt(x: number, y: number, ang: number) {
     this.drawTinted(this.projFrame(), x, y, 36, 20, ang, "#6fbf6a");
-    this.drawTinted(this.wispFrame(), x, y, 22, 22, ang + this.animT, "#3d7a45");
+    this.drawTinted(this.impactFrame(this.animT), x, y, 18, 18, ang, "#3d7a45");
   }
 
   private drawVineWrap(x: number, y: number, r: number) {
@@ -2640,7 +2643,6 @@ export class GameEngine {
       ctx.stroke();
     }
     ctx.restore();
-    this.drawTinted(this.wispFrame(), x, y, 18, 18, this.animT, "#6fbf6a");
   }
 
   private drawVineAura(x: number, y: number) {
@@ -2656,7 +2658,7 @@ export class GameEngine {
   }
 
   private drawIceBolt(x: number, y: number, ang: number) {
-    this.drawTinted(this.wispFrame(), x, y, 26, 26, ang, "#c5eaf6");
+    this.drawGlow(x, y, 14, "#9ad8ea");
     this.drawTinted(this.projFrame(), x, y, 36, 18, ang, "#9ad8ea");
   }
 
@@ -2677,7 +2679,7 @@ export class GameEngine {
       else if (s.kind === "shard") {
         this.drawTinted(this.projFrame(), s.x, s.y, s.size * 4, s.size * 1.6, Math.atan2(s.vy, s.vx), s.color);
       } else {
-        this.drawTinted(this.wispFrame(), s.x, s.y, s.size * 2.2, s.size * 2.2, 0, s.color);
+        this.drawTinted(this.impactFrame(this.animT), s.x, s.y, s.size * 2.4, s.size * 2.4, 0, s.color);
       }
       ctx.globalAlpha = 1;
     }
