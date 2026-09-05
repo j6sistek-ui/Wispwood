@@ -2471,164 +2471,113 @@ export class GameEngine {
         this.drawEmberOrb(b);
         continue;
       }
-      const img = this.assets!.projectile[Math.floor(this.animT * 12) % 4]!;
-      const pw = 32;
-      const ph = 20;
-      ctx.save();
-      ctx.translate(b.x, b.y);
-      ctx.rotate(ang);
-      ctx.drawImage(img, -pw / 2, -ph / 2, pw, ph);
-      ctx.restore();
+      this.drawTinted(this.projFrame(), b.x, b.y, 32, 20, ang);
     }
   }
 
-  private drawVoidOrb(b: Bullet) {
-    const ctx = this.ctx;
-    const spin = b.ang * 2.4;
-    const r = 62 + Math.sin(this.animT * 14) * 4;
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    ctx.rotate(spin);
-    const g = ctx.createRadialGradient(0, 0, 3, 0, 0, r);
-    g.addColorStop(0, "#d8c4f0");
-    g.addColorStop(0.18, "#7a48b8");
-    g.addColorStop(0.45, "#2a1038");
-    g.addColorStop(0.78, "#0a060e");
-    g.addColorStop(1, "rgba(10,6,14,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(160, 90, 220, 0.7)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 0.85, r * 0.28, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 0.28, r * 0.85, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+  private projFrame() {
+    return this.assets!.projectile[Math.floor(this.animT * 14) % 4]!;
   }
 
-  private drawEmberOrb(b: Bullet) {
-    const ctx = this.ctx;
-    const pulse = 26 + Math.sin(this.animT * 14 + b.dist * 0.05) * 3;
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    const g = ctx.createRadialGradient(0, 0, 3, 0, 0, pulse);
-    g.addColorStop(0, "#fff4d2");
-    g.addColorStop(0.22, "#ffe27a");
-    g.addColorStop(0.55, "#e08a3c");
-    g.addColorStop(0.82, "#c45a48");
-    g.addColorStop(1, "rgba(196,90,72,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(0, 0, pulse, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+  private wispFrame() {
+    return this.assets!.wisp[Math.floor(this.animT * 8) % 4]!;
   }
 
-  private drawCraftBolt(b: Bullet) {
-    const ctx = this.ctx;
-    const ang = Math.atan2(b.dirY, b.dirX);
-    const c = b.color;
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    ctx.rotate(ang);
-    if (b.form === "orb") {
-      const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 22);
-      g.addColorStop(0, "#ffffff");
-      g.addColorStop(0.35, c);
-      g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(0, 0, 22, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (b.form === "meteor") {
-      ctx.fillStyle = c;
-      ctx.beginPath();
-      ctx.arc(0, 0, 16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.beginPath();
-      ctx.arc(-4, -4, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = c;
-      ctx.beginPath();
-      ctx.moveTo(-10, 0);
-      ctx.lineTo(-28, -8);
-      ctx.lineTo(-22, 0);
-      ctx.lineTo(-28, 8);
-      ctx.closePath();
-      ctx.fill();
-    } else if (b.form === "beam") {
-      ctx.fillStyle = c;
-      ctx.globalAlpha = 0.95;
-      ctx.fillRect(-36, -5, 72, 10);
-      ctx.globalAlpha = 0.35;
-      ctx.fillRect(-40, -10, 80, 20);
-      ctx.globalAlpha = 1;
-    } else if (b.form === "wave") {
-      ctx.strokeStyle = c;
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.arc(-4, 0, 18, -1.1, 1.1);
-      ctx.stroke();
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(2, 0, 12, -1, 1);
-      ctx.stroke();
-    } else if (b.form === "shard" || b.form === "nova") {
-      ctx.fillStyle = c;
-      ctx.beginPath();
-      ctx.moveTo(16, 0);
-      ctx.lineTo(0, -8);
-      ctx.lineTo(-10, 0);
-      ctx.lineTo(0, 8);
-      ctx.closePath();
-      ctx.fill();
-    } else {
-      const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 16);
-      g.addColorStop(0, "#ffffff");
-      g.addColorStop(0.4, c);
-      g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(0, 0, 16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = c;
-      ctx.beginPath();
-      ctx.moveTo(18, 0);
-      ctx.lineTo(-10, -7);
-      ctx.lineTo(-4, 0);
-      ctx.lineTo(-10, 7);
-      ctx.closePath();
-      ctx.fill();
+  private impactFrame(t: number) {
+    return this.assets!.impact[Math.min(3, Math.max(0, Math.floor(t * 4)))]!;
+  }
+
+  private coinFrame() {
+    return this.assets!.pickup[Math.floor(this.animT * 8) % 4]!;
+  }
+
+  private tintFilter(hex: string) {
+    const n = parseInt(hex.slice(1), 16);
+    if (!Number.isFinite(n)) return "none";
+    const r = ((n >> 16) & 255) / 255;
+    const g = ((n >> 8) & 255) / 255;
+    const b = (n & 255) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    const d = max - min;
+    let h = 48;
+    let s = 0;
+    if (d > 0.001) {
+      s = d / (1 - Math.abs(2 * l - 1) || 1);
+      if (max === r) h = 60 * (((g - b) / d) % 6);
+      else if (max === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+      if (h < 0) h += 360;
     }
-    ctx.restore();
+    const sat = Math.max(0.45, Math.min(2.1, 0.55 + s * 1.3));
+    const bri = Math.max(0.5, Math.min(1.4, 0.5 + l * 1.15));
+    return `hue-rotate(${Math.round(h - 48)}deg) saturate(${sat}) brightness(${bri})`;
   }
 
-  private drawLightning(x: number, y: number, dx: number, dy: number) {
+  private drawTinted(img: HTMLImageElement, x: number, y: number, w: number, h: number, ang = 0, color?: string) {
     const ctx = this.ctx;
-    const ang = Math.atan2(dy, dx);
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(ang);
-    ctx.strokeStyle = "rgba(255, 226, 122, 0.98)";
-    ctx.lineWidth = 2.6;
-    ctx.lineJoin = "miter";
-    ctx.beginPath();
-    ctx.moveTo(-22, 0);
-    ctx.lineTo(-10, -5);
-    ctx.lineTo(-4, 3);
-    ctx.lineTo(8, -4);
-    ctx.lineTo(14, 2);
-    ctx.lineTo(24, 0);
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(240, 210, 74, 0.85)";
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
+    ctx.imageSmoothingEnabled = false;
+    if (color) ctx.filter = this.tintFilter(color);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
+  }
+
+  private drawVoidOrb(b: Bullet) {
+    const spin = b.ang * 2.4;
+    const r = 118 + Math.sin(this.animT * 14) * 6;
+    this.ctx.save();
+    this.ctx.globalAlpha = 0.55;
+    this.ctx.fillStyle = "#2a1038";
+    this.ctx.beginPath();
+    this.ctx.arc(b.x, b.y, r * 0.42, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.restore();
+    this.drawTinted(this.wispFrame(), b.x, b.y, r, r, spin, "#7a48b8");
+    this.drawTinted(this.projFrame(), b.x, b.y, 44, 28, spin + 0.6, "#d8c4f0");
+  }
+
+  private drawEmberOrb(b: Bullet) {
+    const ang = Math.atan2(b.vy, b.vx);
+    const pulse = 52 + Math.sin(this.animT * 14 + b.dist * 0.05) * 6;
+    this.drawTinted(this.wispFrame(), b.x, b.y, pulse, pulse, this.animT * 2, "#e08a3c");
+    this.drawTinted(this.projFrame(), b.x, b.y, 40, 24, ang, "#f0d24a");
+  }
+
+  private drawCraftBolt(b: Bullet) {
+    const ang = Math.atan2(b.dirY, b.dirX);
+    const c = b.color;
+    if (b.form === "orb") {
+      this.drawTinted(this.wispFrame(), b.x, b.y, 56, 56, this.animT * 3, c);
+      this.drawTinted(this.projFrame(), b.x, b.y, 28, 18, ang, c);
+    } else if (b.form === "meteor") {
+      this.drawTinted(this.impactFrame(this.animT), b.x, b.y, 48, 48, ang, c);
+      this.drawTinted(this.projFrame(), b.x, b.y, 36, 22, ang, c);
+    } else if (b.form === "beam") {
+      this.drawTinted(this.projFrame(), b.x, b.y, 88, 26, ang, c);
+    } else if (b.form === "wave") {
+      this.drawTinted(this.projFrame(), b.x, b.y, 42, 28, ang, c);
+      this.drawTinted(this.projFrame(), b.x + Math.cos(ang) * 8, b.y + Math.sin(ang) * 8, 28, 16, ang + 0.4, c);
+    } else if (b.form === "homing") {
+      this.drawTinted(this.wispFrame(), b.x, b.y, 36, 36, this.animT * 5, c);
+      this.drawTinted(this.projFrame(), b.x, b.y, 26, 16, ang, c);
+    } else if (b.form === "nova" || b.form === "shard") {
+      this.drawTinted(this.projFrame(), b.x, b.y, 30, 16, ang, c);
+    } else if (b.form === "weave") {
+      this.drawTinted(this.wispFrame(), b.x, b.y, 28, 28, ang, c);
+      this.drawTinted(this.projFrame(), b.x, b.y, 34, 18, ang, c);
+    } else {
+      this.drawTinted(this.projFrame(), b.x, b.y, 34, 20, ang, c);
+    }
+  }
+
+  private drawLightning(x: number, y: number, dx: number, dy: number) {
+    const ang = Math.atan2(dy, dx);
+    this.drawTinted(this.projFrame(), x, y, 64, 24, ang, "#f0d24a");
+    this.drawTinted(this.impactFrame(this.animT), x, y, 22, 22, ang + this.animT, "#ffe27a");
   }
 
   private drawBoltBurst(x: number, y: number, radius: number) {
@@ -2658,90 +2607,24 @@ export class GameEngine {
     const ctx = this.ctx;
     const ang = Math.atan2(dirY, dirX);
     const fade = 1 - k;
-    const flash = Math.max(0, 1 - k * 3.2);
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(ang);
-    ctx.globalAlpha = flash * 0.85;
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(0, 0, 10 + flash * 22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 0.7 * fade;
-    const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, radius);
-    glow.addColorStop(0, "rgba(255,255,255,0.95)");
-    glow.addColorStop(0.18, "rgba(255,242,160,0.85)");
-    glow.addColorStop(0.42, "rgba(255,154,60,0.55)");
-    glow.addColorStop(0.72, "rgba(255,70,28,0.22)");
-    glow.addColorStop(1, "rgba(255,70,28,0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 0.95 * fade;
-    ctx.strokeStyle = "#fff4c8";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.55, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = "#ff9a3c";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.88, 0, Math.PI * 2);
-    ctx.stroke();
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2 + k * 0.6;
-      const len = radius * (0.55 + (i % 3) * 0.22);
-      ctx.globalAlpha = fade * (0.55 + (i % 2) * 0.3);
-      ctx.strokeStyle = i % 2 === 0 ? "#ffffff" : "#f0d24a";
-      ctx.lineWidth = i % 3 === 0 ? 3 : 1.6;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
-      ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "#ffffff";
     ctx.globalAlpha = fade;
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2;
-      const r = (i % 2 === 0 ? 18 : 8) * (1 + k * 0.4);
-      const px = Math.cos(a) * r;
-      const py = Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
+    const boom = this.assets!.impact[Math.min(3, Math.floor(k * 4))]!;
+    const s = radius * 1.15;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(boom, -s / 2, -s / 2, s, s);
+    ctx.drawImage(this.projFrame(), -s * 0.2, -10, s * 0.7, 20);
     ctx.restore();
+    ctx.globalAlpha = fade * 0.85;
+    this.drawTinted(this.wispFrame(), x, y, 28 + fade * 20, 28 + fade * 20, this.animT, "#f0d24a");
     ctx.globalAlpha = 1;
   }
 
   private drawVineBolt(x: number, y: number, ang: number) {
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(ang);
-    ctx.strokeStyle = "#3d7a45";
-    ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    for (let i = -10; i <= 12; i++) {
-      const t = i / 12;
-      const px = i * 1.6;
-      const py = Math.sin(i * 0.7 + this.animT * 10) * 4.5;
-      if (i === -10) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-      void t;
-    }
-    ctx.stroke();
-    ctx.strokeStyle = "#8ed48a";
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-    ctx.fillStyle = "#6fbf6a";
-    ctx.beginPath();
-    ctx.arc(12, 0, 4.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    this.drawTinted(this.projFrame(), x, y, 36, 20, ang, "#6fbf6a");
+    this.drawTinted(this.wispFrame(), x, y, 22, 22, ang + this.animT, "#3d7a45");
   }
 
   private drawVineWrap(x: number, y: number, r: number) {
@@ -2757,6 +2640,7 @@ export class GameEngine {
       ctx.stroke();
     }
     ctx.restore();
+    this.drawTinted(this.wispFrame(), x, y, 18, 18, this.animT, "#6fbf6a");
   }
 
   private drawVineAura(x: number, y: number) {
@@ -2772,30 +2656,8 @@ export class GameEngine {
   }
 
   private drawIceBolt(x: number, y: number, ang: number) {
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(ang);
-    const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, 16);
-    glow.addColorStop(0, "rgba(234, 248, 253, 0.95)");
-    glow.addColorStop(0.45, "rgba(168, 222, 240, 0.55)");
-    glow.addColorStop(1, "rgba(126, 200, 232, 0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(0, 0, 16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#eaf8fd";
-    ctx.beginPath();
-    ctx.moveTo(12, 0);
-    ctx.lineTo(-8, -5);
-    ctx.lineTo(-5, 0);
-    ctx.lineTo(-8, 5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = "rgba(186, 230, 244, 0.95)";
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    ctx.restore();
+    this.drawTinted(this.wispFrame(), x, y, 26, 26, ang, "#c5eaf6");
+    this.drawTinted(this.projFrame(), x, y, 36, 18, ang, "#9ad8ea");
   }
 
   private drawFx() {
@@ -2803,15 +2665,9 @@ export class GameEngine {
     for (const a of this.arcs) {
       if (!a.alive) continue;
       const k = clamp(a.ttl / a.max, 0, 1);
-      ctx.globalAlpha = 0.25 + k * 0.55;
-      ctx.fillStyle = "rgba(240, 210, 74, 0.35)";
-      ctx.beginPath();
-      ctx.arc(a.x, a.y, a.r * (0.7 + k * 0.3), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#f0d24a";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+      this.ctx.globalAlpha = 0.35 + k * 0.5;
+      this.drawTinted(this.impactFrame(1 - k), a.x, a.y, a.r * 2, a.r * 2, this.animT, "#f0d24a");
+      this.ctx.globalAlpha = 1;
     }
     for (const s of this.sparks) {
       if (!s.alive) continue;
@@ -2819,30 +2675,20 @@ export class GameEngine {
       if (s.kind === "flake") this.drawSnowflake(s.x, s.y, s.size, s.ttl * 8, s.color);
       else if (s.kind === "coin") this.drawCoin(s.x, s.y, s.size, s.color);
       else if (s.kind === "shard") {
-        const ang = Math.atan2(s.vy, s.vx);
-        ctx.save();
-        ctx.translate(s.x, s.y);
-        ctx.rotate(ang);
-        ctx.fillStyle = s.color;
-        ctx.fillRect(0, -s.size * 0.35, s.size * 3.4, s.size * 0.7);
-        ctx.restore();
+        this.drawTinted(this.projFrame(), s.x, s.y, s.size * 4, s.size * 1.6, Math.atan2(s.vy, s.vx), s.color);
       } else {
-        ctx.fillStyle = s.color;
-        ctx.fillRect(s.x, s.y, s.size, s.size);
+        this.drawTinted(this.wispFrame(), s.x, s.y, s.size * 2.2, s.size * 2.2, 0, s.color);
       }
       ctx.globalAlpha = 1;
     }
     for (const b of this.bursts) {
       if (!b.alive) continue;
       ctx.globalAlpha = 1 - b.t / 0.28;
-      if (b.spell === "frost") this.drawIceBurst(b.x, b.y, 20 + b.t * 70);
-      else if (b.spell === "bolt") this.drawBoltBurst(b.x, b.y, 18 + b.t * 90);
-      else if (b.spell === "boom") this.drawBoomBurst(b.x, b.y, 28 + b.t * 140);
-      else {
-        const img = this.assets!.impact[Math.min(3, Math.floor(b.t * 14))]!;
-        const s = 36 + b.t * 40;
-        ctx.drawImage(img, b.x - s / 2, b.y - s / 2, s, s);
-      }
+      const hit = 42 + b.t * 70;
+      const tint =
+        b.spell === "frost" ? "#9ad8ea" : b.spell === "bolt" ? "#f0d24a" : b.spell === "vine" ? "#6fbf6a" : b.spell === "void" ? "#9a7ab8" : undefined;
+      this.drawTinted(this.impactFrame(b.t * 8), b.x, b.y, hit, hit, b.t * 6, tint);
+      if (b.spell === "boom") this.drawBoomBurst(b.x, b.y, 28 + b.t * 140);
       ctx.globalAlpha = 1;
     }
     ctx.font = "8px \"Press Start 2P\", monospace";
@@ -2858,18 +2704,7 @@ export class GameEngine {
   }
 
   private drawCoin(x: number, y: number, size: number, color: string) {
-    const ctx = this.ctx;
-    ctx.beginPath();
-    ctx.fillStyle = color;
-    ctx.arc(x, y, size, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#c9a227";
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.fillStyle = "rgba(255, 245, 180, 0.7)";
-    ctx.arc(x - size * 0.25, y - size * 0.25, size * 0.28, 0, Math.PI * 2);
-    ctx.fill();
+    this.drawTinted(this.coinFrame(), x, y, Math.max(12, size * 3.2), Math.max(12, size * 3.2), 0, color);
   }
 
   private drawSnowflake(x: number, y: number, size: number, rot: number, color: string) {
