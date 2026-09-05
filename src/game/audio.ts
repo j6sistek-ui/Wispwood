@@ -5,6 +5,7 @@ export class GameAudio {
   private master: GainNode | null = null;
   private sfx: GainNode | null = null;
   private music: GainNode | null = null;
+  private makeup: GainNode | null = null;
   private bedNodes: Array<AudioScheduledSourceNode> = [];
   private bedTimer = 0;
   private bedOn = false;
@@ -12,6 +13,7 @@ export class GameAudio {
   private nextNote = 0;
   private jackBuf: AudioBuffer | null = null;
   private jackLoading = false;
+  private noiseBuf: AudioBuffer | null = null;
   muted = false;
 
   unlock() {
@@ -21,12 +23,24 @@ export class GameAudio {
       this.master = this.ctx.createGain();
       this.sfx = this.ctx.createGain();
       this.music = this.ctx.createGain();
+      this.makeup = this.ctx.createGain();
+      const glue = this.makeComp(-24, 8, 5.5, 0.01, 0.14);
+      const grit = this.ctx.createWaveShaper();
+      grit.curve = this.satCurve(1.8);
+      grit.oversample = "2x";
+      const limit = this.makeComp(-3.5, 0.4, 18, 0.003, 0.06);
       this.sfx.connect(this.master);
-      this.music.connect(this.master);
+      this.music.connect(glue);
+      glue.connect(grit);
+      grit.connect(limit);
+      limit.connect(this.makeup);
+      this.makeup.connect(this.master);
       this.master.connect(this.ctx.destination);
       this.master.gain.value = this.muted ? 0 : 1;
-      this.sfx.gain.value = 1;
+      this.sfx.gain.value = 1.15;
       this.music.gain.value = this.muted ? 0 : 1.7;
+      this.makeup.gain.value = 2.6;
+      this.makeNoiseBuf();
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
     this.loadJackpot();
@@ -47,7 +61,7 @@ export class GameAudio {
     this.unlock();
     if (!this.ctx || !this.master || !this.music || this.bedOn) return;
     this.bedOn = true;
-    this.music.gain.setTargetAtTime(this.muted ? 0 : 1.35, this.ctx.currentTime, 0.08);
+    this.music.gain.setTargetAtTime(this.muted ? 0 : 1.7, this.ctx.currentTime, 0.08);
     this.step = 0;
     this.nextNote = this.ctx.currentTime + 0.04;
     this.tickBed();
@@ -77,56 +91,300 @@ export class GameAudio {
 
   private tickBed() {
     if (!this.bedOn || !this.ctx) return;
-    const stepDur = 60 / 96;
-    while (this.nextNote < this.ctx.currentTime + 0.25) {
-      this.scheduleStep(this.step, this.nextNote);
-      this.step = (this.step + 1) % 16;
+    const stepDur = 60 / 162 / 2;
+    while (this.nextNote < this.ctx.currentTime + 0.18) {
+      this.scheduleStep(this.step, this.nextNote, stepDur);
+      this.step = (this.step + 1) % 64;
       this.nextNote += stepDur;
     }
-    this.bedTimer = window.setTimeout(() => this.tickBed(), 40);
+    if (this.bedNodes.length > 220) {
+      const drop = this.bedNodes.splice(0, this.bedNodes.length - 80);
+      for (const n of drop) {
+        try {
+          n.stop();
+        } catch {
+          /* already stopped */
+        }
+      }
+    }
+    this.bedTimer = window.setTimeout(() => this.tickBed(), 50);
   }
 
-  private scheduleStep(step: number, t: number) {
-    const bass = [98, 0, 0, 0, 73.42, 0, 0, 0, 87.31, 0, 0, 0, 110, 0, 0, 0];
-    const lead = [261.63, 0, 329.63, 0, 392, 0, 329.63, 0, 293.66, 0, 261.63, 0, 196, 0, 261.63, 0];
-    const b = bass[step] ?? 0;
-    const l = lead[step] ?? 0;
-    if (b) this.pianoTone(b, 0.95, 0.18, t);
-    if (l) this.pianoTone(l, 1.15, 0.28, t);
-    if (step % 4 === 0) this.musicTone(80, 0.12, "sine", 0.1, -16, t);
-    if (step % 8 === 4) this.musicNoise(0.08, 0.1, t);
+  private scheduleStep(step: number, t: number, stepDur: number) {
+    const motif = [1046.5, 155.56, 830.61, 98.0];
+    const phase =
+      step < 8 ? "hook" : step < 16 ? "groove" : step < 24 ? "build" : step < 28 ? "cut" : step < 32 ? "rise" : "drop";
+
+    if (phase === "hook" || phase === "groove") {
+      if (step % 2 === 0) {
+        const f = motif[(step / 2) % 4]!;
+        this.smash(f, 0.46, t, phase === "groove" ? 1.15 : 1);
+      }
+      if (phase === "groove") {
+        if (step % 2 === 0) this.kick(t, 0.36);
+        if (step % 8 === 4) this.snare(t, 0.32);
+        if (step % 2 === 1) this.kick(t, 0.16);
+        this.playNoise(0.018, 0.06, 7000, t);
+        this.growl(65.41, 0.22, 0.18, t);
+      } else if (step === 0) this.growl(49.0, 0.5, 0.2, t);
+    }
+
+    if (phase === "build") {
+      const climb = [130.81, 155.56, 196.0, 207.65, 261.63, 311.13, 392.0, 415.3];
+      const f = climb[step - 16]!;
+      this.smash(f, 0.18, t, 0.9);
+      this.smash(f * 2, 0.14, t, 0.7);
+      this.growl(f * 0.5, 0.2, 0.16, t);
+      this.playNoise(0.04, 0.06 + (step - 16) * 0.02, 2800, t);
+      this.kick(t, 0.28);
+      this.snare(t, 0.12 + (step - 16) * 0.03);
+    }
+
+    if (phase === "cut") {
+      this.playNoise(0.014, 0.07, 8000, t);
+      if (step === 24) this.growl(32.7, 0.8, 0.22, t);
+      if (step === 27) this.musicTone(28, 0.5, "sine", 0.32, 120, t);
+    }
+
+    if (phase === "rise") {
+      const run = [65.41, 98.0, 130.81, 196.0, 261.63, 392.0, 523.25, 830.61];
+      const i = step - 28;
+      this.smash(run[i]!, 0.14, t, 1.1);
+      this.smash(run[i]! * 2, 0.12, t, 0.85);
+      this.growl(run[i]! * 0.5, 0.2, 0.2, t);
+      this.violinTone(run[Math.min(7, i + 2)]! * 2, 0.22, 0.14, t);
+      this.playNoise(0.06, 0.1 + i * 0.05, 900 + i * 700, t);
+      this.kick(t, 0.3);
+    }
+
+    if (phase === "drop") {
+      const d = step - 32;
+      const f = motif[d % 4]!;
+      const flip = [155.56, 1046.5, 98.0, 830.61][d % 4]!;
+      this.smash(f, 0.2, t, 1.25);
+      this.violinTone(flip, 0.16, 0.18, t);
+      const bassJump = [41.2, 65.41, 49.0, 77.78, 43.65, 87.31, 38.89, 98.0];
+      this.growl(bassJump[d % 8]!, 0.2, 0.24, t);
+      this.kick(t, 0.4);
+      const clave = d % 8;
+      if (clave === 0 || clave === 3 || clave === 6 || clave === 2) this.snare(t, 0.34);
+      this.playNoise(0.02, 0.08, 6500, t);
+      if (d % 8 === 0) {
+        this.playNoise(0.22, 0.28, 400, t);
+        this.smash(523.25, 0.35, t, 1.1);
+        this.smash(830.61, 0.3, t, 0.9);
+        this.violinTone(1244.5, 0.28, 0.16, t);
+        this.growl(32.7, 0.4, 0.26, t);
+      }
+      if (d % 8 === 7) {
+        this.pianoTone(1244.5, 0.09, 0.18, t, true);
+        this.pianoTone(932.33, 0.09, 0.16, t + stepDur * 0.33, true);
+        this.pianoTone(622.25, 0.09, 0.16, t + stepDur * 0.66, true);
+        this.musicTone(1100, 0.22, "sawtooth", 0.08, -700, t);
+        this.growl(55, 0.25, 0.2, t);
+      }
+      if (d === 0) {
+        this.violinTone(1568, 0.55, 0.18, t);
+        this.smash(1046.5, 0.55, t, 1.3);
+        this.growl(41.2, 0.6, 0.28, t);
+      }
+    }
+
+    if (step === 0) {
+      this.playNoise(0.28, 0.24, 350, t);
+      this.violinTone(830.61, 0.8, 0.14, t);
+      this.growl(32.7, 0.7, 0.22, t);
+    }
   }
 
-  private pianoTone(freq: number, dur: number, gain: number, when: number) {
+  private smash(freq: number, dur: number, when: number, amt = 1) {
+    this.pianoTone(freq, dur, 0.22 * amt, when, true);
+    this.pianoTone(Math.max(48, freq * 0.5), dur, 0.16 * amt, when, true);
+    this.pianoTone(freq * 1.4983, dur * 0.75, 0.08 * amt, when, false);
+    this.musicTone(freq, dur * 0.55, "sawtooth", 0.045 * amt, 0, when);
+  }
+
+  private growl(freq: number, dur: number, gain: number, when: number) {
     if (!this.ctx || !this.music) return;
-    const partials: Array<[number, number]> = [
-      [1, 1],
-      [2, 0.42],
-      [3, 0.2],
-      [4, 0.12],
-      [5, 0.07],
-      [6, 0.04],
-      [8, 0.025],
-    ];
-    for (const [n, amp] of partials) {
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(380, when);
+    lp.Q.value = 2.4;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(gain, when + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    lp.connect(g);
+    g.connect(this.music);
+    for (const detune of [-11, 0, 10]) {
       const osc = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq * n * (1 + 0.00035 * n * n), when);
-      const a = Math.max(0.0002, gain * amp);
-      g.gain.setValueAtTime(0.0001, when);
-      g.gain.exponentialRampToValueAtTime(a, when + 0.01);
-      g.gain.exponentialRampToValueAtTime(a * 0.32, when + dur * 0.28);
-      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-      osc.connect(g);
-      g.connect(this.music);
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(Math.max(32, freq), when);
+      osc.detune.setValueAtTime(detune, when);
+      osc.connect(lp);
       osc.start(when);
       osc.stop(when + dur + 0.03);
       osc.onended = () => {
         osc.disconnect();
+      };
+      this.bedNodes.push(osc);
+    }
+    this.musicTone(Math.max(28, freq * 0.5), dur, "sine", gain * 1.15, -6, when);
+  }
+
+  private kick(when: number, gain: number) {
+    this.musicTone(52, 0.14, "sine", gain, -28, when);
+    this.musicTone(30, 0.2, "sine", gain * 0.85, -6, when);
+    this.playNoise(0.018, gain * 0.25, 900, when);
+  }
+
+  private snare(when: number, gain: number) {
+    this.playNoise(0.09, gain, 1400, when);
+    this.playNoise(0.05, gain * 0.5, 3200, when);
+    this.musicTone(180, 0.07, "triangle", gain * 0.4, -60, when);
+    this.musicTone(90, 0.08, "sine", gain * 0.22, -30, when);
+  }
+
+  private makeComp(threshold: number, knee: number, ratio: number, attack: number, release: number) {
+    const c = this.ctx!.createDynamicsCompressor();
+    c.threshold.value = threshold;
+    c.knee.value = knee;
+    c.ratio.value = ratio;
+    c.attack.value = attack;
+    c.release.value = release;
+    return c;
+  }
+
+  private satCurve(drive: number) {
+    const n = 256;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(x * drive);
+    }
+    return curve;
+  }
+
+  private makeNoiseBuf() {
+    if (!this.ctx || this.noiseBuf) return;
+    const n = Math.floor(this.ctx.sampleRate * 0.25);
+    const buf = this.ctx.createBuffer(1, Math.max(1, n), this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    this.noiseBuf = buf;
+  }
+
+  private playNoise(dur: number, gain: number, hp: number, when: number) {
+    if (!this.ctx || !this.music) return;
+    if (!this.noiseBuf) this.makeNoiseBuf();
+    if (!this.noiseBuf) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const g = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = hp;
+    g.gain.setValueAtTime(gain, when);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(this.music);
+    src.start(when);
+    src.stop(when + dur + 0.02);
+    src.onended = () => {
+      src.disconnect();
+      filter.disconnect();
+      g.disconnect();
+    };
+  }
+
+  private pianoTone(freq: number, dur: number, gain: number, when: number, grand = false) {
+    if (!this.ctx || !this.music) return;
+    const partials: Array<[number, number]> = grand
+      ? [
+          [1, 1],
+          [2, 0.52],
+          [3, 0.26],
+          [4, 0.13],
+          [5, 0.07],
+        ]
+      : [
+          [1, 1],
+          [2, 0.3],
+        ];
+    for (const [n, amp] of partials) {
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * n * (1 + 0.0004 * n * n), when);
+      const a = Math.max(0.0002, gain * amp);
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(a, when + (grand ? 0.004 : 0.008));
+      g.gain.exponentialRampToValueAtTime(a * (grand ? 0.42 : 0.3), when + dur * 0.18);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      osc.connect(g);
+      g.connect(this.music);
+      osc.start(when);
+      osc.stop(when + dur + 0.05);
+      osc.onended = () => {
+        osc.disconnect();
         g.disconnect();
       };
+      this.bedNodes.push(osc);
     }
+    if (grand) this.playNoise(0.012, gain * 0.04, 1200, when);
+  }
+
+  private violinTone(freq: number, dur: number, gain: number, when: number) {
+    if (!this.ctx || !this.music) return;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(Math.min(2800, freq * 2.6), when);
+    filter.Q.value = 1.4;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(gain, when + 0.1);
+    g.gain.setValueAtTime(gain * 0.92, when + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    filter.connect(g);
+    g.connect(this.music);
+    for (const detune of [-6, 7]) {
+      const osc = this.ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, when);
+      osc.detune.setValueAtTime(detune, when);
+      for (let i = 1; i <= 7; i++) {
+        osc.detune.linearRampToValueAtTime(detune + Math.sin(i * 1.2) * 10, when + i * (dur / 8));
+      }
+      osc.connect(filter);
+      osc.start(when);
+      osc.stop(when + dur + 0.04);
+      osc.onended = () => {
+        osc.disconnect();
+      };
+      this.bedNodes.push(osc);
+    }
+  }
+
+
+
+  private chipTone(freq: number, dur: number, type: OscillatorType, gain: number, when: number) {
+    if (!this.ctx || !this.music) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, when);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(gain, when + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    osc.connect(g);
+    g.connect(this.music);
+    osc.start(when);
+    osc.stop(when + dur + 0.02);
+    osc.onended = () => {
+      osc.disconnect();
+      g.disconnect();
+    };
   }
 
   private musicTone(
