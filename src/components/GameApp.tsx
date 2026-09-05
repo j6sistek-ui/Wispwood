@@ -30,6 +30,14 @@ const idleHud: HudState = {
   boomUnlocked: false,
   crafted: null,
   sandbox: false,
+  max: false,
+  trinkoo: 0,
+  runTrinkoo: 0,
+  ownedRelics: [],
+  equipped: [null, null, null],
+  sandboxPlaying: false,
+  sandboxEdit: 0,
+  sandboxDeck: [{ count: 0, label: "Wave 1 empty" }],
 };
 
 function isChromeTarget(target: EventTarget | null) {

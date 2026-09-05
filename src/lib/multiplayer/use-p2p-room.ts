@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { P2PRoom, type PeerInfo } from "./p2p";
 
 export interface UseP2PRoomOptions {
-  room: string;
+  room: string | null;
   name?: string;
   onStart?: () => void;
 }
 
 export interface P2PRoomHandle {
   selfId: string;
-  room: string;
+  room: string | null;
   peers: PeerInfo[];
   joined: boolean;
   broadcast: (data: unknown) => void;
@@ -22,7 +22,6 @@ export interface P2PRoomHandle {
 
 export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
   const [selfId] = useState(() => `p-${Math.random().toString(36).slice(2, 10)}`);
-  const [room] = useState(() => options.room);
   const [name] = useState(() => options.name ?? selfId);
   const [peers, setPeers] = useState<PeerInfo[]>([]);
   const [joined, setJoined] = useState(false);
@@ -32,8 +31,12 @@ export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
   );
   const onStartRef = useRef(options.onStart);
   onStartRef.current = options.onStart;
+  const room = options.room;
 
   useEffect(() => {
+    setPeers([]);
+    setJoined(false);
+    if (!room) return;
     const p2p = new P2PRoom({
       room,
       selfId,

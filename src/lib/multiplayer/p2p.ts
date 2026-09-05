@@ -110,6 +110,7 @@ export class P2PRoom {
   private everPolled = false;
   private lastPeersFingerprint = "";
   private roomStarted = false;
+  private startBlast: ReturnType<typeof setInterval> | null = null;
 
   constructor(opts: P2PRoomOptions) {
     this.opts = opts;
@@ -138,6 +139,7 @@ export class P2PRoom {
     this.closed = true;
     if (this.pollTimer) clearTimeout(this.pollTimer);
     if (this.pingTimer) clearInterval(this.pingTimer);
+    if (this.startBlast) clearInterval(this.startBlast);
     for (const slot of this.peers.values()) slot.pc.close();
     this.peers.clear();
     // Leaving the roster is the teardown broadcast: everyone's next poll
@@ -152,8 +154,21 @@ export class P2PRoom {
 
   /** Tell every lantern in the room to enter the night. */
   startRoom(): void {
+    this.blastStart();
+    if (this.startBlast) clearInterval(this.startBlast);
+    this.startBlast = setInterval(() => this.blastStart(), 350);
+    window.setTimeout(() => {
+      if (this.startBlast) {
+        clearInterval(this.startBlast);
+        this.startBlast = null;
+      }
+    }, 4000);
+  }
+
+  private blastStart() {
     this.markStarted();
     this.send({ type: "ww-start" });
+    this.broadcast({ type: "ww-start" });
     void fetch("/api/rtc", {
       method: "POST",
       headers: { "content-type": "application/json" },

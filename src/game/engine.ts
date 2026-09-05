@@ -4,6 +4,7 @@ import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
+import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
@@ -73,6 +74,9 @@ export function spellDamage(spell: Spell, damageUp: number, crafted?: CraftedSpe
   return 19 + damageUp * 2;
 }
 
+export type FoeKind = "wisp" | "runner" | "brute" | "elite";
+export type SandboxUnit = { kind: FoeKind } | { boss: number };
+
 export type HudState = {
   phase: Phase;
   hp: number;
@@ -92,6 +96,14 @@ export type HudState = {
   boomUnlocked: boolean;
   crafted: CraftedSpell | null;
   sandbox: boolean;
+  max: boolean;
+  trinkoo: number;
+  runTrinkoo: number;
+  ownedRelics: RelicId[];
+  equipped: Array<RelicId | null>;
+  sandboxPlaying: boolean;
+  sandboxEdit: number;
+  sandboxDeck: Array<{ count: number; label: string }>;
 };
 
 type Dir = "down" | "left" | "right" | "up";
@@ -242,6 +254,17 @@ function clamp(v: number, a: number, b: number) {
   return Math.max(a, Math.min(b, v));
 }
 
+function sandboxWaveLabel(units: SandboxUnit[], index: number) {
+  if (!units.length) return `Wave ${index + 1} empty`;
+  const tally = new Map<string, number>();
+  for (const u of units) {
+    const key = "boss" in u ? BOSSES[u.boss]?.name ?? "Boss" : u.kind;
+    tally.set(key, (tally.get(key) ?? 0) + 1);
+  }
+  const bits = [...tally.entries()].map(([k, n]) => (n > 1 ? `${n} ${k}` : k));
+  return `W${index + 1} ${bits.join(" · ")}`;
+}
+
 function goldFor(kind: EnemyKind) {
   if (kind === "elite") return 35;
   if (kind === "brute") return 16;
@@ -291,6 +314,18 @@ function emptyUpgrades(): Record<Spell, SpellUpgrades> {
   };
 }
 
+function maxUpgrades(): Record<Spell, SpellUpgrades> {
+  return {
+    ember: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
+    frost: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
+    bolt: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
+    void: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
+    vine: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
+    boom: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
+    craft: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
+  };
+}
+
 export class GameEngine {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
@@ -312,6 +347,7 @@ export class GameEngine {
   private pauseLatch = false;
 
   player = { x: ARENA / 2, y: ARENA / 2, hp: 100, maxHp: 100, invuln: 0, face: "down" as Dir, frame: 0, moving: false, vx: 0, vy: 0, knockT: 0, knockX: 0, knockY: 1 };
+  private ghosts = new Map<string, { name: string; x: number; y: number; face: Dir; hp: number; frame: number; ttl: number }>();
   aim = { x: 1, y: 0 };
   cam = { x: 0, y: 0 };
   fireCd = 0;
@@ -328,7 +364,18 @@ export class GameEngine {
   vineUnlocked = false;
   boomUnlocked = false;
   richRun = false;
+  maxRun = false;
   crafted: CraftedSpell | null = null;
+  trinkoo = 0;
+  runTrinkoo = 0;
+  ownedRelics: RelicId[] = [];
+  equipped: Array<RelicId | null> = emptyLoadout();
+  private metaSave = { trinkoo: 0, ownedRelics: [] as RelicId[], equipped: emptyLoadout() };
+  private secondWindUsed = false;
+  private sandboxDeck: SandboxUnit[][] = [[]];
+  private sandboxEdit = 0;
+  private sandboxPlaying = false;
+  private sandboxQueue: SandboxUnit[] = [];
   private toSpawn = 0;
   private spawnT = 0;
   private waveGap = 0;
@@ -360,6 +407,10 @@ export class GameEngine {
     this.best = save.best;
     this.bestNight = save.bestNight;
     this.muted = save.muted;
+    this.trinkoo = save.trinkoo;
+    this.ownedRelics = [...save.ownedRelics];
+    this.equipped = parseLoadout(save.equipped);
+    this.captureMeta();
     this.audio.setMuted(save.muted);
     this.reduced =
       typeof window !== "undefined" &&
@@ -403,16 +454,40 @@ export class GameEngine {
       boomUnlocked: this.boomUnlocked,
       crafted: this.crafted ? { ...this.crafted } : null,
       sandbox: this.richRun,
+      max: this.maxRun,
+      trinkoo: this.maxRun ? 999999 : this.trinkoo,
+      runTrinkoo: this.runTrinkoo,
+      ownedRelics: [...this.ownedRelics],
+      equipped: [...this.equipped],
+      sandboxPlaying: this.sandboxPlaying,
+      sandboxEdit: this.sandboxEdit,
+      sandboxDeck: this.sandboxDeck.map((units, i) => ({
+        count: units.length,
+        label: sandboxWaveLabel(units, i),
+      })),
     };
   }
 
   private emit() {
+    if (this.maxRun) {
+      this.gold = 999999;
+      if (this.player.hp < this.player.maxHp) this.player.hp = this.player.maxHp;
+    }
     const h = this.hud();
     for (const fn of this.listeners) fn(h);
   }
 
   private persist() {
-    writeSave({ version: 1, best: this.best, bestNight: this.bestNight, muted: this.muted });
+    if (this.maxRun) return;
+    writeSave({
+      version: 2,
+      best: this.best,
+      bestNight: this.bestNight,
+      muted: this.muted,
+      trinkoo: this.maxRun ? this.metaSave.trinkoo : this.trinkoo,
+      ownedRelics: this.maxRun ? [...this.metaSave.ownedRelics] : [...this.ownedRelics],
+      equipped: this.maxRun ? [...this.metaSave.equipped] : [...this.equipped],
+    });
   }
 
   async boot() {
@@ -476,11 +551,13 @@ export class GameEngine {
     this.view.h = h;
   }
 
-  play(rich = false) {
+  play(mode: boolean | "sandbox" | "max" = false) {
     this.audio.unlock();
-    this.richRun = rich;
+    this.maxRun = mode === "max";
+    this.richRun = mode === true || mode === "sandbox";
     this.resetRun();
-    if (rich) this.gold = 99999;
+    if (this.maxRun) this.applyMaxLoadout();
+    else if (this.richRun) this.gold = 99999;
     this.phase = "playing";
     this.beginWave();
     this.audio.startBed();
@@ -488,7 +565,39 @@ export class GameEngine {
   }
 
   replay() {
-    this.play(this.richRun);
+    this.play(this.maxRun ? "max" : this.richRun ? "sandbox" : false);
+  }
+
+  private captureMeta() {
+    this.metaSave = {
+      trinkoo: this.trinkoo,
+      ownedRelics: [...this.ownedRelics],
+      equipped: [...this.equipped],
+    };
+  }
+
+  private applyMaxLoadout() {
+    this.gold = 999999;
+    this.boltUnlocked = true;
+    this.voidUnlocked = true;
+    this.vineUnlocked = true;
+    this.boomUnlocked = true;
+    this.upgrades = maxUpgrades();
+    this.player.maxHp = 999;
+    this.player.hp = 999;
+    this.ownedRelics = RELICS.map((r) => r.id);
+    this.equipped = [this.ownedRelics[0] ?? null, this.ownedRelics[1] ?? null, this.ownedRelics[2] ?? null];
+    this.crafted = {
+      name: "Maxflare",
+      color: "#f0d24a",
+      damage: 46,
+      shape: "meteor",
+      extra: "burn",
+      cooldown: 0.35,
+      rarity: "legendary",
+      shots: 5,
+      ability: "explode",
+    };
   }
 
   togglePause() {
@@ -563,7 +672,7 @@ export class GameEngine {
     this.gold -= 100;
     this.audio.pickup();
     this.emit();
-    if (Math.random() < 0.01) return "jackpot";
+    if (Math.random() < (this.hasRelic("luckytooth") ? 0.05 : 0.01)) return "jackpot";
     return Math.random() < 0.5 ? "craft" : "miss";
   }
 
@@ -671,7 +780,13 @@ export class GameEngine {
   }
 
   leaveRun() {
+    this.sandboxPlaying = false;
+    this.sandboxQueue = [];
+    this.sandboxDeck = [[]];
+    this.sandboxEdit = 0;
     this.resetRun();
+    this.maxRun = false;
+    this.richRun = false;
     this.phase = "title";
     this.audio.stopBed();
     this.emit();
@@ -682,6 +797,129 @@ export class GameEngine {
     this.audio.setMuted(this.muted);
     this.persist();
     this.emit();
+  }
+
+  redeemCode(code: string) {
+    const key = code.trim().toUpperCase();
+    if (!key) return "Need a code";
+    if (key === "WISPER") {
+      this.trinkoo += 100;
+      this.persist();
+      this.audio.unlock();
+      this.audio.pickup();
+      this.emit();
+      return "+100 trinkoo";
+    }
+    return "Unknown code";
+  }
+
+  hasRelic(id: RelicId) {
+    if (this.maxRun) return true;
+    return this.equipped.includes(id);
+  }
+
+  rollRelic(): RelicId | "poor" | "full" {
+    if (this.trinkoo < RELIC_COST) return "poor";
+    const id = rollFromPool(this.ownedRelics);
+    if (!id) return "full";
+    this.trinkoo -= RELIC_COST;
+    this.ownedRelics = [...this.ownedRelics, id];
+    const slot = this.equipped.findIndex((x) => x == null);
+    if (slot >= 0) this.equipped[slot] = id;
+    this.persist();
+    this.emit();
+    return id;
+  }
+
+  equipRelic(id: RelicId) {
+    if (!this.ownedRelics.includes(id)) return;
+    if (this.equipped.includes(id)) return;
+    const slot = this.equipped.findIndex((x) => x == null);
+    if (slot < 0) return;
+    this.equipped[slot] = id;
+    this.audio.pickup();
+    this.persist();
+    this.emit();
+  }
+
+  unequipRelic(slot: number) {
+    if (slot < 0 || slot >= MAX_EQUIP) return;
+    this.equipped[slot] = null;
+    this.persist();
+    this.emit();
+  }
+
+  sandboxToggleRelic(id: RelicId) {
+    if (!this.richRun) return;
+    const i = this.equipped.indexOf(id);
+    if (i >= 0) this.equipped[i] = null;
+    else {
+      const slot = this.equipped.findIndex((x) => x == null);
+      if (slot >= 0) this.equipped[slot] = id;
+      else this.equipped[0] = id;
+    }
+    if (this.hasRelic("nightlantern")) {
+      this.player.maxHp = 130;
+      if (this.player.hp > 130) this.player.hp = 130;
+    } else {
+      this.player.maxHp = 100;
+      if (this.player.hp > 100) this.player.hp = 100;
+    }
+    this.audio.pickup();
+    this.floatAt(this.player.x, this.player.y - 40, id, "#c8a4ff");
+    this.emit();
+  }
+
+  sandboxBindRune(spell: CraftedSpell) {
+    if (!this.richRun) return;
+    this.saveCrafted(spell);
+    this.floatAt(this.player.x, this.player.y - 40, spell.name, spell.color);
+  }
+
+  private grantTrinkoo(n: number, x: number, y: number) {
+    if (this.richRun || n <= 0) return;
+    this.trinkoo += n;
+    this.runTrinkoo += n;
+    this.floatAt(x, y - 28, `+${n} trinkoo`, "#c8a4ff");
+    this.persist();
+  }
+
+
+  nudgePlayer(dx: number, dy: number) {
+    this.player.x = clamp(this.player.x + dx, 80, ARENA - 80);
+    this.player.y = clamp(this.player.y + dy, 80, ARENA - 80);
+    this.emit();
+  }
+
+  netSnapshot() {
+    return {
+      type: "ww-state" as const,
+      x: this.player.x,
+      y: this.player.y,
+      face: this.player.face,
+      hp: this.player.hp,
+      frame: this.player.frame,
+      moving: this.player.moving,
+    };
+  }
+
+  applyGhost(
+    id: string,
+    data: { name?: string; x: number; y: number; face?: Dir; hp?: number; frame?: number },
+  ) {
+    this.ghosts.set(id, {
+      name: data.name || "Ranger",
+      x: data.x,
+      y: data.y,
+      face: data.face ?? "down",
+      hp: data.hp ?? 100,
+      frame: data.frame ?? 0,
+      ttl: 2.5,
+    });
+  }
+
+  clearGhosts() {
+    this.ghosts.clear();
   }
 
   setTouchMove(x: number, y: number) {
@@ -722,7 +960,7 @@ export class GameEngine {
     };
     this.aim = { x: 0, y: 1 };
     this.score = 0;
-    this.gold = 0;
+    this.gold = this.hasRelic("greedywick") ? 80 : 0;
     this.upgrades = emptyUpgrades();
     this.boltUnlocked = false;
     this.voidUnlocked = false;
@@ -739,6 +977,12 @@ export class GameEngine {
     this.trauma = 0;
     this.animT = 0;
     this.burnAcc = 0;
+    this.secondWindUsed = false;
+    this.runTrinkoo = 0;
+    if (this.hasRelic("nightlantern")) {
+      this.player.maxHp = 130;
+      this.player.hp = 130;
+    }
     this.bullets = [];
     this.enemies = [];
     this.pickups = [];
@@ -763,6 +1007,62 @@ export class GameEngine {
   spawnBoss(id: number) {
     if (this.phase !== "playing" && this.phase !== "paused") return;
     this.placeBoss(id);
+  }
+
+  sandboxAddFoe(kind: FoeKind) {
+    this.sandboxPush({ kind });
+  }
+
+  sandboxAddBoss(id: number) {
+    this.sandboxPush({ boss: id });
+  }
+
+  sandboxNewWave() {
+    if (this.sandboxDeck.length >= 12) return;
+    const cur = this.sandboxDeck[this.sandboxEdit];
+    if (cur && cur.length === 0 && this.sandboxEdit === this.sandboxDeck.length - 1) return;
+    this.sandboxDeck.push([]);
+    this.sandboxEdit = this.sandboxDeck.length - 1;
+    this.emit();
+  }
+
+  sandboxPickWave(i: number) {
+    if (i < 0 || i >= this.sandboxDeck.length) return;
+    this.sandboxEdit = i;
+    this.emit();
+  }
+
+  sandboxClearDeck() {
+    this.sandboxDeck = [[]];
+    this.sandboxEdit = 0;
+    this.sandboxPlaying = false;
+    this.sandboxQueue = [];
+    this.toSpawn = 0;
+    this.emit();
+  }
+
+  sandboxPlayWaves() {
+    if (!this.richRun) return;
+    if (this.phase !== "playing" && this.phase !== "paused") return;
+    const ready = this.sandboxDeck.filter((w) => w.length > 0);
+    if (!ready.length) return;
+    this.sandboxDeck = ready;
+    this.sandboxEdit = 0;
+    this.sandboxPlaying = true;
+    this.sandboxQueue = [];
+    this.clearFoes();
+    this.wave = 0;
+    this.waveGap = 0.2;
+    this.beginWave();
+    this.emit();
+  }
+
+  private sandboxPush(unit: SandboxUnit) {
+    const wave = this.sandboxDeck[this.sandboxEdit] ?? [];
+    if (wave.length >= 24) return;
+    wave.push(unit);
+    this.sandboxDeck[this.sandboxEdit] = wave;
+    this.emit();
   }
 
   lineupBosses() {
@@ -791,16 +1091,38 @@ export class GameEngine {
 
   private beginWave() {
     this.wave += 1;
-    if (this.wave > this.bestNight) {
+    if (this.wave > 1) this.grantTrinkoo(1, this.player.x, this.player.y);
+    if (this.wave > this.bestNight && !this.maxRun) {
       this.bestNight = this.wave;
       this.persist();
     }
-    this.toSpawn = this.richRun ? 0 : 5 + this.wave * 3;
     this.spawnT = 0.2;
     this.waveGap = 0;
     this.audio.wave();
-    this.floatAt(this.player.x, this.player.y - 40, this.richRun ? "Sandbox" : `Night ${this.wave}`);
-    if (!this.richRun && this.wave > 0 && this.wave % 5 === 0) {
+    if (this.richRun) {
+      if (!this.sandboxPlaying) {
+        this.toSpawn = 0;
+        this.floatAt(this.player.x, this.player.y - 40, "Sandbox");
+        this.emit();
+        return;
+      }
+      const deck = this.sandboxDeck[this.wave - 1];
+      if (!deck || deck.length === 0) {
+        this.sandboxPlaying = false;
+        this.toSpawn = 0;
+        this.floatAt(this.player.x, this.player.y - 40, "Deck clear");
+        this.emit();
+        return;
+      }
+      this.sandboxQueue = [...deck];
+      this.toSpawn = this.sandboxQueue.length;
+      this.floatAt(this.player.x, this.player.y - 40, `Wave ${this.wave}/${this.sandboxDeck.length}`);
+      this.emit();
+      return;
+    }
+    this.toSpawn = 5 + this.wave * 3;
+    this.floatAt(this.player.x, this.player.y - 40, `Night ${this.wave}`);
+    if (this.wave > 0 && this.wave % 5 === 0) {
       const id = (Math.floor(this.wave / 5) - 1) % BOSSES.length;
       this.placeBoss(id);
       this.toSpawn = 8;
@@ -827,6 +1149,10 @@ export class GameEngine {
     const dt = FIXED;
     this.animT += dt;
     this.fireCd = Math.max(0, this.fireCd - dt);
+    for (const [id, g] of this.ghosts) {
+      g.ttl -= dt;
+      if (g.ttl <= 0) this.ghosts.delete(id);
+    }
     this.player.invuln = Math.max(0, this.player.invuln - dt);
     this.player.knockT = Math.max(0, this.player.knockT - dt);
     this.playerSlow = Math.max(0, this.playerSlow - dt);
@@ -895,8 +1221,8 @@ export class GameEngine {
     const rate = sliding ? 3.2 : want > 0.12 ? PLAYER_ACCEL : PLAYER_STOP;
     const k = 1 - Math.exp(-rate * dt);
     const stunned = this.playerStun > 0;
-    const tx = sliding || stunned ? 0 : actions.moveX * PLAYER_SPEED * (this.playerSlow > 0 ? 0.42 : 1);
-    const ty = sliding || stunned ? 0 : actions.moveY * PLAYER_SPEED * (this.playerSlow > 0 ? 0.42 : 1);
+    const tx = sliding || stunned ? 0 : actions.moveX * PLAYER_SPEED * (this.hasRelic("swiftroot") ? 1.28 : 1) * (this.playerSlow > 0 ? 0.42 : 1);
+    const ty = sliding || stunned ? 0 : actions.moveY * PLAYER_SPEED * (this.hasRelic("swiftroot") ? 1.28 : 1) * (this.playerSlow > 0 ? 0.42 : 1);
     this.player.vx += (tx - this.player.vx) * k;
     this.player.vy += (ty - this.player.vy) * k;
     if (!sliding && Math.hypot(this.player.vx, this.player.vy) < 6 && want < 0.08) {
@@ -933,13 +1259,18 @@ export class GameEngine {
       this.spell === "craft" && this.crafted
         ? this.crafted.cooldown
         : this.spell === "bolt"
-          ? BOLT_CD
+          ? BOLT_CD * (this.hasRelic("stormquill") ? 0.65 : 1)
           : this.spell === "void"
             ? VOID_CD
             : this.spell === "boom"
-              ? BOOM_CD
+              ? BOOM_CD * (this.hasRelic("blastcap") ? 0.65 : 1)
             : FIRE_CD;
     this.fireCd = baseCd * (1 - speedUp * 0.025);
+    this.castCurrent();
+    if (this.hasRelic("echoflint") && Math.random() < 0.22) this.castCurrent();
+  }
+
+  private castCurrent() {
     if (this.spell === "void") {
       this.spawnVoid();
     } else if (this.spell === "boom") {
@@ -1490,11 +1821,11 @@ export class GameEngine {
   private hurtEnemy(e: Enemy, dmg: number, vx: number, vy: number, spell: Spell) {
     e.hp -= dmg;
     e.flash = 0.08;
-    if (spell === "ember") e.burn = 3;
-    if (spell === "craft" && this.crafted?.extra === "burn") e.burn = 3;
+    if (spell === "ember") e.burn = this.hasRelic("emberheart") ? 5 : 3;
+    if (spell === "craft" && this.crafted?.extra === "burn") e.burn = this.hasRelic("emberheart") ? 5 : 3;
     if (spell === "frost" || (spell === "craft" && this.crafted?.extra === "slow")) {
       const resist = e.kind === "elite" ? 1.1 : e.kind === "brute" ? 1.8 : 3;
-      e.freeze = resist;
+      e.freeze = resist * (this.hasRelic("frostglass") ? 1.7 : 1);
       this.floatAt(e.x, e.y - 22, "slow");
     }
     if (spell === "bolt" || (spell === "craft" && this.crafted?.extra === "stun")) {
@@ -1504,7 +1835,7 @@ export class GameEngine {
     const m = Math.hypot(vx, vy) || 1;
     const nx = vx / m;
     const ny = vy / m;
-    const knock = spell === "void" ? 180 : spell === "boom" ? 36 : e.kind === "boss" ? 18 : 10;
+    const knock = spell === "void" ? (this.hasRelic("voidring") ? 320 : 180) : spell === "boom" ? 36 : e.kind === "boss" ? 18 : 10;
     e.kvx = nx * (knock / 0.22);
     e.kvy = ny * (knock / 0.22);
     e.knockX = nx;
@@ -1702,8 +2033,14 @@ export class GameEngine {
       this.floatAt(e.x, e.y - 36, def.drop, def.color2);
       if (Math.random() < 0.4) this.spawnPickup(e.x + 18, e.y);
     }
+    if (this.hasRelic("goldbeetle")) gold = Math.floor(gold * 1.5);
     this.gold += gold;
     this.floatAt(e.x, e.y - 18, `+${gold}`, "#f0d24a");
+    if (this.hasRelic("bloodsap")) {
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + 3);
+      this.floatAt(e.x, e.y - 30, "+hp", "#c45a4a");
+    }
+    if (e.kind === "boss") this.grantTrinkoo(5, e.x, e.y);
     this.spawnCoins(e.x, e.y, coins);
     this.burstSparks(e.x, e.y, sparkN, sparkColor);
     if (Math.random() < 0.28) this.spawnPickup(e.x, e.y);
@@ -1717,15 +2054,15 @@ export class GameEngine {
     for (const e of this.enemies) {
       if (!e.alive || e.burn <= 0) continue;
       e.burn -= 1;
-      e.hp -= 1;
+      e.hp -= this.hasRelic("emberheart") ? 2 : 1;
       e.flash = 0.06;
-      this.floatAt(e.x, e.y - 16, "1", "#e8a050");
+      this.floatAt(e.x, e.y - 16, this.hasRelic("emberheart") ? "2" : "1", "#e8a050");
       if (e.hp <= 0) this.killEnemy(e);
     }
   }
 
   private spawnFlow(dt: number) {
-    if (this.richRun) return;
+    if (this.richRun && !this.sandboxPlaying) return;
     if (this.toSpawn <= 0) {
       const live = this.enemies.some((e) => e.alive);
       if (!live) {
@@ -1739,10 +2076,18 @@ export class GameEngine {
     }
     this.spawnT -= dt;
     if (this.spawnT <= 0) {
-      this.spawnEnemy();
+      if (this.sandboxPlaying) this.spawnSandboxUnit();
+      else this.spawnEnemy();
       this.toSpawn -= 1;
-      this.spawnT = Math.max(0.22, 0.72 - this.wave * 0.045);
+      this.spawnT = Math.max(0.18, 0.62 - this.wave * 0.04);
     }
+  }
+
+  private spawnSandboxUnit() {
+    const unit = this.sandboxQueue.shift();
+    if (!unit) return;
+    if ("boss" in unit) this.placeBoss(unit.boss);
+    else this.spawnEnemy(unit.kind);
   }
 
   private spawnEnemy(kind?: "wisp" | "runner" | "brute" | "elite") {
@@ -1896,7 +2241,7 @@ export class GameEngine {
       e.vineIcd = Math.max(0, e.vineIcd - dt);
       e.wrapped = Math.max(0, e.wrapped - dt);
       if (this.spell === "vine" && e.vineIcd <= 0 && e.wrapped <= 0) {
-        const reach = 72 + e.r;
+        const reach = (this.hasRelic("thornlace") ? 118 : 72) + e.r;
         if (Math.hypot(e.x - px, e.y - py) < reach) this.wrapEnemy(e);
       }
       if (e.stun <= 0) {
@@ -1963,15 +2308,7 @@ export class GameEngine {
       }
       if (e.stun <= 0 && this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, PLAYER_R)) {
         const hit = e.kind === "elite" ? 22 : e.kind === "brute" ? 18 : e.kind === "runner" ? 10 : 8;
-        this.player.hp -= hit;
-        this.player.invuln = 0.85;
-        const kd = Math.hypot(px - e.x, py - e.y) || 1;
-        this.player.vx += ((px - e.x) / kd) * 220;
-        this.player.vy += ((py - e.y) / kd) * 220;
-        this.markPlayerKnock((px - e.x) / kd, (py - e.y) / kd, 0.32);
-        this.trauma = Math.min(1, this.trauma + 0.45);
-        this.audio.hurt();
-        this.emit();
+        this.hurtLantern(hit, px - e.x, py - e.y, 220);
       }
     }
   }
@@ -2176,9 +2513,21 @@ export class GameEngine {
   }
 
   private hurtLantern(amount: number, kx: number, ky: number, knock: number) {
+    if (this.maxRun) return;
     if (this.player.invuln > 0) return;
     const m = Math.hypot(kx, ky) || 1;
-    this.player.hp -= amount;
+    let dmg = amount;
+    if (this.hasRelic("ironbark")) dmg = Math.max(1, Math.floor(dmg * 0.7));
+    if (this.player.hp - dmg <= 0 && this.hasRelic("secondwind") && !this.secondWindUsed) {
+      this.secondWindUsed = true;
+      this.player.hp = 25;
+      this.player.invuln = 1.25;
+      this.floatAt(this.player.x, this.player.y - 36, "SECOND WIND", "#eaf8fd");
+      this.audio.wave();
+      this.emit();
+      return;
+    }
+    this.player.hp -= dmg;
     this.player.invuln = 0.7;
     this.player.vx += (kx / m) * knock;
     this.player.vy += (ky / m) * knock;
@@ -2327,7 +2676,17 @@ export class GameEngine {
         p.alive = false;
         continue;
       }
-      if (circleHit(p.x, p.y, 16, this.player.x, this.player.y, PLAYER_R + 8)) {
+      if (this.hasRelic("moonmoth")) {
+        const dx = this.player.x - p.x;
+        const dy = this.player.y - p.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < 220) {
+          p.x += (dx / d) * 90 * dt;
+          p.y += (dy / d) * 90 * dt;
+        }
+      }
+      const grab = this.hasRelic("moonmoth") ? 36 : 16;
+      if (circleHit(p.x, p.y, grab, this.player.x, this.player.y, PLAYER_R + 8)) {
         p.alive = false;
         this.player.hp = Math.min(this.player.maxHp, this.player.hp + 18);
         this.audio.pickup();
@@ -2579,6 +2938,9 @@ export class GameEngine {
       }
       if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel") {
         drawables.push({ y: this.player.y, draw: () => this.drawPlayer() });
+        for (const g of this.ghosts.values()) {
+          drawables.push({ y: g.y, draw: () => this.drawGhost(g) });
+        }
       }
       drawables.sort((a, b) => a.y - b.y);
       for (const d of drawables) d.draw();
@@ -2628,6 +2990,21 @@ export class GameEngine {
     this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
     this.ctx.globalAlpha = 1;
     if (this.spell === "vine") this.drawVineAura(this.player.x, this.player.y);
+  }
+
+  private drawGhost(g: { name: string; x: number; y: number; face: Dir; hp: number; frame: number }) {
+    const frames = this.assets!.player[g.face];
+    const img = frames[Math.floor(g.frame) % 4]!;
+    this.ctx.globalAlpha = 0.92;
+    this.drawKnockSprite(img, g.x, g.y, 64, 0.78, 0, 1, 0, 0.28);
+    this.ctx.globalAlpha = 1;
+    const ctx = this.ctx;
+    ctx.font = "8px \"Press Start 2P\", monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(12,13,12,0.7)";
+    ctx.fillRect(Math.round(g.x - 36), Math.round(g.y - 58), 72, 12);
+    ctx.fillStyle = "#ecece8";
+    ctx.fillText(g.name.slice(0, 10), Math.round(g.x), Math.round(g.y - 48));
   }
 
   private drawEnemy(e: Enemy) {

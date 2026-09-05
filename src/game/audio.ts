@@ -536,6 +536,18 @@ export class GameAudio {
     this.tone(523, 0.22, "sine", 0.04, 40);
   }
 
+  relicTick() {
+    this.tone(520 + Math.random() * 400, 0.05, "square", 0.06, 80);
+  }
+
+  relicReveal() {
+    this.tone(392, 0.12, "triangle", 0.1, 40);
+    this.tone(523, 0.16, "triangle", 0.1, 60, 0.08);
+    this.tone(784, 0.28, "sine", 0.12, 40, 0.16);
+    this.tone(1046, 0.4, "sine", 0.1, 20, 0.28);
+    this.noise(0.12, 0.08);
+  }
+
   jackpot() {
     this.unlock();
     if (this.ctx?.state === "suspended") void this.ctx.resume();

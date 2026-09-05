@@ -104,6 +104,8 @@ const ABILITIES: CraftAbility[] = [
   "ignite", "mist", "thorn", "grav", "shatter", "fork", "veil", "howl",
 ];
 
+export const WHEEL_RUNES: CraftedSpell[] = CATALOG;
+
 export function generateSpell(prompt = ""): CraftedSpell {
   const hint = prompt.trim();
   if (hint) return remix(parseSpellPrompt(hint));

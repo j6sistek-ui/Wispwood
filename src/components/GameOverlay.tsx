@@ -3,9 +3,10 @@ import type { HudState } from "@/game/engine";
 import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
-import { rarityTint, wheelChoices, pickLegendary, spellFlavor } from "@/game/spell-prompt";
+import { rarityTint, wheelChoices, pickLegendary, spellFlavor, WHEEL_RUNES } from "@/game/spell-prompt";
 import { glyphFor, coreGlyph, CORE_COLOR } from "@/game/craft-sprites";
 import { BOSSES } from "@/game/bosses";
+import { RELICS, RELIC_COST, relicById, type RelicId } from "@/game/relics";
 import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -37,14 +38,14 @@ export function GameOverlay({ engine, hud }: Props) {
 
       {hud.phase === "boot" || hud.loading ? <Boot /> : null}
       {hud.phase === "title" && !hud.loading ? (
-        <Title engine={engine} bestNight={hud.bestNight} />
+        <Title engine={engine} hud={hud} />
       ) : null}
       {hud.phase === "paused" ? <Pause engine={engine} hud={hud} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
       {hud.phase === "wheel" ? <FortuneWheel engine={engine} hud={hud} /> : null}
       {hud.phase === "dead" ? <Dead engine={engine} hud={hud} /> : null}
       {spawnOpen && hud.sandbox && (hud.phase === "playing" || hud.phase === "paused") ? (
-        <SpawnMenu engine={engine} onClose={() => setSpawnOpen(false)} />
+        <SpawnMenu engine={engine} hud={hud} onClose={() => setSpawnOpen(false)} />
       ) : null}
 
       {showSticks ? <TouchSticks engine={engine} /> : null}
@@ -99,6 +100,18 @@ function Hud({
         </div>
       </div>
       <p className="mx-auto mt-1 max-w-sm text-right font-pixel text-[8px] tabular-nums text-gold">{hud.gold}g · {hud.score}</p>
+      <div className="mx-auto mt-1 flex max-w-sm items-center justify-end gap-1">
+        {hud.equipped.map((id, i) => (
+          <span
+            key={i}
+            className="inline-block border border-muted px-1 font-pixel text-[7px] leading-4"
+            style={{ color: id ? relicById(id).color : "#5a5a5a" }}
+          >
+            {id ? relicById(id).glyph : "--"}
+          </span>
+        ))}
+        <span className="font-pixel text-[8px] text-[#c8a4ff]">{hud.trinkoo}t</span>
+      </div>
 
       <div className="pointer-events-auto mx-auto mt-2 flex justify-center gap-2" data-ui>
         <button
@@ -151,12 +164,12 @@ function makeRoomCode() {
 
 function Title({
   engine,
-  bestNight,
+  hud,
 }: {
   engine: GameEngine | null;
-  bestNight: number;
+  hud: HudState;
 }) {
-  const [menu, setMenu] = useState<"home" | "multiplayer" | "join" | "room" | "name" | "account">("home");
+  const [menu, setMenu] = useState<"home" | "multiplayer" | "join" | "room" | "name" | "account" | "shop" | "guide" | "admin">("home");
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [joinCode, setJoinCode] = useState("");
@@ -169,6 +182,8 @@ function Title({
   const [accountNote, setAccountNote] = useState("");
   const [shownPass, setShownPass] = useState("");
   const [shareNote, setShareNote] = useState("");
+  const [adminCode, setAdminCode] = useState("");
+  const [adminNote, setAdminNote] = useState("");
 
   useEffect(() => {
     const n = loadPlayerName();
@@ -259,14 +274,28 @@ function Title({
     setMenu("multiplayer");
   };
 
+  const submitAdmin = () => {
+    const note = engine?.redeemCode(adminCode) ?? "Need a code";
+    setAdminNote(note);
+    if (note.startsWith("+")) setAdminCode("");
+  };
+
   const titleLabel =
-    menu === "multiplayer" || menu === "join" || menu === "room" ? "MULTIPLAYER" : "WISPWOOD";
+    menu === "multiplayer" || menu === "join" || menu === "room"
+      ? "MULTIPLAYER"
+      : menu === "shop"
+        ? "TRINKOO"
+        : menu === "guide"
+          ? "FIELD BOOK"
+          : menu === "admin"
+            ? "ADMIN"
+            : "WISPWOOD";
 
   return (
-    <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))] pointer-events-auto">
+    <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-2 overflow-y-auto px-4 py-[max(1rem,env(safe-area-inset-top))] pointer-events-auto">
       <PixelBanner text={titleLabel} />
       <div className="pointer-events-none shrink-0 text-center">
-        <p className="font-pixel text-pixel-sm text-muted">Max night {bestNight}</p>
+        <p className="font-pixel text-pixel-sm text-muted">Max night {hud.bestNight}</p>
       </div>
 
       {menu === "room" && roomCode ? (
@@ -311,6 +340,43 @@ function Title({
             ) : null}
             <PixelButton primary onClick={() => void submitAccountLogin()}>
               Log in
+            </PixelButton>
+          </div>
+        ) : menu === "shop" ? (
+          <RelicShop engine={engine} hud={hud} />
+        ) : menu === "guide" ? (
+          <FieldManual />
+        ) : menu === "admin" ? (
+          <div className="pointer-events-auto flex w-full max-w-xs flex-col items-center gap-3">
+            <p className="text-center font-pixel text-pixel-sm leading-relaxed text-muted">
+              Type an admin code
+            </p>
+            <input
+              autoFocus
+              value={adminCode}
+              maxLength={16}
+              spellCheck={false}
+              autoCapitalize="characters"
+              autoComplete="off"
+              placeholder="CODE"
+              onChange={(e) => {
+                setAdminCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16));
+                setAdminNote("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitAdmin();
+              }}
+              className="h-14 w-full border-2 border-muted bg-surface text-center font-pixel text-base tracking-[0.2em] text-fg outline-none placeholder:text-subtle"
+            />
+            {adminNote ? (
+              <p className={"font-pixel text-pixel-sm " + (adminNote.startsWith("+") ? "text-gold" : "text-danger")}>
+                {adminNote}
+              </p>
+            ) : (
+              <p className="font-pixel text-pixel-sm text-subtle">Enter a code</p>
+            )}
+            <PixelButton primary onClick={submitAdmin}>
+              Enter code
             </PixelButton>
           </div>
         ) : menu === "name" ? (
@@ -372,26 +438,54 @@ function Title({
             </PixelButton>
           </div>
         ) : (
-          <div className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 border-2 border-fg bg-bg/80 p-3">
+          <div className="pointer-events-auto flex w-full max-w-xs flex-col gap-1.5 border-2 border-fg bg-bg/80 p-2">
             {menu === "multiplayer" ? (
-              <>
+              <div className="grid grid-cols-2 gap-1.5">
                 <PixelButton primary onClick={createRoom}>
                   Create
                 </PixelButton>
                 <PixelButton onClick={() => setMenu("join")}>Join</PixelButton>
-              </>
+              </div>
             ) : (
               <>
                 <PixelButton primary onClick={() => engine?.play()}>
                   Enter the clearing
                 </PixelButton>
-                <PixelButton onClick={() => engine?.play(true)}>
-                  Sand box clearing
+                <div className="grid grid-cols-2 gap-1.5">
+                  <PixelButton compact onClick={() => engine?.play(true)}>
+                    Sandbox
+                  </PixelButton>
+                  <PixelButton compact onClick={() => setMenu("multiplayer")}>
+                    Multiplayer
+                  </PixelButton>
+                  <PixelButton compact onClick={() => setMenu("guide")}>
+                    Field book
+                  </PixelButton>
+                  <PixelButton compact onClick={() => setMenu("shop")}>
+                    Shop
+                  </PixelButton>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <PixelButton compact onClick={() => setMenu("name")}>
+                    Name
+                  </PixelButton>
+                  <PixelButton compact onClick={() => setMenu("account")}>
+                    Account
+                  </PixelButton>
+                  <PixelButton compact onClick={() => void shareGame()}>
+                    {shareNote || "Share"}
+                  </PixelButton>
+                </div>
+                <PixelButton
+                  compact
+                  onClick={() => {
+                    setAdminCode("");
+                    setAdminNote("");
+                    setMenu("admin");
+                  }}
+                >
+                  Admin codes
                 </PixelButton>
-                <PixelButton onClick={() => setMenu("multiplayer")}>Multiplayer</PixelButton>
-                <PixelButton onClick={() => setMenu("name")}>Name</PixelButton>
-                <PixelButton onClick={() => setMenu("account")}>Account</PixelButton>
-                <PixelButton onClick={() => void shareGame()}>{shareNote || "Share"}</PixelButton>
               </>
             )}
           </div>
@@ -404,7 +498,7 @@ function Title({
             onClick={() => {
               if (menu === "room") leaveRoom();
               else if (menu === "join") setMenu("multiplayer");
-              else if (menu === "name" || menu === "account") setMenu("home");
+              else if (menu === "name" || menu === "account" || menu === "shop" || menu === "guide" || menu === "admin") setMenu("home");
               else setMenu("home");
             }}
             className="font-pixel text-pixel-sm text-muted"
@@ -413,11 +507,8 @@ function Title({
           </button>
         ) : (
           <>
-            <p className="text-center font-pixel text-pixel-sm leading-relaxed text-subtle">
-              Playing as {playerName}
-            </p>
-            <p className="text-center font-pixel text-pixel-sm leading-relaxed text-subtle">
-              WASD move · tap shoot · B book
+            <p className="text-center font-pixel text-[8px] leading-relaxed text-subtle">
+              {playerName} · {hud.trinkoo}t · WASD move · tap shoot
             </p>
           </>
         )}
@@ -490,7 +581,16 @@ function Lobby({
   );
 }
 
-function SpawnMenu({ engine, onClose }: { engine: GameEngine | null; onClose: () => void }) {
+function SpawnMenu({
+  engine,
+  hud,
+  onClose,
+}: {
+  engine: GameEngine | null;
+  hud: HudState;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<"foes" | "waves" | "relics" | "runes">("foes");
   const foes = [
     { kind: "wisp" as const, label: "Wisp" },
     { kind: "runner" as const, label: "Runner" },
@@ -501,37 +601,136 @@ function SpawnMenu({ engine, onClose }: { engine: GameEngine | null; onClose: ()
     <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-bg/75 px-3 py-6 pointer-events-auto">
       <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-3 border-2 border-fg bg-surface px-3 py-4">
         <p className="font-pixel text-pixel text-fg">Spawn</p>
-        <p className="font-pixel text-pixel-sm text-muted">Sandbox is empty until you drop a foe</p>
-        <div className="grid w-full grid-cols-2 gap-2">
-          {foes.map((f) => (
+        <div className="grid w-full grid-cols-4 gap-1">
+          {(["foes", "waves", "relics", "runes"] as const).map((t) => (
             <button
-              key={f.kind}
+              key={t}
               type="button"
               data-ui
-              onClick={() => engine?.spawnFoe(f.kind)}
-              className="h-11 border-2 border-fg bg-bg font-pixel text-[10px] text-fg"
+              onClick={() => setTab(t)}
+              className={
+                "h-10 border-2 font-pixel text-[8px] " +
+                (tab === t ? "border-gold bg-accent text-accent-fg" : "border-muted bg-bg text-fg")
+              }
             >
-              {f.label}
+              {t === "foes" ? "Drop" : t === "waves" ? "Waves" : t === "relics" ? "Relics" : "Runes"}
             </button>
           ))}
         </div>
-        <p className="mt-1 font-pixel text-pixel-sm text-gold">Bosses</p>
-        <div className="grid max-h-[42vh] w-full grid-cols-2 gap-2 overflow-y-auto overscroll-contain">
-          {BOSSES.map((b, i) => (
-            <button
-              key={b.name}
-              type="button"
-              data-ui
-              onClick={() => engine?.spawnBoss(i)}
-              className="h-12 shrink-0 border-2 bg-bg px-1 font-pixel text-[9px] text-fg"
-              style={{ borderColor: b.color2, color: b.color2 }}
+        {tab === "foes" ? (
+          <>
+            <p className="font-pixel text-pixel-sm text-muted">Sandbox is empty until you drop a foe</p>
+            <div className="grid w-full grid-cols-2 gap-2">
+              {foes.map((f) => (
+                <button
+                  key={f.kind}
+                  type="button"
+                  data-ui
+                  onClick={() => engine?.spawnFoe(f.kind)}
+                  className="h-11 border-2 border-fg bg-bg font-pixel text-[10px] text-fg"
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div className="grid max-h-[32vh] w-full grid-cols-2 gap-2 overflow-y-auto overscroll-contain">
+              {BOSSES.map((b, i) => (
+                <button
+                  key={b.name}
+                  type="button"
+                  data-ui
+                  onClick={() => engine?.spawnBoss(i)}
+                  className="h-12 shrink-0 border-2 bg-bg px-1 font-pixel text-[9px]"
+                  style={{ borderColor: b.color2, color: b.color2 }}
+                >
+                  {b.name}
+                </button>
+              ))}
+            </div>
+            <PixelButton onClick={() => engine?.lineupBosses()}>Line up bosses</PixelButton>
+            <PixelButton onClick={() => engine?.clearFoes()}>Clear all</PixelButton>
+          </>
+        ) : tab === "waves" ? (
+          <>
+            <p className="font-pixel text-pixel-sm text-muted">Tap foes into a wave, then play</p>
+            <div className="flex w-full gap-1 overflow-x-auto">
+              {hud.sandboxDeck.map((w, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  data-ui
+                  onClick={() => engine?.sandboxPickWave(i)}
+                  className={
+                    "h-9 shrink-0 border-2 px-2 font-pixel text-[8px] " +
+                    (hud.sandboxEdit === i ? "border-gold text-gold" : "border-muted text-muted")
+                  }
+                >
+                  W{i + 1}:{w.count}
+                </button>
+              ))}
+            </div>
+            <p className="w-full text-center font-pixel text-[8px] text-gold">
+              {hud.sandboxDeck[hud.sandboxEdit]?.label ?? "Wave empty"}
+            </p>
+            <div className="grid w-full grid-cols-2 gap-2">
+              {foes.map((f) => (
+                <button
+                  key={f.kind}
+                  type="button"
+                  data-ui
+                  onClick={() => engine?.sandboxAddFoe(f.kind)}
+                  className="h-11 border-2 border-fg bg-bg font-pixel text-[10px] text-fg"
+                >
+                  + {f.label}
+                </button>
+              ))}
+            </div>
+            <PixelButton onClick={() => engine?.sandboxNewWave()}>New wave</PixelButton>
+            <PixelButton
+              primary
+              onClick={() => {
+                engine?.sandboxPlayWaves();
+                onClose();
+              }}
             >
-              {b.name}
-            </button>
-          ))}
-        </div>
-        <PixelButton onClick={() => engine?.lineupBosses()}>Line up bosses</PixelButton>
-        <PixelButton onClick={() => engine?.clearFoes()}>Clear all</PixelButton>
+              Play waves
+            </PixelButton>
+            <PixelButton onClick={() => engine?.sandboxClearDeck()}>Clear deck</PixelButton>
+          </>
+        ) : tab === "relics" ? (
+          <div className="grid max-h-[46vh] w-full grid-cols-2 gap-2 overflow-y-auto overscroll-contain">
+            {RELICS.map((r) => {
+              const on = hud.equipped.includes(r.id);
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  data-ui
+                  onClick={() => engine?.sandboxToggleRelic(r.id)}
+                  className="h-12 border-2 bg-bg px-1 font-pixel text-[9px]"
+                  style={{ borderColor: on ? r.color : "#666", color: r.color }}
+                >
+                  {r.glyph} {r.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid max-h-[46vh] w-full grid-cols-2 gap-2 overflow-y-auto overscroll-contain">
+            {WHEEL_RUNES.map((s) => (
+              <button
+                key={s.name}
+                type="button"
+                data-ui
+                onClick={() => engine?.sandboxBindRune(s)}
+                className="h-12 border-2 bg-bg px-1 font-pixel text-[9px]"
+                style={{ color: s.color, borderColor: hud.crafted?.name === s.name ? s.color : rarityTint(s.rarity) }}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
         <PixelButton primary onClick={onClose}>
           Close
         </PixelButton>
@@ -601,14 +800,251 @@ function PixelBanner({ text }: { text: string }) {
   );
 }
 
+function FieldManual() {
+  const [page, setPage] = useState(0);
+  const pages = [
+    { title: "Field book", kind: "cover" as const, lines: ["Hold the lantern", "Outlast the night", "WASD move · tap shoot", "B opens the book"] },
+    { title: "Ember", kind: "ember" as const, lines: ["Core fire bolt", "Weaves as it flies", "Burns 1/sec for 3s", "Starter spell"] },
+    { title: "Ice", kind: "frost" as const, lines: ["Three shots side by side", "Light blue snow trail", "Slows what it hits", "Always in the book"] },
+    { title: "Bolt", kind: "bolt" as const, lines: ["Buy for 100g", "Fast yellow lance", "1.5s wait", "Trail stuns foes"] },
+    { title: "Void", kind: "void" as const, lines: ["Buy for 300g", "Purple orb orbits you", "2s spin · 2.5s wait", "Huge knockback"] },
+    { title: "Vine", kind: "vine" as const, lines: ["Buy for 1777g", "Close foes wrap 5s", "Shot homes per wrap", "Bosses resist longer"] },
+    { title: "Explosion", kind: "boom" as const, lines: ["Buy for 2500g", "Pixel blast on aim", "100 dmg · 0.2s wait", "Knocks you back too"] },
+    { title: "Wheel", kind: "wheel" as const, lines: ["100g a spin", "Spell, miss, or jackpot", "1% jackpot: gold + legend", "Binds a rune in the book"] },
+    { title: "Sandbox", kind: "sandbox" as const, lines: ["No nights until you spawn", "Drop foes or build waves", "Wear any relic this run", "Bind any rune from the list"] },
+    { title: "Trinkoo", kind: "relics" as const, lines: ["+1 trinkoo a survived night", "+5 for a boss", "Roll 10t for a relic", "Wear 3. Shop is on title"] },
+  ];
+  const cur = pages[page] ?? pages[0]!;
+  const flip = (dir: -1 | 1) => {
+    const next = page + dir;
+    if (next < 0 || next >= pages.length) return;
+    setPage(next);
+  };
+  const glyph =
+    cur.kind === "cover" ? null : cur.kind === "wheel" ? (
+      <span className="font-pixel text-lg text-gold">W</span>
+    ) : cur.kind === "sandbox" ? (
+      <span className="font-pixel text-lg text-[#6fbf6a]">S</span>
+    ) : cur.kind === "relics" ? (
+      <span className="font-pixel text-lg text-[#c8a4ff]">T</span>
+    ) : (
+      <CoreGlyph spell={cur.kind} />
+    );
+  return (
+    <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center gap-2">
+      <div className="relative w-full">
+        <img
+          src={asset("game/hud-spellbook.png")}
+          alt="Field book"
+          className="pixelated h-auto max-h-[min(62vh,20rem)] w-full select-none object-contain"
+          draggable={false}
+        />
+        <div className="absolute inset-x-[12%] inset-y-[18%] grid grid-cols-2 gap-[8%]">
+          <div className="flex flex-col items-center justify-center px-1 text-center font-pixel text-bg">
+            <p className="text-pixel-sm text-bg/70">
+              {page + 1} / {pages.length}
+            </p>
+            <span className="mt-2">{glyph}</span>
+            <p className="mt-2 text-pixel">{cur.title}</p>
+          </div>
+          <div className="flex flex-col items-center justify-center gap-1.5 px-1 text-center font-pixel text-bg">
+            {cur.lines.map((line) => (
+              <span key={line} className="text-pixel-sm leading-relaxed">
+                {line}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="flex w-full max-w-xs gap-2">
+        <PixelButton onClick={() => flip(-1)}>Prev</PixelButton>
+        <PixelButton onClick={() => flip(1)}>Next</PixelButton>
+      </div>
+    </div>
+  );
+}
+
+function RelicShop({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
+  const [tab, setTab] = useState<"roll" | "lore">("roll");
+  const [spinning, setSpinning] = useState(false);
+  const [shown, setShown] = useState<RelicId | null>(null);
+  const [flash, setFlash] = useState<RelicId | null>(null);
+  const [note, setNote] = useState("");
+
+  const roll = () => {
+    if (!engine || spinning) return;
+    const res = engine.rollRelic();
+    if (res === "poor") {
+      setNote("Need 10 trinkoo");
+      return;
+    }
+    if (res === "full") {
+      setNote("Every relic is yours");
+      return;
+    }
+    setNote("");
+    setSpinning(true);
+    setFlash(null);
+    let i = 0;
+    const id = window.setInterval(() => {
+      engine.audio.relicTick();
+      setShown(RELICS[i % RELICS.length]!.id);
+      i += 1;
+      if (i >= 20) {
+        window.clearInterval(id);
+        setShown(res);
+        setFlash(res);
+        engine.audio.relicReveal();
+        setSpinning(false);
+      }
+    }, 55);
+  };
+
+  const preview = shown ? relicById(shown) : null;
+  const won = flash ? relicById(flash) : null;
+
+  return (
+    <div className="pointer-events-auto flex w-full max-w-xs flex-col items-center gap-3">
+      <p className="font-pixel text-pixel-sm text-[#c8a4ff]">{hud.trinkoo} trinkoo</p>
+      <div className="grid w-full grid-cols-2 gap-1">
+        {(["roll", "lore"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            data-ui
+            onClick={() => setTab(t)}
+            className={
+              "h-10 border-2 font-pixel text-[9px] " +
+              (tab === t ? "border-gold bg-accent text-accent-fg" : "border-muted bg-surface text-fg")
+            }
+          >
+            {t === "roll" ? "Roll" : "Relics"}
+          </button>
+        ))}
+      </div>
+      {tab === "lore" ? (
+        <div className="max-h-[52vh] w-full overflow-y-auto overscroll-contain border-2 border-fg bg-bg p-2">
+          {RELICS.map((r) => {
+            const owned = hud.ownedRelics.includes(r.id);
+            const on = hud.equipped.includes(r.id);
+            return (
+              <button
+                key={r.id}
+                type="button"
+                data-ui
+                onClick={() => owned && !on && engine?.equipRelic(r.id)}
+                className="mb-2 flex w-full items-start gap-2 border-b border-muted pb-2 text-left last:mb-0 last:border-b-0 last:pb-0"
+              >
+                <span
+                  className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border border-muted font-pixel text-[8px]"
+                  style={{ color: r.color, outline: on ? `2px solid ${r.color}` : undefined }}
+                >
+                  {r.glyph}
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-pixel text-[9px]" style={{ color: r.color }}>
+                    {r.name}
+                    {on ? " · on" : owned ? " · owned" : ""}
+                  </span>
+                  <span className="mt-1 block font-pixel text-[8px] leading-relaxed text-muted">
+                    {r.blurb}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <>
+          <div className="flex w-full justify-center gap-2">
+            {hud.equipped.map((id, i) => {
+              const r = id ? relicById(id) : null;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  data-ui
+                  onClick={() => engine?.unequipRelic(i)}
+                  className="flex h-14 w-14 flex-col items-center justify-center border-2 border-fg bg-surface"
+                  style={{ boxShadow: r ? `2px 2px 0 0 ${r.color}` : undefined }}
+                >
+                  <span className="font-pixel text-[10px]" style={{ color: r?.color ?? "#666" }}>
+                    {r?.glyph ?? "--"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="font-pixel text-[8px] text-muted">Tap a slot to unequip · 3 max</p>
+          <div
+            className="flex h-20 w-full items-center justify-center border-2 border-gold bg-bg"
+            style={{ transform: spinning ? "scale(1.04)" : "scale(1)" }}
+          >
+            {preview ? (
+              <div className="text-center">
+                <p className="font-pixel text-xl" style={{ color: preview.color }}>
+                  {preview.glyph}
+                </p>
+                <p className="mt-1 font-pixel text-[9px]" style={{ color: preview.color }}>
+                  {preview.name}
+                </p>
+              </div>
+            ) : (
+              <p className="font-pixel text-pixel-sm text-muted">Roll a relic</p>
+            )}
+          </div>
+          <PixelButton primary onClick={roll}>
+            {spinning ? "Rolling..." : `Roll ${RELIC_COST} trinkoo`}
+          </PixelButton>
+          {note ? <p className="font-pixel text-pixel-sm text-danger">{note}</p> : null}
+          <div className="grid w-full grid-cols-4 gap-1">
+            {RELICS.map((r) => {
+              const owned = hud.ownedRelics.includes(r.id);
+              const on = hud.equipped.includes(r.id);
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  data-ui
+                  disabled={!owned || on || spinning}
+                  onClick={() => engine?.equipRelic(r.id)}
+                  className="flex h-10 items-center justify-center border border-muted bg-surface font-pixel text-[8px]"
+                  style={{
+                    color: owned ? r.color : "#444",
+                    outline: on ? `2px solid ${r.color}` : undefined,
+                    opacity: owned ? 1 : 0.35,
+                  }}
+                >
+                  {owned ? r.glyph : "??"}
+                </button>
+              );
+            })}
+          </div>
+          {won && !spinning ? (
+            <div className="w-full border-2 border-gold bg-surface px-2 py-2 text-center">
+              <p className="font-pixel text-lg" style={{ color: won.color }}>
+                {won.glyph}
+              </p>
+              <p className="mt-1 font-pixel text-[10px] text-gold">{won.name}</p>
+              <p className="mt-1 font-pixel text-[8px] leading-relaxed text-muted">{won.blurb}</p>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 function PixelButton({
   children,
   onClick,
   primary = false,
+  compact = false,
 }: {
   children: ReactNode;
   onClick: () => void;
   primary?: boolean;
+  compact?: boolean;
 }) {
   return (
     <button
@@ -616,7 +1052,8 @@ function PixelButton({
       data-ui
       onClick={onClick}
       className={
-        "h-14 w-full rounded-none border-2 px-3 font-pixel text-pixel leading-tight shadow-[4px_4px_0_0_var(--color-bg)] transition-transform duration-150 active:translate-x-px active:translate-y-px " +
+        "w-full rounded-none border-2 px-2 font-pixel leading-tight shadow-[3px_3px_0_0_var(--color-bg)] transition-transform duration-150 active:translate-x-px active:translate-y-px " +
+        (compact ? "h-11 text-[9px] " : "h-12 text-pixel ") +
         (primary
           ? "border-fg bg-accent text-accent-fg"
           : "border-muted bg-surface text-fg")
