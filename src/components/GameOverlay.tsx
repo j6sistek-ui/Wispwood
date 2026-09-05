@@ -1,4 +1,3 @@
-import { BookOpen } from "lucide-react";
 import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
 import type { HudState } from "@/game/engine";
 import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
@@ -39,7 +38,7 @@ export function GameOverlay({ engine, hud }: Props) {
       {hud.phase === "title" && !hud.loading ? (
         <Title engine={engine} bestNight={hud.bestNight} />
       ) : null}
-      {hud.phase === "paused" ? <Pause engine={engine} /> : null}
+      {hud.phase === "paused" ? <Pause engine={engine} hud={hud} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
       {hud.phase === "wheel" ? <FortuneWheel engine={engine} hud={hud} /> : null}
       {hud.phase === "dead" ? <Dead engine={engine} hud={hud} /> : null}
@@ -80,44 +79,33 @@ function Hud({
   return (
     <div
       className="pointer-events-none px-3"
-      style={{ paddingTop: "max(2.75rem, calc(env(safe-area-inset-top, 0px) + 1.75rem))" }}
+      style={{ paddingTop: "max(1.5rem, calc(env(safe-area-inset-top, 0px) + 0.75rem))" }}
     >
-      <div className="mx-auto flex max-w-sm items-stretch justify-center gap-2">
-        <div className="flex-1 border-2 border-fg bg-bg/95 px-3 py-2 text-center">
-          <p className="font-pixel text-[8px] tracking-wide text-muted">NIGHT</p>
-          <p className="mt-1 font-pixel text-2xl tabular-nums leading-none text-fg">{hud.wave}</p>
+      <div className="mx-auto flex max-w-sm items-stretch gap-1.5">
+        <div className="border-2 border-fg bg-bg/95 px-2 py-1 text-center">
+          <p className="font-pixel text-[7px] text-muted">NIGHT</p>
+          <p className="font-pixel text-xl tabular-nums leading-none text-fg">{hud.wave}</p>
         </div>
-        <div className="flex-1 border-2 border-gold bg-bg/95 px-3 py-2 text-center">
-          <p className="font-pixel text-[8px] tracking-wide text-gold">MAX NIGHTS</p>
-          <p className="mt-1 font-pixel text-2xl tabular-nums leading-none text-gold">{hud.bestNight}</p>
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="min-w-0 rounded-xl border border-border bg-bg/80 px-2.5 py-1.5">
-          <p className="text-[9px] font-medium tracking-[0.16em] text-muted uppercase">Lantern</p>
-          <div className="mt-1 h-1.5 w-20 overflow-hidden rounded-full bg-elevated sm:w-32">
-            <div
-              className="h-full rounded-full bg-accent transition-[width] duration-150"
-              style={{ width: `${pct * 100}%` }}
-            />
+        <div className="min-w-0 flex-1 border-2 border-border bg-bg/95 px-2 py-1">
+          <p className="font-pixel text-[7px] text-muted">LANTERN</p>
+          <div className="mt-1 h-2 overflow-hidden border border-border bg-elevated">
+            <div className="h-full bg-accent" style={{ width: `${pct * 100}%` }} />
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-bg/80 px-2.5 py-1.5 text-right">
-          <p className="text-[9px] font-medium tracking-[0.16em] text-muted uppercase">Score</p>
-          <p className="font-display text-lg font-medium tabular-nums leading-none">{hud.score}</p>
-          <p className="font-pixel text-[8px] tabular-nums text-gold">{hud.gold}g</p>
+        <div className="border-2 border-gold bg-bg/95 px-2 py-1 text-center">
+          <p className="font-pixel text-[7px] text-gold">MAX</p>
+          <p className="font-pixel text-xl tabular-nums leading-none text-gold">{hud.bestNight}</p>
         </div>
       </div>
+      <p className="mx-auto mt-1 max-w-sm text-right font-pixel text-[8px] tabular-nums text-gold">{hud.gold}g · {hud.score}</p>
 
-      <div className="pointer-events-auto mx-auto mt-3 flex justify-center gap-2" data-ui>
+      <div className="pointer-events-auto mx-auto mt-2 flex justify-center gap-2" data-ui>
         <button
           type="button"
           data-ui
           onClick={() => engine?.toggleBook()}
-          className="flex h-11 min-w-[6.5rem] items-center justify-center gap-1.5 border-2 border-fg bg-bg px-3 font-pixel text-[10px] text-fg"
+          className="flex h-10 min-w-[6rem] items-center justify-center gap-1.5 border-2 border-fg bg-bg px-3 font-pixel text-[9px] text-fg"
         >
-          <BookOpen className="size-3.5" strokeWidth={2} />
           Book
           <span className="text-muted">{spellLabel}</span>
         </button>
@@ -125,7 +113,7 @@ function Hud({
           type="button"
           data-ui
           onClick={() => engine?.openWheel()}
-          className="flex h-11 min-w-[6.5rem] items-center justify-center gap-1.5 border-2 border-gold bg-bg px-3 font-pixel text-[10px] text-fg"
+          className="flex h-10 min-w-[6rem] items-center justify-center gap-1.5 border-2 border-gold bg-bg px-3 font-pixel text-[9px] text-fg"
         >
           Wheel
           <span className="text-gold">100g</span>
@@ -135,7 +123,7 @@ function Hud({
             type="button"
             data-ui
             onClick={() => onSpawn?.()}
-            className="flex h-11 items-center justify-center border-2 border-accent bg-bg px-3 font-pixel text-[10px] text-fg"
+            className="flex h-10 items-center justify-center border-2 border-accent bg-bg px-3 font-pixel text-[9px] text-fg"
           >
             Spawn
           </button>
@@ -148,7 +136,7 @@ function Hud({
 function Boot() {
   return (
     <div className="absolute inset-0 grid place-items-center bg-bg">
-      <p className="text-sm tracking-[0.22em] text-muted uppercase">Gathering dusk</p>
+      <p className="font-pixel text-pixel-sm text-muted">Gathering dusk</p>
     </div>
   );
 }
@@ -282,7 +270,7 @@ function Title({
       <img
         src={titleSrc}
         alt={titleAlt}
-        className="h-auto w-[min(90vw,22rem)] max-h-[22vh] shrink-0 object-contain"
+        className="pixelated h-auto w-[min(90vw,22rem)] max-h-[26vh] shrink-0 object-contain"
       />
       <div className="pointer-events-none shrink-0 text-center">
         <p className="font-pixel text-pixel-sm text-muted">Max night {bestNight}</p>
@@ -391,7 +379,7 @@ function Title({
             </PixelButton>
           </div>
         ) : (
-          <div className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border-2 border-border bg-bg/80 p-3">
+          <div className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 border-2 border-fg bg-bg/80 p-3">
             {menu === "multiplayer" ? (
               <>
                 <PixelButton primary onClick={createRoom}>
@@ -407,7 +395,7 @@ function Title({
                 <PixelButton onClick={() => engine?.play(true)}>
                   Sand box clearing
                 </PixelButton>
-                <PixelButton onClick={() => setMenu("multiplayer")}>Join</PixelButton>
+                <PixelButton onClick={() => setMenu("multiplayer")}>Multiplayer</PixelButton>
                 <PixelButton onClick={() => setMenu("name")}>Name</PixelButton>
                 <PixelButton onClick={() => setMenu("account")}>Account</PixelButton>
                 <PixelButton onClick={() => void shareGame()}>{shareNote || "Share"}</PixelButton>
@@ -585,39 +573,19 @@ function PixelButton({
   );
 }
 
-function Pause({ engine }: { engine: GameEngine | null }) {
+function Pause({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg/60 pointer-events-auto">
-      <div className="pointer-events-auto flex w-[min(92vw,20rem)] flex-col gap-3 rounded-3xl border border-border bg-surface p-6">
-        <p className="text-center font-display text-2xl">Paused</p>
-        <button
-          type="button"
-          onClick={() => engine?.togglePause()}
-          className="h-11 rounded-xl border border-border text-sm font-medium"
-        >
+    <div className="absolute inset-0 grid place-items-center bg-bg/70 pointer-events-auto">
+      <div className="pointer-events-auto flex w-[min(92vw,20rem)] flex-col gap-2 border-2 border-fg bg-surface p-4">
+        <p className="text-center font-pixel text-pixel text-fg">Paused</p>
+        <PixelButton primary onClick={() => engine?.togglePause()}>
           Resume
-        </button>
-        <button
-          type="button"
-          onClick={() => engine?.openBook()}
-          className="h-11 rounded-xl border border-border text-sm font-medium"
-        >
-          Spellbook
-        </button>
-        <button
-          type="button"
-          onClick={() => engine?.leaveRun()}
-          className="h-11 rounded-xl border border-border text-sm font-medium"
-        >
-          Leave
-        </button>
-        <button
-          type="button"
-          onClick={() => engine?.toggleMute()}
-          className="h-11 rounded-xl border border-border text-sm font-medium"
-        >
-          Toggle sound
-        </button>
+        </PixelButton>
+        <PixelButton onClick={() => engine?.openBook()}>Spellbook</PixelButton>
+        <PixelButton onClick={() => engine?.toggleMute()}>
+          {hud.muted ? "Sound off" : "Sound on"}
+        </PixelButton>
+        <PixelButton onClick={() => engine?.leaveRun()}>Leave</PixelButton>
       </div>
     </div>
   );
@@ -1017,16 +985,17 @@ function UpgradeStat({
 
 function Dead({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg/70 pointer-events-auto">
-      <div className="pointer-events-auto w-[min(92vw,22rem)] rounded-3xl border border-border bg-surface p-7 text-center">
-        <p className="text-[11px] font-medium tracking-[0.22em] text-muted uppercase">The lantern fades</p>
-        <h2 className="mt-2 font-display text-4xl font-medium">Night {hud.wave}</h2>
-        <p className="mt-1 font-pixel text-pixel-sm text-muted">Max night {hud.bestNight}</p>
-        <p className="mt-4 text-sm text-muted">Score {hud.score}</p>
-        <div className="mt-6">
+    <div className="absolute inset-0 grid place-items-center bg-bg/75 pointer-events-auto">
+      <div className="pointer-events-auto w-[min(92vw,22rem)] border-2 border-fg bg-surface p-5 text-center">
+        <p className="font-pixel text-pixel-sm text-muted">The lantern fades</p>
+        <p className="mt-3 font-pixel text-xl text-fg">Night {hud.wave}</p>
+        <p className="mt-2 font-pixel text-pixel-sm text-gold">Max {hud.bestNight}</p>
+        <p className="mt-3 font-pixel text-pixel-sm text-muted">Score {hud.score}</p>
+        <div className="mt-5 flex flex-col gap-2">
           <PixelButton primary onClick={() => engine?.replay()}>
             Light it again
           </PixelButton>
+          <PixelButton onClick={() => engine?.leaveRun()}>Leave</PixelButton>
         </div>
       </div>
     </div>

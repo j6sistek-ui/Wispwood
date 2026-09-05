@@ -162,6 +162,7 @@ export function GameApp() {
           width: "100%",
           height: "100%",
           touchAction: "none",
+          imageRendering: "pixelated",
         }}
       />
       <GameOverlay engine={engine} hud={hud} />

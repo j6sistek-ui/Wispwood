@@ -2240,6 +2240,7 @@ export class GameEngine {
     const oy = (Math.random() - 0.5) * shake;
     ctx.fillStyle = "#0c0d0c";
     ctx.fillRect(0, 0, this.view.w, this.view.h);
+    ctx.imageSmoothingEnabled = false;
     if ((this.phase === "title" || this.phase === "boot") && this.assets) {
       this.drawTitleCover();
       return;
@@ -2377,7 +2378,7 @@ export class GameEngine {
     ctx.fillStyle = def.color2;
     ctx.fillRect(Math.round(e.x - barW / 2), Math.round(e.y - e.r - 18), Math.round(barW * clamp(e.hp / e.maxHp, 0, 1)), 4);
     ctx.fillStyle = def.color2;
-    ctx.font = "8px monospace";
+    ctx.font = "8px \"Press Start 2P\", monospace";
     ctx.textAlign = "center";
     ctx.fillText(def.name, Math.round(e.x), Math.round(e.y - e.r - 24));
   }
@@ -2844,7 +2845,7 @@ export class GameEngine {
       }
       ctx.globalAlpha = 1;
     }
-    ctx.font = "700 15px Figtree, sans-serif";
+    ctx.font = "8px \"Press Start 2P\", monospace";
     ctx.textAlign = "center";
     for (const f of this.floaters) {
       if (!f.alive) continue;
