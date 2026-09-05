@@ -50,20 +50,20 @@ export class GameAudio {
     this.music.gain.setTargetAtTime(this.muted ? 0 : 1.7, this.ctx.currentTime, 0.08);
 
     const drone = this.ctx.createOscillator();
-    drone.type = "sawtooth";
-    drone.frequency.value = 73.42;
+    drone.type = "triangle";
+    drone.frequency.value = 130.81;
     const droneB = this.ctx.createOscillator();
     droneB.type = "square";
-    droneB.frequency.value = 146.83;
+    droneB.frequency.value = 196;
     const eerie = this.ctx.createOscillator();
-    eerie.type = "sawtooth";
-    eerie.frequency.value = 220.5;
+    eerie.type = "triangle";
+    eerie.frequency.value = 329.63;
     const lp = this.ctx.createBiquadFilter();
     lp.type = "lowpass";
-    lp.frequency.value = 920;
-    lp.Q.value = 1.4;
+    lp.frequency.value = 1800;
+    lp.Q.value = 0.7;
     const dg = this.ctx.createGain();
-    dg.gain.value = 0.28;
+    dg.gain.value = 0.12;
     drone.connect(lp);
     droneB.connect(lp);
     eerie.connect(lp);
@@ -72,9 +72,9 @@ export class GameAudio {
 
     const lfo = this.ctx.createOscillator();
     lfo.type = "sine";
-    lfo.frequency.value = 0.18;
+    lfo.frequency.value = 0.35;
     const lfoG = this.ctx.createGain();
-    lfoG.gain.value = 180;
+    lfoG.gain.value = 60;
     lfo.connect(lfoG);
     lfoG.connect(lp.frequency);
 
@@ -86,10 +86,10 @@ export class GameAudio {
     wind.loop = true;
     const bp = this.ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = 1800;
-    bp.Q.value = 0.9;
+    bp.frequency.value = 3200;
+    bp.Q.value = 0.5;
     const wg = this.ctx.createGain();
-    wg.gain.value = 0.05;
+    wg.gain.value = 0.03;
     wind.connect(bp);
     bp.connect(wg);
     wg.connect(this.music);
@@ -130,7 +130,7 @@ export class GameAudio {
 
   private tickBed() {
     if (!this.bedOn || !this.ctx) return;
-    const stepDur = 60 / 152 / 2;
+    const stepDur = 60 / 176 / 2;
     while (this.nextNote < this.ctx.currentTime + 0.2) {
       this.scheduleStep(this.step, this.nextNote);
       this.step = (this.step + 1) % 16;
@@ -140,19 +140,23 @@ export class GameAudio {
   }
 
   private scheduleStep(step: number, t: number) {
-    const bass = [73.42, 0, 73.42, 110, 73.42, 0, 87.31, 98, 73.42, 0, 73.42, 110, 65.41, 87.31, 98, 146.83];
-    const lead = [440, 0, 523.25, 587.33, 698.46, 0, 659.25, 523.25, 587.33, 0, 698.46, 783.99, 698.46, 659.25, 523.25, 880];
+    const bass = [130.81, 0, 130.81, 0, 196, 0, 130.81, 164.81, 174.61, 0, 174.61, 0, 196, 0, 220, 261.63];
+    const lead = [523.25, 659.25, 783.99, 659.25, 523.25, 0, 587.33, 659.25, 698.46, 783.99, 659.25, 523.25, 587.33, 523.25, 392, 523.25];
     const b = bass[step] ?? 0;
     const l = lead[step] ?? 0;
-    if (b) this.musicTone(b, 0.18, "square", 0.28, -6, t);
+    if (b) this.musicTone(b, 0.14, "square", 0.26, 0, t);
     if (l) {
-      this.musicTone(l, 0.14, "sawtooth", 0.2, 18, t);
-      this.musicTone(l * 2, 0.1, "square", 0.08, 24, t);
+      this.musicTone(l, 0.12, "triangle", 0.2, 8, t);
+      this.musicTone(l * 2, 0.08, "sine", 0.08, 10, t);
     }
-    if (step % 2 === 0) this.musicTone(55, 0.09, "sine", 0.42, -18, t);
-    if (step % 4 === 2) this.musicNoise(0.07, 0.22, t);
-    this.musicTone(2400 + (step % 8) * 80, 0.03, "square", 0.06, -400, t);
-    if (step === 7 || step === 15) this.musicTone(196, 0.22, "sawtooth", 0.2, 80, t);
+    if (step % 4 === 0) this.musicTone(60, 0.08, "sine", 0.48, -10, t);
+    if (step % 8 === 4) this.musicNoise(0.08, 0.2, t);
+    if (step % 2 === 1) this.musicTone(3200, 0.025, "square", 0.05, -600, t);
+    if (step === 0 || step === 8) {
+      this.musicTone(261.63, 0.16, "triangle", 0.12, 0, t);
+      this.musicTone(329.63, 0.16, "triangle", 0.1, 0, t);
+      this.musicTone(392, 0.16, "triangle", 0.1, 0, t);
+    }
   }
 
   private musicTone(
