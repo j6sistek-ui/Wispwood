@@ -2,7 +2,7 @@ import { Input, type Actions } from "./input";
 import { GameAudio } from "./audio";
 import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
-import { BOSSES, BOSS_ATTACK, bossForNight, drawBossPixels, type BossDef } from "./bosses";
+import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
@@ -761,9 +761,11 @@ export class GameEngine {
     this.waveGap = 0;
     this.audio.wave();
     this.floatAt(this.player.x, this.player.y - 40, this.richRun ? "Sandbox" : `Night ${this.wave}`);
-    if (!this.richRun && this.wave % 5 === 0) {
-      this.placeBoss(BOSSES.indexOf(bossForNight(this.wave)));
-      this.toSpawn = 6;
+    if (!this.richRun && this.wave > 0 && this.wave % 5 === 0) {
+      const id = (Math.floor(this.wave / 5) - 1) % BOSSES.length;
+      this.placeBoss(id);
+      this.toSpawn = 8;
+      this.floatAt(this.player.x, this.player.y - 72, `BOSS ${BOSSES[id]!.name}`, BOSSES[id]!.color2);
     }
     this.emit();
   }
@@ -1354,7 +1356,9 @@ export class GameEngine {
     if (e.vineIcd > 0) return;
     e.stun = 5;
     e.wrapped = 5;
-    e.vineIcd = 8;
+    e.vineIcd = e.kind === "boss" ? 6 : 8;
+    e.kvx = 0;
+    e.kvy = 0;
     this.floatAt(e.x, e.y - 22, "wrap", "#6fbf6a");
     this.burstSparks(e.x, e.y, 8, "#6fbf6a");
     this.audio.ice();
@@ -1488,9 +1492,10 @@ export class GameEngine {
     e.alive = true;
     e.kind = "boss";
     e.bossId = BOSSES.indexOf(def);
-    const away = this.player.x > ARENA / 2 ? 150 : ARENA - 150;
-    e.x = away;
-    e.y = this.player.y > ARENA / 2 ? 150 : ARENA - 150;
+    const spread = 300 + Math.random() * 40;
+    const ang = Math.random() * Math.PI * 2;
+    e.x = clamp(this.player.x + Math.cos(ang) * spread, 90, ARENA - 90);
+    e.y = clamp(this.player.y + Math.sin(ang) * spread, 90, ARENA - 90);
     e.r = def.r;
     e.speed = def.speed;
     e.maxHp = def.hp + Math.max(0, this.wave - 5) * 40;
@@ -1509,7 +1514,6 @@ export class GameEngine {
     e.knockT = 0;
     e.knockX = 0;
     e.knockY = 1;
-    const ang = Math.random() * Math.PI * 2;
     e.kvx = Math.cos(ang) * def.speed;
     e.kvy = Math.sin(ang) * def.speed;
     this.floatAt(this.player.x, this.player.y - 64, def.name, def.color2);
@@ -1575,7 +1579,7 @@ export class GameEngine {
       e.voidIcd = Math.max(0, e.voidIcd - dt);
       e.vineIcd = Math.max(0, e.vineIcd - dt);
       e.wrapped = Math.max(0, e.wrapped - dt);
-      if (this.spell === "vine" && e.kind !== "boss" && e.vineIcd <= 0 && e.wrapped <= 0) {
+      if (this.spell === "vine" && e.vineIcd <= 0 && e.wrapped <= 0) {
         const reach = 72 + e.r;
         if (Math.hypot(e.x - px, e.y - py) < reach) this.wrapEnemy(e);
       }
@@ -1658,8 +1662,15 @@ export class GameEngine {
 
   private updateBoss(e: Enemy, dt: number, px: number, py: number, index: number) {
     const def: BossDef = BOSSES[e.bossId] ?? BOSSES[0]!;
-    const slow = e.freeze > 0 ? 0.7 : 1;
     const pad = e.r + 8;
+    if (e.wrapped > 0 || e.stun > 0) {
+      e.kvx *= Math.exp(-10 * dt);
+      e.kvy *= Math.exp(-10 * dt);
+      e.x = clamp(e.x + e.kvx * dt, pad, ARENA - pad);
+      e.y = clamp(e.y + e.kvy * dt, pad, ARENA - pad);
+      return;
+    }
+    const slow = e.freeze > 0 ? 0.7 : 1;
     if (def.move === "bounce") {
       e.x += e.kvx * dt * slow;
       e.y += e.kvy * dt * slow;
@@ -1762,9 +1773,9 @@ export class GameEngine {
     }
     const atk = BOSS_ATTACK[def.name] ?? "slam";
     if (e.speed <= 0) return;
-    if ((atk === "drip" || atk === "acid" || atk === "dust") && e.vineIcd <= 0) {
+    if ((atk === "drip" || atk === "acid" || atk === "dust") && e.contact <= 0) {
       this.dropHazard(e.x, e.y, atk === "acid" ? "acid" : atk === "dust" ? "dust" : "goo", def.color2, atk === "dust" ? 46 : 28);
-      e.vineIcd = atk === "dust" ? 0.45 : 0.28;
+      e.contact = atk === "dust" ? 0.45 : 0.28;
     }
     if (e.voidIcd <= 0) {
       this.bossCast(e, def, atk, px, py);
@@ -2359,6 +2370,7 @@ export class GameEngine {
       ctx.stroke();
     }
     ctx.restore();
+    if (e.wrapped > 0) this.drawVineWrap(e.x, e.y, e.r * 0.85);
     const barW = e.r * 1.6;
     ctx.fillStyle = "rgba(12,13,12,0.7)";
     ctx.fillRect(Math.round(e.x - barW / 2), Math.round(e.y - e.r - 18), Math.round(barW), 4);

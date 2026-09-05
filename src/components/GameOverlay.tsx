@@ -535,15 +535,15 @@ function SpawnMenu({ engine, onClose }: { engine: GameEngine | null; onClose: ()
           ))}
         </div>
         <p className="mt-1 font-pixel text-pixel-sm text-gold">Bosses</p>
-        <div className="grid max-h-56 w-full grid-cols-2 gap-2 overflow-y-auto">
+        <div className="grid max-h-[42vh] w-full grid-cols-2 gap-2 overflow-y-auto overscroll-contain">
           {BOSSES.map((b, i) => (
             <button
               key={b.name}
               type="button"
               data-ui
               onClick={() => engine?.spawnBoss(i)}
-              className="h-11 border-2 bg-bg px-1 font-pixel text-[9px] text-fg"
-              style={{ borderColor: b.color2 }}
+              className="h-12 shrink-0 border-2 bg-bg px-1 font-pixel text-[9px] text-fg"
+              style={{ borderColor: b.color2, color: b.color2 }}
             >
               {b.name}
             </button>
