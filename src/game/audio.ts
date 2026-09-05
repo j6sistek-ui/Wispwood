@@ -91,13 +91,42 @@ export class GameAudio {
     const lead = [261.63, 0, 329.63, 0, 392, 0, 329.63, 0, 293.66, 0, 261.63, 0, 196, 0, 261.63, 0];
     const b = bass[step] ?? 0;
     const l = lead[step] ?? 0;
-    if (b) this.musicTone(b, 0.85, "triangle", 0.12, 0, t);
-    if (l) {
-      this.musicTone(l, 1.05, "square", 0.2, 0, t);
-      this.musicTone(l * 2, 0.7, "sine", 0.07, 4, t);
-    }
-    if (step % 4 === 0) this.musicTone(80, 0.12, "sine", 0.14, -16, t);
+    if (b) this.pianoTone(b, 0.95, 0.18, t);
+    if (l) this.pianoTone(l, 1.15, 0.28, t);
+    if (step % 4 === 0) this.musicTone(80, 0.12, "sine", 0.1, -16, t);
     if (step % 8 === 4) this.musicNoise(0.08, 0.1, t);
+  }
+
+  private pianoTone(freq: number, dur: number, gain: number, when: number) {
+    if (!this.ctx || !this.music) return;
+    const partials: Array<[number, number]> = [
+      [1, 1],
+      [2, 0.42],
+      [3, 0.2],
+      [4, 0.12],
+      [5, 0.07],
+      [6, 0.04],
+      [8, 0.025],
+    ];
+    for (const [n, amp] of partials) {
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * n * (1 + 0.00035 * n * n), when);
+      const a = Math.max(0.0002, gain * amp);
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(a, when + 0.01);
+      g.gain.exponentialRampToValueAtTime(a * 0.32, when + dur * 0.28);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      osc.connect(g);
+      g.connect(this.music);
+      osc.start(when);
+      osc.stop(when + dur + 0.03);
+      osc.onended = () => {
+        osc.disconnect();
+        g.disconnect();
+      };
+    }
   }
 
   private musicTone(
