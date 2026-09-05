@@ -19,22 +19,18 @@
     <script>
       (function () {
         var vv = window.visualViewport;
-        var h = Math.max(
-          window.innerHeight,
-          document.documentElement.clientHeight || 0,
-          Math.round((vv && vv.height) || 0),
-        );
-        var w = Math.max(
-          window.innerWidth,
-          document.documentElement.clientWidth || 0,
-          Math.round((vv && vv.width) || 0),
-        );
+        var h = Math.round((vv && vv.height) || window.innerHeight || 0);
+        var w = Math.round((vv && vv.width) || window.innerWidth || 0);
+        var t = Math.round((vv && vv.offsetTop) || 0);
+        var l = Math.round((vv && vv.offsetLeft) || 0);
         document.documentElement.style.setProperty("--app-h", h + "px");
         document.documentElement.style.setProperty("--app-w", w + "px");
+        document.documentElement.style.setProperty("--app-top", t + "px");
+        document.documentElement.style.setProperty("--app-left", l + "px");
       })();
     </script>
-    <script type="module" crossorigin src="/Wispwood/assets/index-BpFsVpBx.js"></script>
-    <link rel="stylesheet" crossorigin href="/Wispwood/assets/index-D_6AmyN2.css">
+    <script type="module" crossorigin src="/Wispwood/assets/index-CZ3QKDRW.js"></script>
+    <link rel="stylesheet" crossorigin href="/Wispwood/assets/index-C_IANRY1.css">
   </head>
   <body class="bg-bg text-fg">
     <div id="root"></div>

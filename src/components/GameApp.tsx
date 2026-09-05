@@ -39,20 +39,16 @@ function isChromeTarget(target: EventTarget | null) {
 
 function lockViewport() {
   const vv = window.visualViewport;
-  const w = Math.max(
-    window.innerWidth,
-    document.documentElement.clientWidth,
-    Math.round(vv?.width ?? 0),
-  );
-  const h = Math.max(
-    window.innerHeight,
-    document.documentElement.clientHeight,
-    Math.round(vv?.height ?? 0),
-  );
+  const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth));
+  const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight));
+  const top = Math.max(0, Math.round(vv?.offsetTop ?? 0));
+  const left = Math.max(0, Math.round(vv?.offsetLeft ?? 0));
   const root = document.documentElement;
   root.style.setProperty("--app-w", `${w}px`);
   root.style.setProperty("--app-h", `${h}px`);
-  return { w, h };
+  root.style.setProperty("--app-top", `${top}px`);
+  root.style.setProperty("--app-left", `${left}px`);
+  return { w, h, top, left };
 }
 
 export function GameApp() {
@@ -87,6 +83,7 @@ export function GameApp() {
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
     const ro = new ResizeObserver(() => {
       lockViewport();
       game.resize();
@@ -137,6 +134,7 @@ export function GameApp() {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pointerdown", onDown);
@@ -150,7 +148,13 @@ export function GameApp() {
   return (
     <main
       className="overflow-hidden bg-bg text-fg"
-      style={{ position: "fixed", inset: 0, width: "100%", height: "100%" }}
+      style={{
+        position: "fixed",
+        top: "var(--app-top, 0px)",
+        left: "var(--app-left, 0px)",
+        width: "var(--app-w, 100%)",
+        height: "var(--app-h, 100%)",
+      }}
     >
       <canvas
         ref={canvasRef}

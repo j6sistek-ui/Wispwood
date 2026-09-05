@@ -79,7 +79,7 @@ function Hud({
   return (
     <div
       className="pointer-events-none px-3"
-      style={{ paddingTop: "max(1.5rem, calc(env(safe-area-inset-top, 0px) + 0.75rem))" }}
+      style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
     >
       <div className="mx-auto flex max-w-sm items-stretch gap-1.5">
         <div className="border-2 border-fg bg-bg/95 px-2 py-1 text-center">
@@ -1008,7 +1008,7 @@ function TouchSticks({ engine, compact = false }: { engine: GameEngine | null; c
       className={
         compact
           ? "pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-6 pb-2"
-          : "pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+          : "pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
       }
     >
       <Stick
