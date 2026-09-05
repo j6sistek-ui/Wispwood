@@ -259,20 +259,12 @@ function Title({
     setMenu("multiplayer");
   };
 
-  const titleSrc =
-    menu === "multiplayer" || menu === "join" || menu === "room"
-      ? asset("game/logo-multiplayer.png")
-      : asset("game/logo-wispwood.png");
-  const titleAlt =
-    menu === "multiplayer" || menu === "join" || menu === "room" ? "Multiplayer" : "Wispwood";
+  const titleLabel =
+    menu === "multiplayer" || menu === "join" || menu === "room" ? "MULTIPLAYER" : "WISPWOOD";
 
   return (
     <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-[max(1.5rem,env(safe-area-inset-top))] pointer-events-auto">
-      <img
-        src={titleSrc}
-        alt={titleAlt}
-        className="pixelated h-auto w-[min(90vw,22rem)] max-h-[26vh] shrink-0 object-contain"
-      />
+      <PixelBanner text={titleLabel} />
       <div className="pointer-events-none shrink-0 text-center">
         <p className="font-pixel text-pixel-sm text-muted">Max night {bestNight}</p>
       </div>
@@ -586,6 +578,26 @@ function SpellGlyph({ color, name }: { color: string; name: string }) {
         )),
       )}
     </span>
+  );
+}
+
+function PixelBanner({ text }: { text: string }) {
+  const small = text.length > 10;
+  return (
+    <div className="w-[min(90vw,20rem)] shrink-0 border-4 border-fg bg-bg">
+      <div className="h-2 bg-gold" />
+      <div className="px-3 py-4 text-center">
+        <p
+          className={
+            "font-pixel leading-none tracking-[0.18em] text-gold " +
+            (small ? "text-[12px]" : "text-[20px]")
+          }
+        >
+          {text}
+        </p>
+      </div>
+      <div className="h-2 bg-gold" />
+    </div>
   );
 }
 
