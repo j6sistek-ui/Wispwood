@@ -4,7 +4,7 @@ import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
 import { rarityTint, wheelChoices, pickLegendary, spellFlavor } from "@/game/spell-prompt";
-import { glyphFor } from "@/game/craft-sprites";
+import { glyphFor, coreGlyph, CORE_COLOR } from "@/game/craft-sprites";
 import { BOSSES } from "@/game/bosses";
 import { asset } from "@/game/paths";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
@@ -548,6 +548,27 @@ function SpawnMenu({ engine, onClose }: { engine: GameEngine | null; onClose: ()
   );
 }
 
+function CoreGlyph({ spell }: { spell: Spell }) {
+  const rows = coreGlyph(spell === "craft" ? "ember" : spell);
+  const color = CORE_COLOR[spell] ?? "#e08a3c";
+  return (
+    <span className="inline-grid" style={{ gridTemplateColumns: "repeat(9, 3px)" }}>
+      {rows.flatMap((row, y) =>
+        [...row].map((ch, x) => (
+          <span
+            key={`${x}-${y}`}
+            style={{
+              width: 3,
+              height: 3,
+              background: ch === "." ? "transparent" : ch === "+" ? "#fff" : color,
+            }}
+          />
+        )),
+      )}
+    </span>
+  );
+}
+
 function SpellGlyph({ color, name }: { color: string; name: string }) {
   const rows = glyphFor(name);
   return (
@@ -875,6 +896,13 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
                 <p className="text-pixel-sm text-bg/70">
                   {page + 1} / {pages.length}
                 </p>
+                <span className="mt-2">
+                  {spell === "craft" && hud.crafted ? (
+                    <SpellGlyph color={hud.crafted.color} name={hud.crafted.name} />
+                  ) : (
+                    <CoreGlyph spell={spell} />
+                  )}
+                </span>
                 <p className="mt-2 text-pixel">{spellName(spell, hud.crafted)}</p>
                 {hud.spell === spell ? <p className="mt-2 text-pixel-sm">Prepared</p> : null}
               </div>

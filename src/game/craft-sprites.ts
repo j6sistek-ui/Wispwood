@@ -218,6 +218,40 @@ export function glyphFor(name: string): string[] {
   return g.map((r) => r.join(""));
 }
 
+export function drawPixelGlyph(
+  ctx: CanvasRenderingContext2D,
+  rows: string[],
+  color: string,
+  x: number,
+  y: number,
+  ang: number,
+  sx: number,
+  sy: number,
+  pixel = 3,
+) {
+  const hi = LIGHT[color] ?? "#ffffff";
+  const dark = shade(color, 0.45);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+  ctx.scale(sx, sy);
+  ctx.imageSmoothingEnabled = false;
+  const h = rows.length;
+  const w = rows[0]!.length;
+  const ox = -((w * pixel) / 2);
+  const oy = -((h * pixel) / 2);
+  for (let gy = 0; gy < h; gy++) {
+    const row = rows[gy]!;
+    for (let gx = 0; gx < w; gx++) {
+      const ch = row[gx]!;
+      if (ch === ".") continue;
+      ctx.fillStyle = ch === "+" ? "#ffffff" : ch === "o" ? hi : ch === ":" ? dark : color;
+      ctx.fillRect(ox + gx * pixel, oy + gy * pixel, pixel, pixel);
+    }
+  }
+  ctx.restore();
+}
+
 export function drawCraftSigil(
   ctx: CanvasRenderingContext2D,
   name: string,
@@ -228,7 +262,6 @@ export function drawCraftSigil(
   t: number,
   ability: CraftAbility,
 ) {
-  const rows = glyphFor(name);
   let rot = ang;
   let sx = 1;
   let sy = 1;
@@ -246,28 +279,120 @@ export function drawCraftSigil(
   else if (ability === "grav" || ability === "pull") rot -= t * 4;
   else if (ability === "veil") sx = sy = 1 + Math.sin(t * 5) * 0.2;
   else if (ability === "dash") sx = 1.4;
-  const hi = LIGHT[color] ?? "#ffffff";
-  const dark = shade(color, 0.45);
-  const P = 3;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rot);
-  ctx.scale(sx, sy);
-  ctx.imageSmoothingEnabled = false;
-  const h = rows.length;
-  const w = rows[0]!.length;
-  const ox = -((w * P) / 2);
-  const oy = -((h * P) / 2);
-  for (let gy = 0; gy < h; gy++) {
-    const row = rows[gy]!;
-    for (let gx = 0; gx < w; gx++) {
-      const ch = row[gx]!;
-      if (ch === ".") continue;
-      ctx.fillStyle = ch === "+" ? "#ffffff" : ch === "o" ? hi : ch === ":" ? dark : color;
-      ctx.fillRect(ox + gx * P, oy + gy * P, P, P);
-    }
+  drawPixelGlyph(ctx, glyphFor(name), color, x, y, rot, sx, sy, 3);
+}
+
+export const CORE_GLYPHS: Record<string, string[]> = {
+  ember: [
+    "..oo.....",
+    ".#o#o....",
+    "#o+o#o...",
+    ".#o+o##..",
+    "..#o#o#..",
+    "...#o#...",
+    "....#o...",
+    ".....#...",
+  ],
+  frost: [
+    "...+.....",
+    "..#o#....",
+    ".#.+.#...",
+    "#o#+#o#..",
+    ".#.+.#...",
+    "..#o#....",
+    ".#...#...",
+    "+.....+..",
+  ],
+  bolt: [
+    "....o#...",
+    "...o#....",
+    "..#o+....",
+    ".#o#.....",
+    "..o#o....",
+    "...#o#...",
+    "....o#...",
+    ".....#...",
+  ],
+  void: [
+    "..####...",
+    ".#::::#..",
+    "#:.oo.:#.",
+    "#:o++o:#.",
+    "#:.oo.:#.",
+    ".#::::#..",
+    "..####...",
+    ".........",
+  ],
+  vine: [
+    "...#o....",
+    "..#o#o...",
+    ".#..#....",
+    "..#o#....",
+    "...#o#...",
+    ".#o..#...",
+    "#o#......",
+    ".##......",
+  ],
+  boom: [
+    "#..+..#..",
+    ".#o+o#...",
+    "#o#+#+o#.",
+    ".+#+#+...",
+    "#o#+#+o#.",
+    ".#o+o#...",
+    "#..+..#..",
+    ".........",
+  ],
+};
+
+export const CORE_COLOR: Record<string, string> = {
+  ember: "#e08a3c",
+  frost: "#9ad8ea",
+  bolt: "#f0d24a",
+  void: "#7a48b8",
+  vine: "#6fbf6a",
+  boom: "#ff9a3c",
+};
+
+export function coreGlyph(spell: string): string[] {
+  return CORE_GLYPHS[spell] ?? CORE_GLYPHS.ember!;
+}
+
+export function drawCoreSigil(
+  ctx: CanvasRenderingContext2D,
+  spell: string,
+  x: number,
+  y: number,
+  ang: number,
+  t: number,
+) {
+  const rows = coreGlyph(spell);
+  const color = CORE_COLOR[spell] ?? "#e08a3c";
+  let rot = ang;
+  let sx = 1;
+  let sy = 1;
+  let pixel = 4;
+  if (spell === "ember") {
+    sx = sy = 1.15 + Math.sin(t * 14) * 0.12;
+    rot += Math.sin(t * 9) * 0.15;
+  } else if (spell === "frost") {
+    rot += t * 4;
+    sx = sy = 1.05;
+  } else if (spell === "bolt") {
+    sx = 1.8;
+    sy = 0.85;
+    pixel = 3;
+  } else if (spell === "void") {
+    rot += t * 8;
+    sx = sy = 2.2 + Math.sin(t * 10) * 0.12;
+    pixel = 5;
+  } else if (spell === "vine") {
+    rot += Math.sin(t * 10) * 0.45;
+    sx = 1.25;
+  } else if (spell === "boom") {
+    sx = sy = 1.4 + Math.abs(Math.sin(t * 8)) * 0.35;
   }
-  ctx.restore();
+  drawPixelGlyph(ctx, rows, color, x, y, rot, sx, sy, pixel);
 }
 
 function shade(hex: string, k: number) {

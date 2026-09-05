@@ -3,7 +3,7 @@ import { GameAudio } from "./audio";
 import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
-import { drawCraftSigil } from "./craft-sprites";
+import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
@@ -2742,11 +2742,13 @@ export class GameEngine {
       if (!b.alive) continue;
       const ang = Math.atan2(b.vy, b.vx);
       if (b.spell === "frost") {
-        this.drawIceBolt(b.x, b.y, ang);
+        this.drawGlow(b.x, b.y, 14, "#9ad8ea");
+        drawCoreSigil(this.ctx, "frost", b.x, b.y, ang, this.animT);
         continue;
       }
       if (b.spell === "bolt") {
-        this.drawLightning(b.x, b.y, b.dirX, b.dirY);
+        this.drawGlow(b.x, b.y, 12, "#f0d24a");
+        drawCoreSigil(this.ctx, "bolt", b.x, b.y, Math.atan2(b.dirY, b.dirX), this.animT);
         continue;
       }
       if (b.spell === "craft") {
@@ -2754,15 +2756,18 @@ export class GameEngine {
         continue;
       }
       if (b.spell === "void") {
-        this.drawVoidOrb(b);
+        this.drawGlow(b.x, b.y, 56, "#4a2068");
+        drawCoreSigil(this.ctx, "void", b.x, b.y, b.ang * 2.4, this.animT);
         continue;
       }
       if (b.spell === "vine") {
-        this.drawVineBolt(b.x, b.y, ang);
+        this.drawGlow(b.x, b.y, 12, "#6fbf6a");
+        drawCoreSigil(this.ctx, "vine", b.x, b.y, ang, this.animT);
         continue;
       }
       if (b.spell === "ember") {
-        this.drawEmberOrb(b);
+        this.drawGlow(b.x, b.y, 22, "#e08a3c");
+        drawCoreSigil(this.ctx, "ember", b.x, b.y, ang, this.animT + b.dist * 0.01);
         continue;
       }
       this.drawTinted(this.projFrame(), b.x, b.y, 32, 20, ang);
@@ -2896,6 +2901,7 @@ export class GameEngine {
     ctx.drawImage(boom, -s / 2, -s / 2, s, s);
     ctx.drawImage(this.projFrame(), -s * 0.2, -10, s * 0.7, 20);
     ctx.restore();
+    drawCoreSigil(this.ctx, "boom", x, y, ang, this.animT + k);
     ctx.globalAlpha = 1;
   }
 
