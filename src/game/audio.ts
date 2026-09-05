@@ -336,8 +336,7 @@ export class GameAudio {
       this.tone(1046.5, 0.12, "sine", 0.14, 40, t + 0.16);
     }
     this.yellJackpot();
-    this.holdVoice(980, 820, 1480, 0.55, 0.7, 0.28);
-    this.holdVoice(740, 420, 980, 2.4, 1.2, 0.32);
+    this.humanShout(0.58);
     for (let i = 0; i < 18; i++) {
       this.tone(1400 + (i % 4) * 220, 0.06, "sine", 0.09, 80, 1.3 + i * 0.08);
     }
@@ -350,18 +349,76 @@ export class GameAudio {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     try {
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance("JACKPOT");
-      u.pitch = 1.9;
-      u.rate = 0.85;
-      u.volume = 1;
-      u.lang = "en-US";
-      const voices = window.speechSynthesis.getVoices();
-      const high = voices.find((v) => /female|child|zira|samantha|google us|kyoko/i.test(v.name));
-      if (high) u.voice = high;
-      window.setTimeout(() => window.speechSynthesis.speak(u), 620);
+      const voice = this.pickVoice();
+      const say = (text: string, delay: number, pitch: number, rate: number) => {
+        window.setTimeout(() => {
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = "en-US";
+          u.volume = 1;
+          u.pitch = pitch;
+          u.rate = rate;
+          if (voice) u.voice = voice;
+          window.speechSynthesis.speak(u);
+        }, delay);
+      };
+      say("Yeah!", 520, 1.28, 1.22);
+      say("Jackpot!", 820, 1.42, 1.08);
+      say("Jackpot! Let's go!", 1580, 1.38, 1.18);
     } catch {
       /* speech optional */
     }
+  }
+
+  private pickVoice() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+    const voices = window.speechSynthesis.getVoices();
+    const prefer = /samantha|alex|aria|guy|davis|jenny|google us english|daniel|moira|karen|fred/i;
+    return (
+      voices.find((v) => prefer.test(v.name) && /^en/i.test(v.lang)) ||
+      voices.find((v) => /^en-US/i.test(v.lang) && !/compact|novelty|whisper|bad news|good news|bells/i.test(v.name)) ||
+      voices.find((v) => /^en/i.test(v.lang)) ||
+      null
+    );
+  }
+
+  private humanShout(delay: number) {
+    if (!this.ctx || !this.sfx) return;
+    const t = this.ctx.currentTime + delay;
+    const pulse = this.ctx.createOscillator();
+    pulse.type = "sawtooth";
+    pulse.frequency.setValueAtTime(240, t);
+    pulse.frequency.linearRampToValueAtTime(310, t + 0.12);
+    pulse.frequency.linearRampToValueAtTime(270, t + 0.55);
+    const vib = this.ctx.createOscillator();
+    vib.frequency.value = 5.4;
+    const vibG = this.ctx.createGain();
+    vibG.gain.value = 8;
+    vib.connect(vibG);
+    vibG.connect(pulse.frequency);
+    const f1 = this.ctx.createBiquadFilter();
+    f1.type = "bandpass";
+    f1.Q.value = 5;
+    f1.frequency.setValueAtTime(520, t);
+    f1.frequency.linearRampToValueAtTime(740, t + 0.18);
+    const f2 = this.ctx.createBiquadFilter();
+    f2.type = "bandpass";
+    f2.Q.value = 4;
+    f2.frequency.setValueAtTime(1180, t);
+    f2.frequency.linearRampToValueAtTime(980, t + 0.4);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.28);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    pulse.connect(f1);
+    pulse.connect(f2);
+    f1.connect(g);
+    f2.connect(g);
+    g.connect(this.sfx);
+    pulse.start(t);
+    vib.start(t);
+    pulse.stop(t + 0.74);
+    vib.stop(t + 0.74);
   }
 
   private holdVoice(f0: number, f1: number, f2: number, dur: number, delay: number, gain: number) {
