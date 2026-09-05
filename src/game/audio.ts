@@ -240,7 +240,7 @@ export class GameAudio {
     };
   }
 
-  private noise(dur: number, gain = 0.08) {
+  private noise(dur: number, gain = 0.08, delay = 0) {
     if (!this.ctx || !this.sfx || this.muted) return;
     const n = this.ctx.sampleRate * dur;
     const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
@@ -249,7 +249,7 @@ export class GameAudio {
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     const g = this.ctx.createGain();
-    const t = this.ctx.currentTime;
+    const t = this.ctx.currentTime + delay;
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     const filter = this.ctx.createBiquadFilter();
@@ -312,42 +312,56 @@ export class GameAudio {
     if (this.ctx?.state === "suspended") void this.ctx.resume();
     if (!this.ctx || !this.sfx || this.muted) return;
     if (this.music) {
-      this.music.gain.setTargetAtTime(0.1, this.ctx.currentTime, 0.04);
+      this.music.gain.setTargetAtTime(0.08, this.ctx.currentTime, 0.04);
       window.setTimeout(() => {
         if (this.music && this.ctx && this.bedOn) {
           this.music.gain.setTargetAtTime(1.7, this.ctx.currentTime, 0.2);
         }
-      }, 4800);
+      }, 6200);
     }
-    for (let i = 0; i < 14; i++) {
-      const t = i * 0.038;
-      this.tone(920 + (i % 3) * 180, 0.04, "square", 0.1, 0, t);
-      this.tone(180, 0.03, "square", 0.08, 0, t);
+    this.tone(90, 0.12, "square", 0.22, -20, 0);
+    this.noise(0.08, 0.16, 0);
+    for (let i = 0; i < 28; i++) {
+      const t = 0.05 + i * (0.018 + i * 0.0012);
+      this.tone(780 + (i % 5) * 140, 0.03, "square", 0.1, 0, t);
+      this.tone(160 + (i % 3) * 40, 0.025, "square", 0.07, 0, t);
     }
-    this.noise(0.12, 0.22);
-    this.tone(80, 0.2, "sine", 0.28, -10, 0.52);
-    const bells = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1568, 2093];
-    for (let i = 0; i < bells.length; i++) {
-      const t = 0.55 + i * 0.07;
-      this.tone(bells[i]!, 0.22, "triangle", 0.2, 12, t);
-      this.tone(bells[i]! * 2, 0.16, "sine", 0.1, 8, t);
+    for (let r = 0; r < 3; r++) {
+      const t = 0.62 + r * 0.16;
+      this.tone(140, 0.08, "square", 0.2, -30, t);
+      this.tone(980, 0.05, "triangle", 0.14, 0, t);
+      this.noise(0.04, 0.12, t);
     }
-    const hit = [523.25, 659.25, 783.99, 1046.5];
-    for (let k = 0; k < 6; k++) {
-      const t = 1.05 + k * 0.22;
-      for (let i = 0; i < hit.length; i++) {
-        this.tone(hit[i]!, 0.18, "square", 0.16, 0, t + i * 0.04);
-        this.tone(hit[i]! * 2, 0.12, "triangle", 0.08, 0, t + i * 0.04);
-      }
-      this.tone(1046.5, 0.12, "sine", 0.14, 40, t + 0.16);
+    for (let i = 0; i < 70; i++) {
+      const t = 0.7 + Math.random() * 3.8;
+      this.tone(2400 + Math.random() * 1800, 0.025, "sine", 0.07 + Math.random() * 0.05, 80, t);
+      if (i % 3 === 0) this.noise(0.03, 0.06, t);
+    }
+    for (let i = 0; i < 48; i++) {
+      const t = 1.0 + i * 0.055 + Math.random() * 0.03;
+      this.tone(1200 + Math.random() * 900, 0.05, "triangle", 0.09, -40, t);
+      this.tone(700 + Math.random() * 200, 0.04, "square", 0.05, 0, t);
+    }
+    const dings = [1046.5, 1318.5, 1568, 2093, 1568, 1318.5, 2093, 2637];
+    for (let k = 0; k < 10; k++) {
+      const t = 0.95 + k * 0.28;
+      const f = dings[k % dings.length]!;
+      this.tone(f, 0.22, "sine", 0.16, 20, t);
+      this.tone(f * 2, 0.14, "triangle", 0.08, 10, t);
+    }
+    for (let i = 0; i < 16; i++) {
+      this.tone(880 + (i % 4) * 110, 0.07, "square", 0.1, 0, 1.1 + i * 0.09);
+    }
+    for (let i = 0; i < 8; i++) {
+      this.tone(1480, 0.08, "square", 0.12, 0, 2.2 + i * 0.18);
+      this.tone(1960, 0.08, "square", 0.1, 0, 2.28 + i * 0.18);
     }
     this.playJackVoice();
-    for (let i = 0; i < 18; i++) {
-      this.tone(1400 + (i % 4) * 220, 0.06, "sine", 0.07, 80, 1.3 + i * 0.08);
-    }
-    this.tone(80, 0.18, "square", 0.24, -8, 1.05);
-    this.tone(80, 0.16, "square", 0.22, -8, 2.15);
-    this.tone(80, 0.22, "square", 0.26, -8, 3.4);
+    this.tone(80, 0.2, "sine", 0.26, -8, 0.7);
+    this.tone(80, 0.18, "square", 0.22, -8, 2.4);
+    this.tone(80, 0.24, "square", 0.26, -8, 4.2);
+    this.noise(0.2, 0.14, 0.7);
+    this.noise(0.18, 0.12, 2.1);
   }
 
   private loadJackpot() {
