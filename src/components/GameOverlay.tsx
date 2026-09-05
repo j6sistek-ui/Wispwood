@@ -117,8 +117,16 @@ function Hud({
         <button
           type="button"
           data-ui
+          onClick={() => engine?.togglePause()}
+          className="flex h-10 items-center justify-center border-2 border-muted bg-bg px-3 font-pixel text-[9px] text-fg"
+        >
+          Pause
+        </button>
+        <button
+          type="button"
+          data-ui
           onClick={() => engine?.toggleBook()}
-          className="flex h-10 min-w-[6rem] items-center justify-center gap-1.5 border-2 border-fg bg-bg px-3 font-pixel text-[9px] text-fg"
+          className="flex h-10 min-w-[5.5rem] items-center justify-center gap-1.5 border-2 border-fg bg-bg px-3 font-pixel text-[9px] text-fg"
         >
           Book
           <span className="text-muted">{spellLabel}</span>
