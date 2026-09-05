@@ -1,3 +1,5 @@
+import { asset } from "./paths";
+
 export class GameAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -8,6 +10,8 @@ export class GameAudio {
   private bedOn = false;
   private step = 0;
   private nextNote = 0;
+  private jackBuf: AudioBuffer | null = null;
+  private jackLoading = false;
   muted = false;
 
   unlock() {
@@ -25,9 +29,7 @@ export class GameAudio {
       this.music.gain.value = this.muted ? 0 : 1.7;
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.getVoices();
-    }
+    this.loadJackpot();
   }
 
   setMuted(muted: boolean) {
@@ -335,14 +337,52 @@ export class GameAudio {
       }
       this.tone(1046.5, 0.12, "sine", 0.14, 40, t + 0.16);
     }
-    this.yellJackpot();
-    this.humanShout(0.58);
+    this.playJackVoice();
     for (let i = 0; i < 18; i++) {
-      this.tone(1400 + (i % 4) * 220, 0.06, "sine", 0.09, 80, 1.3 + i * 0.08);
+      this.tone(1400 + (i % 4) * 220, 0.06, "sine", 0.07, 80, 1.3 + i * 0.08);
     }
     this.tone(80, 0.18, "square", 0.24, -8, 1.05);
     this.tone(80, 0.16, "square", 0.22, -8, 2.15);
     this.tone(80, 0.22, "square", 0.26, -8, 3.4);
+  }
+
+  private loadJackpot() {
+    if (this.jackBuf || this.jackLoading || !this.ctx) return;
+    this.jackLoading = true;
+    fetch(asset("game/sfx/jackpot.mp3"))
+      .then((r) => r.arrayBuffer())
+      .then((b) => this.ctx!.decodeAudioData(b))
+      .then((buf) => {
+        this.jackBuf = buf;
+      })
+      .catch(() => {
+        this.jackLoading = false;
+      });
+  }
+
+  private playJackVoice() {
+    if (!this.ctx || !this.sfx || this.muted) return;
+    if (!this.jackBuf) {
+      this.loadJackpot();
+      this.yellJackpot();
+      return;
+    }
+    const play = (delay: number, rate: number, gain: number) => {
+      const src = this.ctx!.createBufferSource();
+      src.buffer = this.jackBuf;
+      src.playbackRate.value = rate;
+      const g = this.ctx!.createGain();
+      g.gain.value = gain;
+      src.connect(g);
+      g.connect(this.sfx!);
+      src.start(this.ctx!.currentTime + delay);
+      src.onended = () => {
+        src.disconnect();
+        g.disconnect();
+      };
+    };
+    play(0.55, 1, 1.35);
+    play(1.85, 1.04, 1.15);
   }
 
   private yellJackpot() {
