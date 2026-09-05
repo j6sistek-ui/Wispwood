@@ -77,36 +77,27 @@ export class GameAudio {
 
   private tickBed() {
     if (!this.bedOn || !this.ctx) return;
-    const stepDur = 60 / 140 / 2;
-    while (this.nextNote < this.ctx.currentTime + 0.2) {
+    const stepDur = 60 / 96;
+    while (this.nextNote < this.ctx.currentTime + 0.25) {
       this.scheduleStep(this.step, this.nextNote);
-      this.step = (this.step + 1) % 32;
+      this.step = (this.step + 1) % 16;
       this.nextNote += stepDur;
     }
     this.bedTimer = window.setTimeout(() => this.tickBed(), 40);
   }
 
   private scheduleStep(step: number, t: number) {
-    const bass = [
-      196, 0, 196, 0, 261.63, 0, 196, 246.94, 174.61, 0, 174.61, 220, 174.61, 0, 196, 0, 146.83, 0, 196, 0, 220, 0, 246.94, 0, 164.81, 0, 196, 246.94, 261.63, 0, 220, 196,
-    ];
-    const lead = [
-      523.25, 659.25, 783.99, 659.25, 587.33, 523.25, 493.88, 523.25, 440, 523.25, 659.25, 783.99, 659.25, 587.33, 523.25, 0, 392, 523.25, 659.25, 698.46, 783.99, 659.25, 587.33, 523.25, 493.88, 587.33, 659.25, 880, 783.99, 659.25, 523.25, 659.25,
-    ];
+    const bass = [196, 0, 0, 0, 146.83, 0, 0, 0, 174.61, 0, 0, 0, 220, 0, 0, 0];
+    const lead = [523.25, 0, 659.25, 0, 783.99, 0, 659.25, 0, 587.33, 0, 523.25, 0, 392, 0, 523.25, 0];
     const b = bass[step] ?? 0;
     const l = lead[step] ?? 0;
-    if (b) this.musicTone(b, 0.14, "triangle", 0.14, 0, t);
+    if (b) this.musicTone(b, 0.85, "triangle", 0.12, 0, t);
     if (l) {
-      this.musicTone(l, 0.16, "square", 0.22, 0, t);
-      this.musicTone(l * 2, 0.1, "sine", 0.08, 8, t);
+      this.musicTone(l, 1.05, "square", 0.2, 0, t);
+      this.musicTone(l * 2, 0.7, "sine", 0.07, 4, t);
     }
-    if (step % 4 === 0) this.musicTone(140, 0.06, "sine", 0.16, -20, t);
-    if (step % 8 === 4) this.musicNoise(0.05, 0.12, t);
-    if (step % 2 === 1) this.musicTone(2400, 0.02, "square", 0.05, -400, t);
-    if (step === 0 || step === 16) {
-      this.musicTone(523.25, 0.18, "triangle", 0.1, 0, t);
-      this.musicTone(659.25, 0.18, "triangle", 0.08, 0, t);
-    }
+    if (step % 4 === 0) this.musicTone(160, 0.12, "sine", 0.14, -16, t);
+    if (step % 8 === 4) this.musicNoise(0.08, 0.1, t);
   }
 
   private musicTone(
@@ -124,7 +115,8 @@ export class GameAudio {
     osc.frequency.setValueAtTime(freq, when);
     if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), when + dur);
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(gain, when + 0.012);
+    g.gain.exponentialRampToValueAtTime(gain, when + 0.02);
+    g.gain.setValueAtTime(gain, when + Math.max(0.04, dur * 0.72));
     g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     osc.connect(g);
     g.connect(this.music);
