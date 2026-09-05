@@ -20,17 +20,20 @@ export class GameAudio {
       this.sfx.connect(this.master);
       this.music.connect(this.master);
       this.master.connect(this.ctx.destination);
-      this.master.gain.value = this.muted ? 0 : 0.7;
-      this.sfx.gain.value = 0.85;
-      this.music.gain.value = this.muted ? 0 : 1.15;
+      this.master.gain.value = this.muted ? 0 : 1;
+      this.sfx.gain.value = 1;
+      this.music.gain.value = this.muted ? 0 : 1.7;
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.getVoices();
+    }
   }
 
   setMuted(muted: boolean) {
     this.muted = muted;
     if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(muted ? 0 : 0.7, this.ctx.currentTime, 0.03);
+      this.master.gain.setTargetAtTime(muted ? 0 : 1, this.ctx.currentTime, 0.03);
     }
   }
 
@@ -42,23 +45,23 @@ export class GameAudio {
     this.unlock();
     if (!this.ctx || !this.master || !this.music || this.bedOn) return;
     this.bedOn = true;
-    this.music.gain.setTargetAtTime(this.muted ? 0 : 1.15, this.ctx.currentTime, 0.08);
+    this.music.gain.setTargetAtTime(this.muted ? 0 : 1.7, this.ctx.currentTime, 0.08);
 
     const drone = this.ctx.createOscillator();
     drone.type = "sawtooth";
     drone.frequency.value = 73.42;
     const droneB = this.ctx.createOscillator();
-    droneB.type = "sine";
-    droneB.frequency.value = 110.2;
+    droneB.type = "square";
+    droneB.frequency.value = 146.83;
     const eerie = this.ctx.createOscillator();
-    eerie.type = "triangle";
-    eerie.frequency.value = 77.8;
+    eerie.type = "sawtooth";
+    eerie.frequency.value = 220.5;
     const lp = this.ctx.createBiquadFilter();
     lp.type = "lowpass";
-    lp.frequency.value = 240;
-    lp.Q.value = 0.8;
+    lp.frequency.value = 920;
+    lp.Q.value = 1.4;
     const dg = this.ctx.createGain();
-    dg.gain.value = 0.42;
+    dg.gain.value = 0.28;
     drone.connect(lp);
     droneB.connect(lp);
     eerie.connect(lp);
@@ -67,9 +70,9 @@ export class GameAudio {
 
     const lfo = this.ctx.createOscillator();
     lfo.type = "sine";
-    lfo.frequency.value = 0.07;
+    lfo.frequency.value = 0.18;
     const lfoG = this.ctx.createGain();
-    lfoG.gain.value = 90;
+    lfoG.gain.value = 180;
     lfo.connect(lfoG);
     lfoG.connect(lp.frequency);
 
@@ -81,10 +84,10 @@ export class GameAudio {
     wind.loop = true;
     const bp = this.ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = 720;
-    bp.Q.value = 0.6;
+    bp.frequency.value = 1800;
+    bp.Q.value = 0.9;
     const wg = this.ctx.createGain();
-    wg.gain.value = 0.09;
+    wg.gain.value = 0.05;
     wind.connect(bp);
     bp.connect(wg);
     wg.connect(this.music);
@@ -125,7 +128,7 @@ export class GameAudio {
 
   private tickBed() {
     if (!this.bedOn || !this.ctx) return;
-    const stepDur = 60 / 118 / 2;
+    const stepDur = 60 / 152 / 2;
     while (this.nextNote < this.ctx.currentTime + 0.2) {
       this.scheduleStep(this.step, this.nextNote);
       this.step = (this.step + 1) % 16;
@@ -135,19 +138,19 @@ export class GameAudio {
   }
 
   private scheduleStep(step: number, t: number) {
-    const bass = [73.42, 73.42, 0, 110, 73.42, 87.31, 0, 98, 73.42, 73.42, 0, 110, 65.41, 87.31, 98, 110];
-    const lead = [220, 0, 261.63, 293.66, 349.23, 0, 329.63, 261.63, 293.66, 0, 349.23, 392, 349.23, 329.63, 261.63, 220];
+    const bass = [73.42, 0, 73.42, 110, 73.42, 0, 87.31, 98, 73.42, 0, 73.42, 110, 65.41, 87.31, 98, 146.83];
+    const lead = [440, 0, 523.25, 587.33, 698.46, 0, 659.25, 523.25, 587.33, 0, 698.46, 783.99, 698.46, 659.25, 523.25, 880];
     const b = bass[step] ?? 0;
     const l = lead[step] ?? 0;
-    if (b) this.musicTone(b, 0.22, "square", 0.13, -8, t);
+    if (b) this.musicTone(b, 0.18, "square", 0.28, -6, t);
     if (l) {
-      this.musicTone(l, 0.16, "triangle", 0.11, 12, t);
-      this.musicTone(l * 2, 0.12, "sine", 0.055, 18, t);
+      this.musicTone(l, 0.14, "sawtooth", 0.2, 18, t);
+      this.musicTone(l * 2, 0.1, "square", 0.08, 24, t);
     }
-    if (step % 4 === 0) this.musicTone(48, 0.1, "sine", 0.18, -12, t);
-    if (step % 4 === 2) this.musicNoise(0.05, 0.08, t);
-    if (step % 2 === 1) this.musicTone(880 + (step % 8) * 20, 0.04, "square", 0.035, -200, t);
-    if (step === 7 || step === 15) this.musicTone(155.56, 0.28, "sawtooth", 0.09, 40, t);
+    if (step % 2 === 0) this.musicTone(55, 0.09, "sine", 0.42, -18, t);
+    if (step % 4 === 2) this.musicNoise(0.07, 0.22, t);
+    this.musicTone(2400 + (step % 8) * 80, 0.03, "square", 0.06, -400, t);
+    if (step === 7 || step === 15) this.musicTone(196, 0.22, "sawtooth", 0.2, 80, t);
   }
 
   private musicTone(
@@ -303,33 +306,73 @@ export class GameAudio {
     if (this.ctx?.state === "suspended") void this.ctx.resume();
     if (!this.ctx || !this.sfx || this.muted) return;
     if (this.music) {
-      this.music.gain.setTargetAtTime(0.22, this.ctx.currentTime, 0.04);
+      this.music.gain.setTargetAtTime(0.12, this.ctx.currentTime, 0.04);
       window.setTimeout(() => {
         if (this.music && this.ctx && this.bedOn) {
-          this.music.gain.setTargetAtTime(1.15, this.ctx.currentTime, 0.12);
+          this.music.gain.setTargetAtTime(1.7, this.ctx.currentTime, 0.18);
         }
-      }, 2300);
+      }, 5200);
     }
-    const fanfare = [196, 246.94, 293.66, 392, 493.88, 587.33, 784, 987.77];
-    for (let i = 0; i < fanfare.length; i++) {
-      const f = fanfare[i]!;
-      const t = i * 0.11;
-      this.tone(f, 0.36, "sawtooth", 0.22, 40, t);
-      this.tone(f * 2, 0.3, "triangle", 0.14, 20, t);
-      this.tone(f * 0.5, 0.45, "sine", 0.12, 0, t);
-      this.musicTone(f, 0.36, "sawtooth", 0.18, 40, this.ctx.currentTime + t);
-      this.musicTone(f * 2, 0.28, "triangle", 0.1, 20, this.ctx.currentTime + t);
+    this.yellJackpot();
+    this.holdVoice(820, 780, 1280, 1.7, 0.02, 0.34);
+    this.noise(0.08, 0.18);
+    this.tone(1400, 0.08, "square", 0.16, -500, 1.62);
+    this.holdVoice(760, 340, 860, 3.1, 1.72, 0.38);
+    this.tone(80, 0.16, "square", 0.22, -12, 0.04);
+    this.tone(80, 0.14, "square", 0.24, -12, 1.7);
+    this.tone(80, 0.2, "square", 0.26, -12, 4.6);
+  }
+
+  private yellJackpot() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance("jaaaaack pooooooot");
+      u.pitch = 2;
+      u.rate = 0.18;
+      u.volume = 1;
+      u.lang = "en-US";
+      const voices = window.speechSynthesis.getVoices();
+      const high = voices.find((v) => /female|child|zira|samantha|google us/i.test(v.name));
+      if (high) u.voice = high;
+      window.speechSynthesis.speak(u);
+    } catch {
+      /* speech optional */
     }
-    this.tone(130.81, 1.8, "sawtooth", 0.16, 8, 0.05);
-    this.tone(164.81, 1.8, "triangle", 0.14, 6, 0.05);
-    this.tone(196, 2.0, "sine", 0.16, 10, 0.12);
-    this.tone(261.63, 1.6, "triangle", 0.14, 12, 0.35);
-    this.tone(329.63, 1.4, "sine", 0.13, 16, 0.55);
-    this.tone(392, 1.5, "sawtooth", 0.15, 20, 0.75);
-    this.tone(523.25, 1.2, "triangle", 0.16, 30, 0.95);
-    this.noise(0.16, 0.2);
-    this.tone(80, 0.18, "square", 0.18, -20, 0.18);
-    this.tone(80, 0.16, "square", 0.2, -20, 0.42);
-    this.tone(80, 0.22, "square", 0.22, -20, 0.88);
+  }
+
+  private holdVoice(f0: number, f1: number, f2: number, dur: number, delay: number, gain: number) {
+    if (!this.ctx || !this.sfx) return;
+    const t = this.ctx.currentTime + delay;
+    const pulse = this.ctx.createOscillator();
+    pulse.type = "sawtooth";
+    pulse.frequency.setValueAtTime(f0, t);
+    pulse.frequency.linearRampToValueAtTime(f0 * 0.96, t + dur);
+    const bp1 = this.ctx.createBiquadFilter();
+    bp1.type = "bandpass";
+    bp1.frequency.value = f1;
+    bp1.Q.value = 8;
+    const bp2 = this.ctx.createBiquadFilter();
+    bp2.type = "bandpass";
+    bp2.frequency.value = f2;
+    bp2.Q.value = 7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.08);
+    g.gain.setValueAtTime(gain, t + dur - 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    pulse.connect(bp1);
+    pulse.connect(bp2);
+    bp1.connect(g);
+    bp2.connect(g);
+    g.connect(this.sfx);
+    pulse.start(t);
+    pulse.stop(t + dur + 0.04);
+    pulse.onended = () => {
+      pulse.disconnect();
+      bp1.disconnect();
+      bp2.disconnect();
+      g.disconnect();
+    };
   }
 }
