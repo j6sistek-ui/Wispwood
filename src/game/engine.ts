@@ -1504,13 +1504,13 @@ export class GameEngine {
     const m = Math.hypot(vx, vy) || 1;
     const nx = vx / m;
     const ny = vy / m;
-    const knock = spell === "void" ? 180 : spell === "boom" ? 280 : e.kind === "boss" ? 18 : 10;
+    const knock = spell === "void" ? 180 : spell === "boom" ? 36 : e.kind === "boss" ? 18 : 10;
     e.kvx = nx * (knock / 0.22);
     e.kvy = ny * (knock / 0.22);
     e.knockX = nx;
     e.knockY = ny;
-    e.knockT = spell === "boom" || spell === "void" ? 0.4 : 0.18;
-    this.spawnKnockDust(e.x, e.y, nx, ny, spell === "boom" ? 14 : 6);
+    e.knockT = spell === "void" ? 0.4 : spell === "boom" ? 0.12 : 0.18;
+    this.spawnKnockDust(e.x, e.y, nx, ny, spell === "boom" ? 4 : 6);
     if (spell === "void") e.stun = Math.max(e.stun, 0.35);
     this.hitstop = 0.035;
     this.trauma = Math.min(1, this.trauma + 0.18);
