@@ -50,20 +50,20 @@ export class GameAudio {
     this.music.gain.setTargetAtTime(this.muted ? 0 : 1.7, this.ctx.currentTime, 0.08);
 
     const drone = this.ctx.createOscillator();
-    drone.type = "triangle";
-    drone.frequency.value = 130.81;
+    drone.type = "sawtooth";
+    drone.frequency.value = 110;
     const droneB = this.ctx.createOscillator();
-    droneB.type = "square";
-    droneB.frequency.value = 196;
+    droneB.type = "triangle";
+    droneB.frequency.value = 164.81;
     const eerie = this.ctx.createOscillator();
-    eerie.type = "triangle";
-    eerie.frequency.value = 329.63;
+    eerie.type = "square";
+    eerie.frequency.value = 220;
     const lp = this.ctx.createBiquadFilter();
     lp.type = "lowpass";
-    lp.frequency.value = 1800;
-    lp.Q.value = 0.7;
+    lp.frequency.value = 1400;
+    lp.Q.value = 1.1;
     const dg = this.ctx.createGain();
-    dg.gain.value = 0.12;
+    dg.gain.value = 0.16;
     drone.connect(lp);
     droneB.connect(lp);
     eerie.connect(lp);
@@ -72,9 +72,9 @@ export class GameAudio {
 
     const lfo = this.ctx.createOscillator();
     lfo.type = "sine";
-    lfo.frequency.value = 0.35;
+    lfo.frequency.value = 0.22;
     const lfoG = this.ctx.createGain();
-    lfoG.gain.value = 60;
+    lfoG.gain.value = 90;
     lfo.connect(lfoG);
     lfoG.connect(lp.frequency);
 
@@ -130,33 +130,43 @@ export class GameAudio {
 
   private tickBed() {
     if (!this.bedOn || !this.ctx) return;
-    const stepDur = 60 / 176 / 2;
+    const stepDur = 60 / 128 / 2;
     while (this.nextNote < this.ctx.currentTime + 0.2) {
       this.scheduleStep(this.step, this.nextNote);
-      this.step = (this.step + 1) % 16;
+      this.step = (this.step + 1) % 32;
       this.nextNote += stepDur;
     }
     this.bedTimer = window.setTimeout(() => this.tickBed(), 40);
   }
 
   private scheduleStep(step: number, t: number) {
-    const bass = [130.81, 0, 130.81, 0, 196, 0, 130.81, 164.81, 174.61, 0, 174.61, 0, 196, 0, 220, 261.63];
-    const lead = [523.25, 659.25, 783.99, 659.25, 523.25, 0, 587.33, 659.25, 698.46, 783.99, 659.25, 523.25, 587.33, 523.25, 392, 523.25];
+    const bass = [
+      110, 0, 110, 0, 110, 82.41, 110, 0, 87.31, 0, 87.31, 130.81, 87.31, 0, 110, 0, 98, 0, 98, 146.83, 98, 0, 123.47, 0, 82.41, 0, 82.41, 123.47, 164.81, 0, 98, 110,
+    ];
+    const lead = [
+      220, 261.63, 329.63, 392, 329.63, 0, 293.66, 261.63, 174.61, 220, 261.63, 329.63, 261.63, 220, 196, 0, 196, 246.94, 293.66, 392, 293.66, 246.94, 220, 196, 164.81, 220, 329.63, 440, 392, 329.63, 261.63, 220,
+    ];
     const b = bass[step] ?? 0;
     const l = lead[step] ?? 0;
-    if (b) this.musicTone(b, 0.14, "square", 0.26, 0, t);
+    if (b) this.musicTone(b, 0.16, "square", 0.24, 0, t);
     if (l) {
-      this.musicTone(l, 0.12, "triangle", 0.2, 8, t);
-      this.musicTone(l * 2, 0.08, "sine", 0.08, 10, t);
+      this.musicTone(l, 0.13, "triangle", 0.18, 6, t);
+      this.musicTone(l * 2, 0.09, "sine", 0.07, 10, t);
     }
-    if (step % 4 === 0) this.musicTone(60, 0.08, "sine", 0.48, -10, t);
-    if (step % 8 === 4) this.musicNoise(0.08, 0.2, t);
-    if (step % 2 === 1) this.musicTone(3200, 0.025, "square", 0.05, -600, t);
-    if (step === 0 || step === 8) {
-      this.musicTone(261.63, 0.16, "triangle", 0.12, 0, t);
-      this.musicTone(329.63, 0.16, "triangle", 0.1, 0, t);
-      this.musicTone(392, 0.16, "triangle", 0.1, 0, t);
+    if (step % 4 === 0) this.musicTone(55, 0.09, "sine", 0.44, -12, t);
+    if (step % 8 === 4) this.musicNoise(0.07, 0.18, t);
+    if (step % 2 === 1) this.musicTone(2800, 0.022, "square", 0.045, -500, t);
+    if (step === 0 || step === 16) {
+      this.musicTone(220, 0.22, "sawtooth", 0.12, 0, t);
+      this.musicTone(329.63, 0.22, "sawtooth", 0.1, 0, t);
+      this.musicTone(440, 0.2, "triangle", 0.1, 12, t);
     }
+    if (step === 24) {
+      this.musicTone(164.81, 0.2, "sawtooth", 0.12, 30, t);
+      this.musicTone(329.63, 0.18, "triangle", 0.1, 20, t);
+      this.musicTone(493.88, 0.16, "sine", 0.09, 18, t);
+    }
+    if (step % 16 === 12) this.musicTone(880, 0.1, "sine", 0.1, 40, t);
   }
 
   private musicTone(
