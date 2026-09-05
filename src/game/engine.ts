@@ -1335,9 +1335,16 @@ export class GameEngine {
       }
       if (b.spell === "ember" || (b.spell === "craft" && (b.form === "weave" || b.ability === "trail"))) {
         b.dist += b.speed * dt;
-        const wave = Math.sin(b.dist * 0.038) * (b.ability === "trail" ? 18 : 30);
+        const amp = b.spell === "ember" ? 14 : b.ability === "trail" ? 18 : 30;
+        const phase = b.dist * 0.038;
+        const wave = Math.sin(phase) * amp;
         b.x = b.ox + b.dirX * b.dist + -b.dirY * wave;
         b.y = b.oy + b.dirY * b.dist + b.dirX * wave;
+        if (b.spell === "ember") {
+          const sign = Math.cos(phase) >= 0 ? 1 : -1;
+          if (b.hits !== 0 && sign !== b.hits) this.emberPop(b);
+          b.hits = sign;
+        }
         b.trail += dt;
         if (b.trail >= 0.028) {
           b.trail = 0;
@@ -1644,6 +1651,21 @@ export class GameEngine {
       }
     }
     this.burstSparks(x, y, 8, "#ecece8");
+  }
+
+  private emberPop(b: Bullet) {
+    const r = 38;
+    const dmg = Math.max(2, Math.round(spellDamage("ember", this.upgrades.ember.damage) * 0.18));
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (Math.hypot(e.x - b.x, e.y - b.y) > r + e.r) continue;
+      e.hp -= dmg;
+      e.flash = 0.06;
+      this.floatAt(e.x, e.y - 18, `${dmg}`, "#e08a3c");
+      if (e.hp <= 0) this.killEnemy(e);
+    }
+    this.spawnBurst(b.x, b.y, "ember");
+    this.burstSparks(b.x, b.y, 7, "#e08a3c");
   }
 
   private wrapEnemy(e: Enemy) {

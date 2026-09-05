@@ -861,7 +861,7 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
         : spell === "boom" && !hud.boomUnlocked
         ? ["Locked", "2500 gold", "This night"]
         : spell === "ember"
-          ? [`${dmg} damage`, "Weaves as it flies", "Double-tap to tune"]
+          ? [`${dmg} damage`, "Soft weave, pops on turns", "Pops deal little dmg"]
           : spell === "frost"
             ? [`${dmg} dmg x3`, "Slows what it hits", "Double-tap to tune"]
             : spell === "void"
