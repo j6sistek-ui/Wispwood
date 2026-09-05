@@ -306,36 +306,59 @@ export class GameAudio {
     if (this.ctx?.state === "suspended") void this.ctx.resume();
     if (!this.ctx || !this.sfx || this.muted) return;
     if (this.music) {
-      this.music.gain.setTargetAtTime(0.12, this.ctx.currentTime, 0.04);
+      this.music.gain.setTargetAtTime(0.1, this.ctx.currentTime, 0.04);
       window.setTimeout(() => {
         if (this.music && this.ctx && this.bedOn) {
-          this.music.gain.setTargetAtTime(1.7, this.ctx.currentTime, 0.18);
+          this.music.gain.setTargetAtTime(1.7, this.ctx.currentTime, 0.2);
         }
-      }, 5200);
+      }, 4800);
+    }
+    for (let i = 0; i < 14; i++) {
+      const t = i * 0.038;
+      this.tone(920 + (i % 3) * 180, 0.04, "square", 0.1, 0, t);
+      this.tone(180, 0.03, "square", 0.08, 0, t);
+    }
+    this.noise(0.12, 0.22);
+    this.tone(80, 0.2, "sine", 0.28, -10, 0.52);
+    const bells = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1568, 2093];
+    for (let i = 0; i < bells.length; i++) {
+      const t = 0.55 + i * 0.07;
+      this.tone(bells[i]!, 0.22, "triangle", 0.2, 12, t);
+      this.tone(bells[i]! * 2, 0.16, "sine", 0.1, 8, t);
+    }
+    const hit = [523.25, 659.25, 783.99, 1046.5];
+    for (let k = 0; k < 6; k++) {
+      const t = 1.05 + k * 0.22;
+      for (let i = 0; i < hit.length; i++) {
+        this.tone(hit[i]!, 0.18, "square", 0.16, 0, t + i * 0.04);
+        this.tone(hit[i]! * 2, 0.12, "triangle", 0.08, 0, t + i * 0.04);
+      }
+      this.tone(1046.5, 0.12, "sine", 0.14, 40, t + 0.16);
     }
     this.yellJackpot();
-    this.holdVoice(820, 780, 1280, 1.7, 0.02, 0.34);
-    this.noise(0.08, 0.18);
-    this.tone(1400, 0.08, "square", 0.16, -500, 1.62);
-    this.holdVoice(760, 340, 860, 3.1, 1.72, 0.38);
-    this.tone(80, 0.16, "square", 0.22, -12, 0.04);
-    this.tone(80, 0.14, "square", 0.24, -12, 1.7);
-    this.tone(80, 0.2, "square", 0.26, -12, 4.6);
+    this.holdVoice(980, 820, 1480, 0.55, 0.7, 0.28);
+    this.holdVoice(740, 420, 980, 2.4, 1.2, 0.32);
+    for (let i = 0; i < 18; i++) {
+      this.tone(1400 + (i % 4) * 220, 0.06, "sine", 0.09, 80, 1.3 + i * 0.08);
+    }
+    this.tone(80, 0.18, "square", 0.24, -8, 1.05);
+    this.tone(80, 0.16, "square", 0.22, -8, 2.15);
+    this.tone(80, 0.22, "square", 0.26, -8, 3.4);
   }
 
   private yellJackpot() {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     try {
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance("jaaaaack pooooooot");
-      u.pitch = 2;
-      u.rate = 0.18;
+      const u = new SpeechSynthesisUtterance("JACKPOT");
+      u.pitch = 1.9;
+      u.rate = 0.85;
       u.volume = 1;
       u.lang = "en-US";
       const voices = window.speechSynthesis.getVoices();
-      const high = voices.find((v) => /female|child|zira|samantha|google us/i.test(v.name));
+      const high = voices.find((v) => /female|child|zira|samantha|google us|kyoko/i.test(v.name));
       if (high) u.voice = high;
-      window.speechSynthesis.speak(u);
+      window.setTimeout(() => window.speechSynthesis.speak(u), 620);
     } catch {
       /* speech optional */
     }
