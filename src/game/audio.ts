@@ -87,8 +87,8 @@ export class GameAudio {
   }
 
   private scheduleStep(step: number, t: number) {
-    const bass = [196, 0, 0, 0, 146.83, 0, 0, 0, 174.61, 0, 0, 0, 220, 0, 0, 0];
-    const lead = [523.25, 0, 659.25, 0, 783.99, 0, 659.25, 0, 587.33, 0, 523.25, 0, 392, 0, 523.25, 0];
+    const bass = [98, 0, 0, 0, 73.42, 0, 0, 0, 87.31, 0, 0, 0, 110, 0, 0, 0];
+    const lead = [261.63, 0, 329.63, 0, 392, 0, 329.63, 0, 293.66, 0, 261.63, 0, 196, 0, 261.63, 0];
     const b = bass[step] ?? 0;
     const l = lead[step] ?? 0;
     if (b) this.musicTone(b, 0.85, "triangle", 0.12, 0, t);
@@ -96,7 +96,7 @@ export class GameAudio {
       this.musicTone(l, 1.05, "square", 0.2, 0, t);
       this.musicTone(l * 2, 0.7, "sine", 0.07, 4, t);
     }
-    if (step % 4 === 0) this.musicTone(160, 0.12, "sine", 0.14, -16, t);
+    if (step % 4 === 0) this.musicTone(80, 0.12, "sine", 0.14, -16, t);
     if (step % 8 === 4) this.musicNoise(0.08, 0.1, t);
   }
 
