@@ -9,6 +9,7 @@ export class GameAudio {
   private bedNodes: Array<AudioScheduledSourceNode> = [];
   private bedTimer = 0;
   private bedOn = false;
+  private bedArming = false;
   private step = 0;
   private nextNote = 0;
   private jackBuf: AudioBuffer | null = null;
@@ -37,13 +38,18 @@ export class GameAudio {
       this.makeup.connect(this.master);
       this.master.connect(this.ctx.destination);
       this.master.gain.value = this.muted ? 0 : 1;
-      this.sfx.gain.value = 1.15;
-      this.music.gain.value = this.muted ? 0 : 1.7;
-      this.makeup.gain.value = 2.6;
+      this.sfx.gain.value = 1;
+      this.music.gain.value = this.muted ? 0 : 0.9;
+      this.makeup.gain.value = 1.15;
       this.makeNoiseBuf();
     }
-    if (this.ctx.state === "suspended") void this.ctx.resume();
+    if (this.ctx.state === "suspended") void this.ctx.resume().catch(() => {});
     this.loadJackpot();
+  }
+
+  private clampWhen(when: number) {
+    if (!this.ctx) return when;
+    return Math.max(when, this.ctx.currentTime + 0.001);
   }
 
   setMuted(muted: boolean) {
@@ -59,16 +65,33 @@ export class GameAudio {
 
   startBed() {
     this.unlock();
-    if (!this.ctx || !this.master || !this.music || this.bedOn) return;
-    this.bedOn = true;
-    this.music.gain.setTargetAtTime(this.muted ? 0 : 1.7, this.ctx.currentTime, 0.08);
-    this.step = 0;
-    this.nextNote = this.ctx.currentTime + 0.04;
-    this.tickBed();
+    if (!this.ctx || !this.master || !this.music || this.bedOn || this.bedArming) return;
+    this.bedArming = true;
+    const arm = () => {
+      this.bedArming = false;
+      if (!this.ctx || !this.music || this.bedOn) return;
+      if (this.ctx.state !== "running") {
+        this.bedArming = true;
+        void this.ctx.resume().then(arm).catch(() => {
+          this.bedArming = false;
+        });
+        return;
+      }
+      this.bedOn = true;
+      this.music.gain.setTargetAtTime(this.muted ? 0 : 0.9, this.ctx.currentTime, 0.08);
+      this.step = 0;
+      this.nextNote = this.ctx.currentTime + 0.08;
+      this.tickBed();
+    };
+    if (this.ctx.state === "running") arm();
+    else void this.ctx.resume().then(arm).catch(() => {
+      this.bedArming = false;
+    });
   }
 
   stopBed() {
     this.bedOn = false;
+    this.bedArming = false;
     if (this.bedTimer) {
       window.clearTimeout(this.bedTimer);
       this.bedTimer = 0;
@@ -91,23 +114,36 @@ export class GameAudio {
 
   private tickBed() {
     if (!this.bedOn || !this.ctx) return;
+    if (this.ctx.state !== "running") {
+      void this.ctx.resume().catch(() => {});
+      this.bedTimer = window.setTimeout(() => this.tickBed(), 80);
+      return;
+    }
+    const now = this.ctx.currentTime;
+    if (this.nextNote < now - 0.01) this.nextNote = now;
     const stepDur = 60 / 162 / 2;
-    while (this.nextNote < this.ctx.currentTime + 0.18) {
-      this.scheduleStep(this.step, this.nextNote, stepDur);
+    let n = 0;
+    while (this.nextNote < now + 0.14 && n < 3) {
+      try {
+        this.scheduleStep(this.step, this.nextNote, stepDur);
+      } catch {
+        /* one bad voice must not kill the bed */
+      }
       this.step = (this.step + 1) % 64;
       this.nextNote += stepDur;
+      n += 1;
     }
-    if (this.bedNodes.length > 220) {
-      const drop = this.bedNodes.splice(0, this.bedNodes.length - 80);
-      for (const n of drop) {
+    if (this.bedNodes.length > 120) {
+      const drop = this.bedNodes.splice(0, this.bedNodes.length - 40);
+      for (const node of drop) {
         try {
-          n.stop();
+          node.stop();
         } catch {
           /* already stopped */
         }
       }
     }
-    this.bedTimer = window.setTimeout(() => this.tickBed(), 50);
+    this.bedTimer = window.setTimeout(() => this.tickBed(), 40);
   }
 
   private scheduleStep(step: number, t: number, stepDur: number) {
@@ -324,8 +360,13 @@ export class GameAudio {
       g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
       osc.connect(g);
       g.connect(this.music);
-      osc.start(when);
-      osc.stop(when + dur + 0.05);
+      const t = this.clampWhen(when);
+      try {
+        osc.start(t);
+        osc.stop(t + dur + 0.05);
+      } catch {
+        return;
+      }
       osc.onended = () => {
         osc.disconnect();
         g.disconnect();
@@ -379,8 +420,13 @@ export class GameAudio {
     g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     osc.connect(g);
     g.connect(this.music);
-    osc.start(when);
-    osc.stop(when + dur + 0.02);
+    const t = this.clampWhen(when);
+    try {
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+    } catch {
+      return;
+    }
     osc.onended = () => {
       osc.disconnect();
       g.disconnect();
@@ -407,8 +453,13 @@ export class GameAudio {
     g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     osc.connect(g);
     g.connect(this.music);
-    osc.start(when);
-    osc.stop(when + dur + 0.02);
+    const t = this.clampWhen(when);
+    try {
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+    } catch {
+      return;
+    }
     osc.onended = () => {
       osc.disconnect();
       g.disconnect();
@@ -556,7 +607,7 @@ export class GameAudio {
       this.music.gain.setTargetAtTime(0.08, this.ctx.currentTime, 0.04);
       window.setTimeout(() => {
         if (this.music && this.ctx && this.bedOn) {
-          this.music.gain.setTargetAtTime(1.7, this.ctx.currentTime, 0.2);
+          this.music.gain.setTargetAtTime(0.9, this.ctx.currentTime, 0.2);
         }
       }, 6200);
     }

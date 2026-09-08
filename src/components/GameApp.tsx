@@ -102,6 +102,10 @@ export function GameApp() {
     };
     document.addEventListener("visibilitychange", onVis);
 
+    const unlockAudio = () => game.audio.unlock();
+    window.addEventListener("pointerdown", unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
+
     const playing = () => game.phase === "playing";
 
     const onDown = (e: PointerEvent) => {
@@ -145,6 +149,8 @@ export function GameApp() {
       window.visualViewport?.removeEventListener("scroll", onResize);
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);

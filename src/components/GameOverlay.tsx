@@ -8,8 +8,8 @@ import { glyphFor, coreGlyph, CORE_COLOR } from "@/game/craft-sprites";
 import { BOSSES } from "@/game/bosses";
 import { RELICS, RELIC_COST, relicById, type RelicId } from "@/game/relics";
 import { asset } from "@/game/paths";
-import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useP2PRoom, type P2PRoomHandle } from "@/lib/multiplayer/use-p2p-room";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 type Props = {
   engine: GameEngine | null;
@@ -19,12 +19,66 @@ type Props = {
 export function GameOverlay({ engine, hud }: Props) {
   const [coarse, setCoarse] = useState(false);
   const [spawnOpen, setSpawnOpen] = useState(false);
+  const [playerName, setPlayerName] = useState(() => loadPlayerName());
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
+  const entered = useRef(false);
+
+  const enterNight = useCallback(() => {
+    if (entered.current) return;
+    entered.current = true;
+    engine?.play();
+  }, [engine]);
+
+  const p2p = useP2PRoom({
+    room: roomCode ? `ww${roomCode}` : null,
+    name: playerName,
+    onStart: enterNight,
+  });
+
   useEffect(() => {
     setCoarse(window.matchMedia("(pointer: coarse)").matches);
   }, []);
   useEffect(() => {
     if (hud.phase !== "playing" && hud.phase !== "paused") setSpawnOpen(false);
   }, [hud.phase]);
+  useEffect(() => {
+    if (hud.phase === "title") entered.current = false;
+    if (hud.phase !== "playing" && hud.phase !== "paused") engine?.clearGhosts();
+  }, [hud.phase, engine]);
+  useEffect(() => {
+    return p2p.onMessage((from, data) => {
+      if (!engine || !data || typeof data !== "object") return;
+      const msg = data as {
+        type?: string;
+        name?: string;
+        x?: number;
+        y?: number;
+        face?: "down" | "left" | "right" | "up";
+        hp?: number;
+        frame?: number;
+      };
+      if (msg.type === "ww-state" && typeof msg.x === "number" && typeof msg.y === "number") {
+        engine.applyGhost(from, {
+          name: msg.name || "Ranger",
+          x: msg.x,
+          y: msg.y,
+          face: msg.face,
+          hp: msg.hp,
+          frame: msg.frame,
+        });
+      }
+    });
+  }, [p2p.onMessage, engine]);
+  useEffect(() => {
+    if (!roomCode || !engine) return;
+    const id = window.setInterval(() => {
+      if (engine.phase !== "playing" && engine.phase !== "paused") return;
+      p2p.broadcast({ name: playerName, ...engine.netSnapshot() });
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [roomCode, engine, p2p.broadcast, playerName]);
+
   const showSticks = coarse && hud.phase === "playing";
 
   return (
@@ -33,12 +87,26 @@ export function GameOverlay({ engine, hud }: Props) {
       style={{ position: "absolute", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
     >
       {hud.phase === "playing" || hud.phase === "paused" ? (
-        <Hud engine={engine} hud={hud} onSpawn={() => setSpawnOpen(true)} />
+        <Hud engine={engine} hud={hud} peers={p2p.peers} onSpawn={() => setSpawnOpen(true)} />
       ) : null}
 
       {hud.phase === "boot" || hud.loading ? <Boot /> : null}
       {hud.phase === "title" && !hud.loading ? (
-        <Title engine={engine} hud={hud} />
+        <Title
+          engine={engine}
+          hud={hud}
+          playerName={playerName}
+          setPlayerName={setPlayerName}
+          roomCode={roomCode}
+          setRoomCode={setRoomCode}
+          isHost={isHost}
+          setIsHost={setIsHost}
+          p2p={p2p}
+          onStartNight={() => {
+            p2p.startRoom();
+            enterNight();
+          }}
+        />
       ) : null}
       {hud.phase === "paused" ? <Pause engine={engine} hud={hud} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
@@ -56,10 +124,12 @@ export function GameOverlay({ engine, hud }: Props) {
 function Hud({
   engine,
   hud,
+  peers,
   onSpawn,
 }: {
   engine: GameEngine | null;
   hud: HudState;
+  peers: P2PRoomHandle["peers"];
   onSpawn?: () => void;
 }) {
   const pct = Math.max(0, hud.hp / hud.maxHp);
@@ -112,6 +182,11 @@ function Hud({
         ))}
         <span className="font-pixel text-[8px] text-[#c8a4ff]">{hud.trinkoo}t</span>
       </div>
+      {peers.length > 0 ? (
+        <p className="mx-auto mt-1 max-w-sm text-right font-pixel text-[8px] text-muted">
+          With {peers.map((p) => p.name || "Ranger").join(" · ")}
+        </p>
+      ) : null}
 
       <div className="pointer-events-auto mx-auto mt-2 flex justify-center gap-2" data-ui>
         <button
@@ -173,17 +248,32 @@ function makeRoomCode() {
 function Title({
   engine,
   hud,
+  playerName,
+  setPlayerName,
+  roomCode,
+  setRoomCode,
+  isHost,
+  setIsHost,
+  p2p,
+  onStartNight,
 }: {
   engine: GameEngine | null;
   hud: HudState;
+  playerName: string;
+  setPlayerName: (n: string) => void;
+  roomCode: string | null;
+  setRoomCode: (c: string | null) => void;
+  isHost: boolean;
+  setIsHost: (v: boolean) => void;
+  p2p: P2PRoomHandle;
+  onStartNight: () => void;
 }) {
-  const [menu, setMenu] = useState<"home" | "multiplayer" | "join" | "room" | "name" | "account" | "shop" | "guide" | "admin">("home");
-  const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [isHost, setIsHost] = useState(false);
+  const [menu, setMenu] = useState<"home" | "multiplayer" | "join" | "room" | "name" | "account" | "shop" | "guide" | "admin">(
+    roomCode ? "room" : "home",
+  );
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
-  const [playerName, setPlayerName] = useState("Ranger");
-  const [nameDraft, setNameDraft] = useState("Ranger");
+  const [nameDraft, setNameDraft] = useState(playerName);
   const [nameWait, setNameWait] = useState(0);
   const [nameNote, setNameNote] = useState("");
   const [accountPass, setAccountPass] = useState("");
@@ -199,7 +289,11 @@ function Title({
     setNameDraft(n);
     setNameWait(nameCooldownMs());
     setShownPass(loadGuestCreds()?.password ?? "");
-  }, []);
+  }, [setPlayerName]);
+
+  useEffect(() => {
+    if (roomCode) setMenu("room");
+  }, [roomCode]);
 
   useEffect(() => {
     if (menu !== "account") return;
@@ -308,11 +402,11 @@ function Title({
 
       {menu === "room" && roomCode ? (
           <Lobby
-            key={roomCode}
             code={roomCode}
             isHost={isHost}
             playerName={playerName}
-            onStart={() => engine?.play()}
+            p2p={p2p}
+            onStart={onStartNight}
             onLeave={leaveRoom}
           />
         ) : menu === "account" ? (
@@ -529,30 +623,26 @@ function Lobby({
   code,
   isHost,
   playerName,
+  p2p,
   onStart,
   onLeave,
 }: {
   code: string;
   isHost: boolean;
   playerName: string;
+  p2p: P2PRoomHandle;
   onStart: () => void;
   onLeave: () => void;
 }) {
-  const started = useRef(false);
-  const enter = () => {
-    if (started.current) return;
-    started.current = true;
-    onStart();
-  };
-  const p2p = useP2PRoom({ room: `ww${code}`, name: playerName, onStart: enter });
-  const others = p2p.peers.length;
+  const others = p2p.peers;
+  const linked = others.filter((p) => p.connectionState === "connected").length;
   const status = !p2p.joined
     ? "Opening path"
-    : others > 0
-      ? `${others + 1} lanterns`
-      : isHost
+    : others.length === 0
+      ? isHost
         ? "Give this code to a friend"
-        : "Waiting for host to start";
+        : "Waiting for host"
+      : `${linked + 1} lanterns ready`;
 
   return (
     <div className="pointer-events-auto flex w-full max-w-xs flex-col items-center gap-4">
@@ -561,22 +651,24 @@ function Lobby({
         <p className="mt-3 font-pixel text-xl tracking-[0.35em] text-fg">{code}</p>
         <p className="mt-3 font-pixel text-pixel-sm leading-relaxed text-subtle">{status}</p>
         <div className="mt-3 flex flex-col gap-1">
-          <p className="font-pixel text-pixel-sm text-fg">{playerName}{isHost ? " · host" : ""}</p>
-          {p2p.peers.map((peer) => (
-            <p key={peer.id} className="font-pixel text-pixel-sm text-muted">
-              {peer.name || "Ranger"}
-            </p>
-          ))}
+          <p className="font-pixel text-pixel-sm text-fg">
+            {playerName}
+            {isHost ? " · host" : ""} · you
+          </p>
+          {others.length === 0 ? (
+            <p className="font-pixel text-[8px] text-subtle">No one else yet</p>
+          ) : (
+            others.map((peer) => (
+              <p key={peer.id} className="font-pixel text-pixel-sm text-muted">
+                {peer.name || "Ranger"}
+                {peer.connectionState === "connected" ? " · linked" : " · joining"}
+              </p>
+            ))
+          )}
         </div>
       </div>
       {isHost ? (
-        <PixelButton
-          primary
-          onClick={() => {
-            p2p.startRoom();
-            enter();
-          }}
-        >
+        <PixelButton primary onClick={onStart}>
           Start night
         </PixelButton>
       ) : (
