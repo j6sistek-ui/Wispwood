@@ -10,6 +10,7 @@
     "dev": "vite dev --host 0.0.0.0 --port 8080",
     "build": "vite build && npm run db:migrate",
     "build:pages": "VITE_AUTH_ENABLED=false vite build --config vite.pages.config.ts && node -e \"require('fs').writeFileSync('docs/.nojekyll','')\"",
+    "push:github": "bash scripts/push-github.sh",
     "db:migrate": "node scripts/migrate.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview --host 0.0.0.0 --port 8080",
