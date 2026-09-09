@@ -9,7 +9,9 @@ import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
 export type SpellStat = "speed" | "damage";
+export type SpellTuneStat = "move" | "reload" | "size" | "dmg";
 export type SpellUpgrades = { speed: number; damage: number };
+export type SpellTune = { move: number; reload: number; size: number; dmg: number };
 export type CraftShape = "single" | "triple" | "weave" | "orb" | "beam" | "nova" | "wave" | "meteor" | "shard" | "homing";
 export type CraftExtra = "none" | "burn" | "slow" | "stun";
 export type CraftAbility =
@@ -104,6 +106,9 @@ export type HudState = {
   sandboxPlaying: boolean;
   sandboxEdit: number;
   sandboxDeck: Array<{ count: number; label: string }>;
+  bodySize: number;
+  bodySpeed: number;
+  tunes: Record<Spell, SpellTune>;
 };
 
 type Dir = "down" | "left" | "right" | "up";
@@ -314,6 +319,18 @@ function emptyUpgrades(): Record<Spell, SpellUpgrades> {
   };
 }
 
+function emptyTunes(): Record<Spell, SpellTune> {
+  return {
+    ember: { move: 1, reload: 1, size: 1, dmg: 1 },
+    frost: { move: 1, reload: 1, size: 1, dmg: 1 },
+    bolt: { move: 1, reload: 1, size: 1, dmg: 1 },
+    void: { move: 1, reload: 1, size: 1, dmg: 1 },
+    vine: { move: 1, reload: 1, size: 1, dmg: 1 },
+    boom: { move: 1, reload: 1, size: 1, dmg: 1 },
+    craft: { move: 1, reload: 1, size: 1, dmg: 1 },
+  };
+}
+
 function maxUpgrades(): Record<Spell, SpellUpgrades> {
   return {
     ember: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
@@ -359,6 +376,7 @@ export class GameEngine {
   muted = false;
   spell: Spell = "ember";
   upgrades: Record<Spell, SpellUpgrades> = emptyUpgrades();
+  private tunes: Record<Spell, SpellTune> = emptyTunes();
   boltUnlocked = false;
   voidUnlocked = false;
   vineUnlocked = false;
@@ -375,6 +393,8 @@ export class GameEngine {
   private sandboxDeck: SandboxUnit[][] = [[]];
   private sandboxEdit = 0;
   private sandboxPlaying = false;
+  private bodySize = 1;
+  private bodySpeed = 1;
   private sandboxQueue: SandboxUnit[] = [];
   private toSpawn = 0;
   private spawnT = 0;
@@ -466,6 +486,17 @@ export class GameEngine {
         count: units.length,
         label: sandboxWaveLabel(units, i),
       })),
+      bodySize: this.bodySize,
+      bodySpeed: this.bodySpeed,
+      tunes: {
+        ember: { ...this.tunes.ember },
+        frost: { ...this.tunes.frost },
+        bolt: { ...this.tunes.bolt },
+        void: { ...this.tunes.void },
+        vine: { ...this.tunes.vine },
+        boom: { ...this.tunes.boom },
+        craft: { ...this.tunes.craft },
+      },
     };
   }
 
@@ -558,7 +589,13 @@ export class GameEngine {
     this.richRun = mode === true || mode === "sandbox";
     this.resetRun();
     if (this.maxRun) this.applyMaxLoadout();
-    else if (this.richRun) this.gold = 99999;
+    else if (this.richRun) {
+      this.gold = 99999;
+      this.boltUnlocked = true;
+      this.voidUnlocked = true;
+      this.vineUnlocked = true;
+      this.boomUnlocked = true;
+    }
     this.phase = "playing";
     this.beginWave();
     this.audio.startBed();
@@ -765,6 +802,7 @@ export class GameEngine {
   }
 
   upgradeSpell(spell: Spell, stat: SpellStat): boolean {
+    if (this.richRun) return false;
     if (spell === "bolt" && !this.boltUnlocked) return false;
     if (spell === "void" && !this.voidUnlocked) return false;
     if (spell === "vine" && !this.vineUnlocked) return false;
@@ -877,6 +915,44 @@ export class GameEngine {
     this.floatAt(this.player.x, this.player.y - 40, spell.name, spell.color);
   }
 
+  sandboxTuneSpell(spell: Spell, stat: SpellTuneStat, dir: -1 | 1 | 0) {
+    if (!this.richRun) return;
+    const t = this.tunes[spell];
+    if (dir === 0) t[stat] = 1;
+    else {
+      const step = stat === "size" ? 0.5 : 0.25;
+      const max = stat === "size" ? 16 : 4;
+      t[stat] = clamp(Math.round((t[stat] + dir * step) / step) * step, 0.25, max);
+    }
+    this.floatAt(this.player.x, this.player.y - 40, `${stat} ${t[stat].toFixed(2)}x`);
+    this.emit();
+  }
+
+  private tuneOf(spell: Spell): SpellTune {
+    return this.richRun ? this.tunes[spell] : { move: 1, reload: 1, size: 1, dmg: 1 };
+  }
+
+  private dmgOf(spell: Spell) {
+    return spellDamage(spell, this.upgrades[spell].damage, this.crafted) * this.tuneOf(spell).dmg;
+  }
+
+  sandboxTune(stat: "size" | "speed", dir: -1 | 1 | 0) {
+    if (!this.richRun) return;
+    const step = 0.25;
+    if (stat === "size") {
+      this.bodySize = dir === 0 ? 1 : clamp(Math.round((this.bodySize + dir * step) * 4) / 4, 0.5, 3);
+      this.floatAt(this.player.x, this.player.y - 40, `size ${this.bodySize.toFixed(2)}x`);
+    } else {
+      this.bodySpeed = dir === 0 ? 1 : clamp(Math.round((this.bodySpeed + dir * step) * 4) / 4, 0.5, 3);
+      this.floatAt(this.player.x, this.player.y - 40, `speed ${this.bodySpeed.toFixed(2)}x`);
+    }
+    this.emit();
+  }
+
+  private bodyR() {
+    return PLAYER_R * this.bodySize;
+  }
+
   private grantTrinkoo(n: number, x: number, y: number) {
     if (this.richRun || n <= 0) return;
     this.trinkoo += n;
@@ -959,10 +1035,13 @@ export class GameEngine {
       knockX: 0,
       knockY: 1,
     };
+    this.bodySize = 1;
+    this.bodySpeed = 1;
     this.aim = { x: 0, y: 1 };
     this.score = 0;
     this.gold = this.hasRelic("greedywick") ? 80 : 0;
     this.upgrades = emptyUpgrades();
+    this.tunes = emptyTunes();
     this.boltUnlocked = false;
     this.voidUnlocked = false;
     this.vineUnlocked = false;
@@ -1223,8 +1302,8 @@ export class GameEngine {
     const rate = sliding ? 3.2 : want > 0.12 ? PLAYER_ACCEL : PLAYER_STOP;
     const k = 1 - Math.exp(-rate * dt);
     const stunned = this.playerStun > 0;
-    const tx = sliding || stunned ? 0 : actions.moveX * PLAYER_SPEED * (this.hasRelic("swiftroot") ? 1.28 : 1) * (this.playerSlow > 0 ? 0.42 : 1);
-    const ty = sliding || stunned ? 0 : actions.moveY * PLAYER_SPEED * (this.hasRelic("swiftroot") ? 1.28 : 1) * (this.playerSlow > 0 ? 0.42 : 1);
+    const tx = sliding || stunned ? 0 : actions.moveX * PLAYER_SPEED * this.bodySpeed * (this.hasRelic("swiftroot") ? 1.28 : 1) * (this.playerSlow > 0 ? 0.42 : 1);
+    const ty = sliding || stunned ? 0 : actions.moveY * PLAYER_SPEED * this.bodySpeed * (this.hasRelic("swiftroot") ? 1.28 : 1) * (this.playerSlow > 0 ? 0.42 : 1);
     this.player.vx += (tx - this.player.vx) * k;
     this.player.vy += (ty - this.player.vy) * k;
     if (!sliding && Math.hypot(this.player.vx, this.player.vy) < 6 && want < 0.08) {
@@ -1238,7 +1317,7 @@ export class GameEngine {
     nx = clamp(nx, 48, ARENA - 48);
     ny = clamp(ny, 48, ARENA - 48);
     for (const p of this.props) {
-      const r = resolveCircle(nx, ny, PLAYER_R, p.x, p.y, p.r);
+      const r = resolveCircle(nx, ny, this.bodyR(), p.x, p.y, p.r);
       if (r.x !== nx || r.y !== ny) {
         if (Math.abs(r.x - nx) > 0.01) this.player.vx *= 0.35;
         if (Math.abs(r.y - ny) > 0.01) this.player.vy *= 0.35;
@@ -1267,7 +1346,7 @@ export class GameEngine {
             : this.spell === "boom"
               ? BOOM_CD * (this.hasRelic("blastcap") ? 0.65 : 1)
             : FIRE_CD;
-    this.fireCd = baseCd * (1 - speedUp * 0.025);
+    this.fireCd = Math.max(0.05, (baseCd * (1 - speedUp * 0.025)) / this.tuneOf(this.spell).reload);
     this.castCurrent();
     if (this.hasRelic("echoflint") && Math.random() < 0.22) this.castCurrent();
   }
@@ -1324,8 +1403,8 @@ export class GameEngine {
     slot.dirY = this.aim.y;
     slot.t = 0;
     slot.life = 0.55;
-    const reach = 168;
-    const dmg = spellDamage("boom", this.upgrades.boom.damage);
+    const reach = 168 * this.tuneOf("boom").size;
+    const dmg = this.dmgOf("boom");
     for (const e of this.enemies) {
       if (!e.alive) continue;
       const dx = e.x - this.player.x;
@@ -1439,7 +1518,8 @@ export class GameEngine {
     const form = craft.shape;
     const base =
       form === "beam" ? 1500 : form === "meteor" ? 280 : form === "orb" ? 320 : form === "wave" ? 480 : BULLET_SPEED;
-    const speed = base * (1 + this.upgrades.craft.speed * 0.04);
+    const t = this.tuneOf("craft");
+    const speed = base * (1 + this.upgrades.craft.speed * 0.04) * t.move;
     const b = this.allocBullet();
     b.alive = true;
     b.x = opts?.x ?? this.player.x + dirX * 22 + px * side;
@@ -1450,7 +1530,7 @@ export class GameEngine {
     if (opts?.orbit) b.ttl = 2.1;
     if (craft.ability === "rain") b.ttl = 1.35;
     if (craft.ability === "bloom") b.ttl = Math.max(b.ttl, 0.85);
-    b.r = form === "orb" ? 18 : form === "meteor" ? 22 : form === "beam" ? 10 : form === "wave" ? 14 : form === "shard" ? 7 : 9;
+    b.r = (form === "orb" ? 18 : form === "meteor" ? 22 : form === "beam" ? 10 : form === "wave" ? 14 : form === "shard" ? 7 : 9) * t.size;
     b.spell = "craft";
     b.trail = 0;
     b.ox = b.x;
@@ -1458,7 +1538,7 @@ export class GameEngine {
     b.dist = 0;
     b.dirX = dirX;
     b.dirY = dirY;
-    b.speed = opts?.orbit ? 9 + this.upgrades.craft.speed * 0.3 : speed;
+    b.speed = (opts?.orbit ? 9 + this.upgrades.craft.speed * 0.3 : speed);
     b.form = form;
     b.color = craft.color;
     b.ability = opts?.ability ?? craft.ability;
@@ -1472,11 +1552,12 @@ export class GameEngine {
     const b = this.allocBullet();
     b.alive = true;
     b.spell = "void";
+    const t = this.tuneOf("void");
     b.ttl = 2;
-    b.r = 58;
+    b.r = 58 * t.size;
     b.ang = Math.atan2(this.aim.y, this.aim.x);
-    b.orbit = 110;
-    b.speed = 16 + this.upgrades.void.speed * 0.45;
+    b.orbit = 110 * Math.max(0.6, t.size);
+    b.speed = (16 + this.upgrades.void.speed * 0.45) * t.move;
     b.x = this.player.x + Math.cos(b.ang) * b.orbit;
     b.y = this.player.y + Math.sin(b.ang) * b.orbit;
     b.vx = 0;
@@ -1499,7 +1580,8 @@ export class GameEngine {
     const px = -this.aim.y;
     const py = this.aim.x;
     const base = spell === "bolt" ? BOLT_SPEED : BULLET_SPEED;
-    const speed = base * (1 + this.upgrades[spell].speed * 0.04);
+    const t = this.tuneOf(spell);
+    const speed = base * (1 + this.upgrades[spell].speed * 0.04) * t.move;
     const b = this.allocBullet();
     b.alive = true;
     b.x = this.player.x + this.aim.x * 22 + px * side;
@@ -1507,7 +1589,7 @@ export class GameEngine {
     b.vx = this.aim.x * speed;
     b.vy = this.aim.y * speed;
     b.ttl = spell === "ember" ? 1.05 : spell === "vine" ? 0.95 : 0.85;
-    b.r = spell === "ember" ? 22 : spell === "vine" ? 11 : 6;
+    b.r = (spell === "ember" ? 22 : spell === "vine" ? 11 : 6) * t.size;
     b.spell = spell;
     b.trail = 0;
     b.ox = b.x;
@@ -1540,7 +1622,8 @@ export class GameEngine {
   }
 
   private spawnVineHoming(target: Enemy, i: number, n: number) {
-    const speed = BULLET_SPEED * (0.92 + this.upgrades.vine.speed * 0.04);
+    const t = this.tuneOf("vine");
+    const speed = BULLET_SPEED * (0.92 + this.upgrades.vine.speed * 0.04) * t.move;
     const spread = n === 1 ? 0 : (i / (n - 1) - 0.5) * 0.7;
     const base = Math.atan2(target.y - this.player.y, target.x - this.player.x);
     const ang = base + spread;
@@ -1553,7 +1636,7 @@ export class GameEngine {
     b.vx = dirX * speed;
     b.vy = dirY * speed;
     b.ttl = 1.45;
-    b.r = 11;
+    b.r = 11 * t.size;
     b.spell = "vine";
     b.trail = 0;
     b.ox = b.x;
@@ -1660,7 +1743,7 @@ export class GameEngine {
         for (const e of this.enemies) {
           if (!e.alive || e.voidIcd > 0) continue;
           if (circleHit(b.x, b.y, b.r, e.x, e.y, e.r)) {
-            this.hurtEnemy(e, spellDamage("void", this.upgrades.void.damage), b.dirX, b.dirY, "void");
+            this.hurtEnemy(e, this.dmgOf("void"), b.dirX, b.dirY, "void");
             e.voidIcd = 0.22;
           }
         }
@@ -1812,7 +1895,7 @@ export class GameEngine {
             if (!b.alive) break;
           } else {
             b.alive = false;
-            this.hurtEnemy(e, spellDamage(b.spell, this.upgrades[b.spell].damage, this.crafted), b.vx, b.vy, b.spell);
+            this.hurtEnemy(e, this.dmgOf(b.spell), b.vx, b.vy, b.spell);
             break;
           }
         }
@@ -1855,7 +1938,7 @@ export class GameEngine {
   private onCraftHit(b: Bullet, e: Enemy) {
     if (b.ability === "orbit" && e.voidIcd > 0) return;
     const craft = this.crafted;
-    const dmg = spellDamage("craft", this.upgrades.craft.damage, craft);
+    const dmg = this.dmgOf("craft");
     this.hurtEnemy(e, dmg, b.vx, b.vy, "craft");
     const a = b.ability;
     if (a === "leech") this.player.hp = Math.min(this.player.maxHp, this.player.hp + 4);
@@ -1940,7 +2023,7 @@ export class GameEngine {
     if (b.hits >= 90) return;
     b.hits = 90;
     const r = b.ability === "shatter" ? 70 : 56;
-    const dmg = Math.max(6, Math.round(spellDamage("craft", this.upgrades.craft.damage, this.crafted) * 0.55));
+    const dmg = Math.max(6, Math.round(this.dmgOf("craft") * 0.55));
     for (const e of this.enemies) {
       if (!e.alive) continue;
       if (Math.hypot(e.x - b.x, e.y - b.y) <= r + e.r) this.hurtEnemy(e, dmg, e.x - b.x, e.y - b.y, "craft");
@@ -1988,7 +2071,7 @@ export class GameEngine {
 
   private emberPop(b: Bullet) {
     const r = 38;
-    const dmg = Math.max(2, Math.round(spellDamage("ember", this.upgrades.ember.damage) * 0.18));
+    const dmg = Math.max(2, Math.round(this.dmgOf("ember") * 0.18));
     for (const e of this.enemies) {
       if (!e.alive) continue;
       if (Math.hypot(e.x - b.x, e.y - b.y) > r + e.r) continue;
@@ -2308,7 +2391,7 @@ export class GameEngine {
         e.x = r.x;
         e.y = r.y;
       }
-      if (e.stun <= 0 && this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, PLAYER_R)) {
+      if (e.stun <= 0 && this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, this.bodyR())) {
         const hit = e.kind === "elite" ? 22 : e.kind === "brute" ? 18 : e.kind === "runner" ? 10 : 8;
         this.hurtLantern(hit, px - e.x, py - e.y, 220);
       }
@@ -2449,7 +2532,7 @@ export class GameEngine {
         this.trauma = Math.min(1, this.trauma + 0.1);
       }
     }
-    if (this.player.invuln <= 0 && circleHit(e.x, e.y, e.r * (atk === "bite" && e.lunging > 0 ? 1.35 : 1), px, py, PLAYER_R)) {
+    if (this.player.invuln <= 0 && circleHit(e.x, e.y, e.r * (atk === "bite" && e.lunging > 0 ? 1.35 : 1), px, py, this.bodyR())) {
       this.hurtLantern(def.hit + (atk === "bite" && e.lunging > 0 ? 12 : 0), px - e.x, py - e.y, 300);
       if (def.name === "VAMPIRE") e.hp = Math.min(e.maxHp, e.hp + 48);
     }
@@ -2540,7 +2623,7 @@ export class GameEngine {
   }
 
   private radialHurt(x: number, y: number, r: number, dmg: number) {
-    if (Math.hypot(this.player.x - x, this.player.y - y) < r + PLAYER_R) {
+    if (Math.hypot(this.player.x - x, this.player.y - y) < r + this.bodyR()) {
       this.hurtLantern(dmg, this.player.x - x, this.player.y - y, 260);
     }
   }
@@ -2606,7 +2689,7 @@ export class GameEngine {
         s.alive = false;
         continue;
       }
-      if (this.player.invuln <= 0 && circleHit(s.x, s.y, s.r, this.player.x, this.player.y, PLAYER_R)) {
+      if (this.player.invuln <= 0 && circleHit(s.x, s.y, s.r, this.player.x, this.player.y, this.bodyR())) {
         this.hurtLantern(s.dmg, s.vx, s.vy, 180);
         s.alive = false;
       }
@@ -2621,7 +2704,7 @@ export class GameEngine {
         h.alive = false;
         continue;
       }
-      if (!circleHit(h.x, h.y, h.r, this.player.x, this.player.y, PLAYER_R)) continue;
+      if (!circleHit(h.x, h.y, h.r, this.player.x, this.player.y, this.bodyR())) continue;
       if (h.kind === "goo" || h.kind === "dust") this.playerSlow = Math.max(this.playerSlow, 0.55);
       if (h.kind === "web") this.playerStun = Math.max(this.playerStun, 0.7);
       if ((h.kind === "acid" || h.kind === "spore") && this.player.invuln <= 0) {
@@ -2688,7 +2771,7 @@ export class GameEngine {
         }
       }
       const grab = this.hasRelic("moonmoth") ? 36 : 16;
-      if (circleHit(p.x, p.y, grab, this.player.x, this.player.y, PLAYER_R + 8)) {
+      if (circleHit(p.x, p.y, grab, this.player.x, this.player.y, this.bodyR() + 8)) {
         p.alive = false;
         this.player.hp = Math.min(this.player.maxHp, this.player.hp + 18);
         this.audio.pickup();
@@ -2990,7 +3073,7 @@ export class GameEngine {
     const frames = this.assets!.player[this.player.face];
     const i = this.player.moving ? Math.floor(this.player.frame) % 4 : 0;
     const img = frames[i]!;
-    const s = 64;
+    const s = 64 * this.bodySize;
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
     this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
@@ -3141,37 +3224,44 @@ export class GameEngine {
     this.ctx.drawImage(img, p.x - 16, p.y - 20 + bob, 32, 32);
   }
 
+  private shotLook(b: Bullet) {
+    const base =
+      b.spell === "ember" ? 22 : b.spell === "void" ? 58 : b.spell === "vine" ? 11 : b.spell === "craft" ? 9 : 6;
+    return Math.max(0.25, b.r / base);
+  }
+
   private drawBullets() {
     const ctx = this.ctx;
     for (const b of this.bullets) {
       if (!b.alive) continue;
       const ang = Math.atan2(b.vy, b.vx);
+      const look = this.shotLook(b);
       if (b.spell === "frost") {
-        drawCoreSigil(this.ctx, "frost", b.x, b.y, ang, this.animT);
+        drawCoreSigil(this.ctx, "frost", b.x, b.y, ang, this.animT, look);
         continue;
       }
       if (b.spell === "bolt") {
-        drawCoreSigil(this.ctx, "bolt", b.x, b.y, Math.atan2(b.dirY, b.dirX), this.animT);
+        drawCoreSigil(this.ctx, "bolt", b.x, b.y, Math.atan2(b.dirY, b.dirX), this.animT, look);
         continue;
       }
       if (b.spell === "craft") {
-        this.drawCraftBolt(b);
+        this.drawCraftBolt(b, look);
         continue;
       }
       if (b.spell === "void") {
-        this.drawGlow(b.x, b.y, 56, "#4a2068");
-        drawCoreSigil(this.ctx, "void", b.x, b.y, b.ang * 2.4, this.animT);
+        this.drawGlow(b.x, b.y, b.r, "#4a2068");
+        drawCoreSigil(this.ctx, "void", b.x, b.y, b.ang * 2.4, this.animT, look);
         continue;
       }
       if (b.spell === "vine") {
-        drawCoreSigil(this.ctx, "vine", b.x, b.y, ang, this.animT);
+        drawCoreSigil(this.ctx, "vine", b.x, b.y, ang, this.animT, look);
         continue;
       }
       if (b.spell === "ember") {
-        drawCoreSigil(this.ctx, "ember", b.x, b.y, ang, this.animT + b.dist * 0.01);
+        drawCoreSigil(this.ctx, "ember", b.x, b.y, ang, this.animT + b.dist * 0.01, look);
         continue;
       }
-      this.drawTinted(this.projFrame(), b.x, b.y, 32, 20, ang);
+      this.drawTinted(this.projFrame(), b.x, b.y, 32 * look, 20 * look, ang);
     }
   }
 
@@ -3258,10 +3348,10 @@ export class GameEngine {
     this.drawTinted(this.projFrame(), b.x, b.y, 40, 24, ang, "#f0d24a");
   }
 
-  private drawCraftBolt(b: Bullet) {
+  private drawCraftBolt(b: Bullet, look = 1) {
     const ang = Math.atan2(b.dirY || b.vy, b.dirX || b.vx);
     const name = this.crafted?.name ?? "Rune";
-    drawCraftSigil(this.ctx, name, b.color, b.x, b.y, ang, this.animT + b.dist * 0.01, b.ability);
+    drawCraftSigil(this.ctx, name, b.color, b.x, b.y, ang, this.animT + b.dist * 0.01, b.ability, look);
   }
 
   private drawLightning(x: number, y: number, dx: number, dy: number) {
@@ -3289,7 +3379,14 @@ export class GameEngine {
   private drawBlasts() {
     for (const b of this.blasts) {
       if (!b.alive) continue;
-      this.drawBoomBurst(b.x, b.y, 48 + (b.t / b.life) * 170, b.dirX, b.dirY, b.t / b.life);
+      this.drawBoomBurst(
+        b.x,
+        b.y,
+        (48 + (b.t / b.life) * 170) * this.tuneOf("boom").size,
+        b.dirX,
+        b.dirY,
+        b.t / b.life,
+      );
     }
   }
 

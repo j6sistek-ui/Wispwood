@@ -261,6 +261,7 @@ export function drawCraftSigil(
   ang: number,
   t: number,
   ability: CraftAbility,
+  scale = 1,
 ) {
   let rot = ang;
   let sx = 1;
@@ -279,7 +280,7 @@ export function drawCraftSigil(
   else if (ability === "grav" || ability === "pull") rot -= t * 4;
   else if (ability === "veil") sx = sy = 1 + Math.sin(t * 5) * 0.2;
   else if (ability === "dash") sx = 1.4;
-  drawPixelGlyph(ctx, glyphFor(name), color, x, y, rot, sx, sy, 3);
+  drawPixelGlyph(ctx, glyphFor(name), color, x, y, rot, sx * scale, sy * scale, Math.max(2, 3 * scale));
 }
 
 export const CORE_GLYPHS: Record<string, string[]> = {
@@ -365,6 +366,7 @@ export function drawCoreSigil(
   y: number,
   ang: number,
   t: number,
+  scale = 1,
 ) {
   const rows = coreGlyph(spell);
   const color = CORE_COLOR[spell] ?? "#e08a3c";
@@ -392,7 +394,7 @@ export function drawCoreSigil(
   } else if (spell === "boom") {
     sx = sy = 1.4 + Math.abs(Math.sin(t * 8)) * 0.35;
   }
-  drawPixelGlyph(ctx, rows, color, x, y, rot, sx, sy, pixel);
+  drawPixelGlyph(ctx, rows, color, x, y, rot, sx * scale, sy * scale, Math.max(2, pixel * scale));
 }
 
 function shade(hex: string, k: number) {

@@ -1,6 +1,6 @@
 import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
 import type { HudState } from "@/game/engine";
-import { MAX_SPELL_UP, spellDamage, upgradeCost } from "@/game/engine";
+import { MAX_SPELL_UP, spellDamage, upgradeCost, type SpellTuneStat } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
 import { rarityTint, wheelChoices, pickLegendary, spellFlavor, WHEEL_RUNES } from "@/game/spell-prompt";
@@ -690,7 +690,7 @@ function SpawnMenu({
   hud: HudState;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<"foes" | "waves" | "relics" | "runes">("foes");
+  const [tab, setTab] = useState<"foes" | "waves" | "relics" | "runes" | "you">("foes");
   const foes = [
     { kind: "wisp" as const, label: "Wisp" },
     { kind: "runner" as const, label: "Runner" },
@@ -701,8 +701,8 @@ function SpawnMenu({
     <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-bg/75 px-3 py-6 pointer-events-auto">
       <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-3 border-2 border-fg bg-surface px-3 py-4">
         <p className="font-pixel text-pixel text-fg">Spawn</p>
-        <div className="grid w-full grid-cols-4 gap-1">
-          {(["foes", "waves", "relics", "runes"] as const).map((t) => (
+        <div className="grid w-full grid-cols-5 gap-1">
+          {(["foes", "waves", "relics", "runes", "you"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -713,7 +713,7 @@ function SpawnMenu({
                 (tab === t ? "border-gold bg-accent text-accent-fg" : "border-muted bg-bg text-fg")
               }
             >
-              {t === "foes" ? "Drop" : t === "waves" ? "Waves" : t === "relics" ? "Relics" : "Runes"}
+              {t === "foes" ? "Drop" : t === "waves" ? "Waves" : t === "relics" ? "Relics" : t === "runes" ? "Runes" : "You"}
             </button>
           ))}
         </div>
@@ -815,7 +815,7 @@ function SpawnMenu({
               );
             })}
           </div>
-        ) : (
+        ) : tab === "runes" ? (
           <div className="grid max-h-[46vh] w-full grid-cols-2 gap-2 overflow-y-auto overscroll-contain">
             {WHEEL_RUNES.map((s) => (
               <button
@@ -829,6 +829,38 @@ function SpawnMenu({
                 {s.name}
               </button>
             ))}
+          </div>
+        ) : (
+          <div className="flex w-full flex-col gap-3">
+            <p className="text-center font-pixel text-pixel-sm text-muted">This run only</p>
+            <div className="border-2 border-muted bg-bg px-2 py-3">
+              <p className="text-center font-pixel text-[9px] text-fg">Size {hud.bodySize.toFixed(2)}x</p>
+              <div className="mt-2 grid grid-cols-3 gap-1">
+                <button type="button" data-ui className="h-11 border-2 border-fg bg-surface font-pixel text-[9px] text-fg" onClick={() => engine?.sandboxTune("size", -1)}>
+                  Smaller
+                </button>
+                <button type="button" data-ui className="h-11 border-2 border-muted bg-surface font-pixel text-[9px] text-muted" onClick={() => engine?.sandboxTune("size", 0)}>
+                  1x
+                </button>
+                <button type="button" data-ui className="h-11 border-2 border-fg bg-surface font-pixel text-[9px] text-fg" onClick={() => engine?.sandboxTune("size", 1)}>
+                  Bigger
+                </button>
+              </div>
+            </div>
+            <div className="border-2 border-muted bg-bg px-2 py-3">
+              <p className="text-center font-pixel text-[9px] text-fg">Speed {hud.bodySpeed.toFixed(2)}x</p>
+              <div className="mt-2 grid grid-cols-3 gap-1">
+                <button type="button" data-ui className="h-11 border-2 border-fg bg-surface font-pixel text-[9px] text-fg" onClick={() => engine?.sandboxTune("speed", -1)}>
+                  Slower
+                </button>
+                <button type="button" data-ui className="h-11 border-2 border-muted bg-surface font-pixel text-[9px] text-muted" onClick={() => engine?.sandboxTune("speed", 0)}>
+                  1x
+                </button>
+                <button type="button" data-ui className="h-11 border-2 border-fg bg-surface font-pixel text-[9px] text-fg" onClick={() => engine?.sandboxTune("speed", 1)}>
+                  Faster
+                </button>
+              </div>
+            </div>
           </div>
         )}
         <PixelButton primary onClick={onClose}>
@@ -1369,7 +1401,7 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
   const [tuning, setTuning] = useState(false);
   const lastTap = useRef(0);
   const spell = pages[page] ?? "ember";
-  const dmg = spellDamage(spell, hud.upgrades[spell].damage, hud.crafted);
+  const dmg = Math.round(spellDamage(spell, hud.upgrades[spell].damage, hud.crafted) * (hud.sandbox ? hud.tunes[spell].dmg : 1));
 
   const flip = (dir: -1 | 1) => {
     const next = page + dir;
@@ -1433,12 +1465,21 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
           />
 
           {tuning ? (
-            <UpgradePanel
-              spell={spell}
-              hud={hud}
-              onUpgrade={(stat) => engine?.upgradeSpell(spell, stat)}
-              onBack={() => setTuning(false)}
-            />
+            hud.sandbox ? (
+              <SandboxTunePanel
+                spell={spell}
+                hud={hud}
+                onTune={(stat, dir) => engine?.sandboxTuneSpell(spell, stat, dir)}
+                onBack={() => setTuning(false)}
+              />
+            ) : (
+              <UpgradePanel
+                spell={spell}
+                hud={hud}
+                onUpgrade={(stat) => engine?.upgradeSpell(spell, stat)}
+                onBack={() => setTuning(false)}
+              />
+            )
           ) : (
             <div className="absolute inset-x-[12%] inset-y-[18%] grid grid-cols-2 gap-[8%]">
               <div className="flex flex-col items-center justify-center px-1 text-center font-pixel text-bg">
@@ -1470,33 +1511,37 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
             </div>
           )}
         </div>
-        <p className="font-pixel text-pixel-sm tabular-nums text-gold">{hud.gold}g</p>
+        {hud.sandbox ? (
+          <p className="font-pixel text-[8px] text-muted">Double-tap a page to tune. Free.</p>
+        ) : (
+          <p className="font-pixel text-pixel-sm tabular-nums text-gold">{hud.gold}g</p>
+        )}
         <div className="flex w-full max-w-xs gap-2">
           <PixelButton onClick={() => flip(-1)}>Prev</PixelButton>
           <PixelButton onClick={() => flip(1)}>Next</PixelButton>
         </div>
-        {spell === "bolt" && !hud.boltUnlocked ? (
+        {hud.sandbox ? null : spell === "bolt" && !hud.boltUnlocked ? (
           <div className="w-full max-w-xs">
             <PixelButton primary onClick={() => engine?.unlockBolt()}>
               {hud.gold < 100 ? "Need 100g" : "Buy Bolt 100g"}
             </PixelButton>
           </div>
         ) : null}
-        {spell === "void" && !hud.voidUnlocked ? (
+        {hud.sandbox ? null : spell === "void" && !hud.voidUnlocked ? (
           <div className="w-full max-w-xs">
             <PixelButton primary onClick={() => engine?.unlockVoid()}>
               {hud.gold < 300 ? "Need 300g" : "Buy Void 300g"}
             </PixelButton>
           </div>
         ) : null}
-        {spell === "vine" && !hud.vineUnlocked ? (
+        {hud.sandbox ? null : spell === "vine" && !hud.vineUnlocked ? (
           <div className="w-full max-w-xs">
             <PixelButton primary onClick={() => engine?.unlockVine()}>
               {hud.gold < 1777 ? "Need 1777g" : "Buy Vine 1777g"}
             </PixelButton>
           </div>
         ) : null}
-        {spell === "boom" && !hud.boomUnlocked ? (
+        {hud.sandbox ? null : spell === "boom" && !hud.boomUnlocked ? (
           <div className="w-full max-w-xs">
             <PixelButton primary onClick={() => engine?.unlockBoom()}>
               {hud.gold < 2500 ? "Need 2500g" : "Buy Explosion 2500g"}
@@ -1509,6 +1554,65 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
           </PixelButton>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SandboxTunePanel({
+  spell,
+  hud,
+  onTune,
+  onBack,
+}: {
+  spell: Spell;
+  hud: HudState;
+  onTune: (stat: SpellTuneStat, dir: -1 | 1 | 0) => void;
+  onBack: () => void;
+}) {
+  const t = hud.tunes[spell];
+  const name = spellName(spell, hud.crafted);
+  const rows: Array<{ key: SpellTuneStat; label: string; value: number }> = [
+    { key: "move", label: "Move", value: t.move },
+    { key: "reload", label: "Reload", value: t.reload },
+    { key: "size", label: "Size", value: t.size },
+    { key: "dmg", label: "Damage", value: t.dmg },
+  ];
+  return (
+    <div className="absolute inset-x-[10%] inset-y-[12%] flex flex-col items-center justify-between py-1">
+      <p className="font-pixel text-pixel-sm text-bg">{name}</p>
+      <div className="flex w-full flex-col gap-1">
+        {rows.map((row) => (
+          <div key={row.key} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+            <button
+              type="button"
+              data-ui
+              onClick={() => onTune(row.key, -1)}
+              className="h-7 border-2 border-bg bg-bg/10 font-pixel text-[8px] text-bg"
+            >
+              -
+            </button>
+            <button
+              type="button"
+              data-ui
+              onClick={() => onTune(row.key, 0)}
+              className="min-w-[5.5rem] font-pixel text-[8px] tabular-nums text-bg"
+            >
+              {row.label} {row.value.toFixed(2)}x
+            </button>
+            <button
+              type="button"
+              data-ui
+              onClick={() => onTune(row.key, 1)}
+              className="h-7 border-2 border-bg bg-bg/10 font-pixel text-[8px] text-bg"
+            >
+              +
+            </button>
+          </div>
+        ))}
+      </div>
+      <button type="button" data-ui onClick={onBack} className="font-pixel text-pixel-sm text-bg">
+        Back
+      </button>
     </div>
   );
 }

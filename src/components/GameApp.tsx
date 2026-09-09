@@ -38,6 +38,17 @@ const idleHud: HudState = {
   sandboxPlaying: false,
   sandboxEdit: 0,
   sandboxDeck: [{ count: 0, label: "Wave 1 empty" }],
+  bodySize: 1,
+  bodySpeed: 1,
+  tunes: {
+    ember: { move: 1, reload: 1, size: 1, dmg: 1 },
+    frost: { move: 1, reload: 1, size: 1, dmg: 1 },
+    bolt: { move: 1, reload: 1, size: 1, dmg: 1 },
+    void: { move: 1, reload: 1, size: 1, dmg: 1 },
+    vine: { move: 1, reload: 1, size: 1, dmg: 1 },
+    boom: { move: 1, reload: 1, size: 1, dmg: 1 },
+    craft: { move: 1, reload: 1, size: 1, dmg: 1 },
+  },
 };
 
 function isChromeTarget(target: EventTarget | null) {
