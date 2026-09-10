@@ -222,7 +222,7 @@ function Hud({
             onClick={() => onSpawn?.()}
             className="flex h-10 items-center justify-center border-2 border-accent bg-bg px-3 font-pixel text-[9px] text-fg"
           >
-            Spawn
+            Menu
           </button>
         ) : null}
       </div>
@@ -700,7 +700,7 @@ function SpawnMenu({
   return (
     <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-bg/75 px-3 py-6 pointer-events-auto">
       <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-3 border-2 border-fg bg-surface px-3 py-4">
-        <p className="font-pixel text-pixel text-fg">Spawn</p>
+        <p className="font-pixel text-pixel text-fg">Menu</p>
         <div className="grid w-full grid-cols-5 gap-1">
           {(["foes", "waves", "relics", "runes", "you"] as const).map((t) => (
             <button
