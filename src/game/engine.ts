@@ -1010,9 +1010,11 @@ export class GameEngine {
     return this.richRun ? this.tunes[spell] : { move: 1, reload: 1, size: 1, dmg: 1 };
   }
 
-  private dmgOf(spell: Spell) {
+  private dmgOf(spell: Spell): number {
     if (spell === "fuse" && this.fused) {
-      return (this.dmgOf(this.fused.a) + this.dmgOf(this.fused.b)) * this.tuneOf("fuse").dmg;
+      const a = spellDamage(this.fused.a, this.upgrades[this.fused.a].damage) * this.tuneOf(this.fused.a).dmg;
+      const b = spellDamage(this.fused.b, this.upgrades[this.fused.b].damage) * this.tuneOf(this.fused.b).dmg;
+      return (a + b) * this.tuneOf("fuse").dmg;
     }
     return spellDamage(spell, this.upgrades[spell].damage, this.crafted) * this.tuneOf(spell).dmg;
   }

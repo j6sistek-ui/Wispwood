@@ -146,6 +146,8 @@ function Hud({
               ? "Boom"
             : hud.spell === "craft"
               ? (hud.crafted?.name ?? "Rune")
+              : hud.spell === "fuse"
+                ? (hud.fused?.name ?? "Fused")
               : "Ember";
 
   return (
@@ -872,7 +874,7 @@ function SpawnMenu({
 }
 
 function CoreGlyph({ spell }: { spell: Spell }) {
-  const rows = coreGlyph(spell === "craft" ? "ember" : spell);
+  const rows = coreGlyph(spell === "craft" || spell === "fuse" ? "ember" : spell);
   const color = CORE_COLOR[spell] ?? "#e08a3c";
   return (
     <span className="inline-grid" style={{ gridTemplateColumns: "repeat(9, 3px)" }}>
@@ -1450,7 +1452,7 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
     if (now - lastTap.current < 380) {
       lastTap.current = 0;
       engine?.chooseSpell(spell);
-      setTuning(true);
+      if (hud.sandbox || (spell !== "fuse" && spell !== "craft")) setTuning(true);
       return;
     }
     lastTap.current = now;
