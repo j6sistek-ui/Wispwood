@@ -919,15 +919,15 @@ function FusionGlyph({ fuseKey, color }: { fuseKey: string; color: string }) {
 function SpellGlyph({ color, name }: { color: string; name: string }) {
   const rows = glyphFor(name);
   return (
-    <span className="inline-grid" style={{ gridTemplateColumns: "repeat(8, 2px)" }}>
+    <span className="inline-grid" style={{ gridTemplateColumns: "repeat(8, 3px)" }}>
       {rows.flatMap((row, y) =>
         [...row].map((ch, x) => (
           <span
             key={`${x}-${y}`}
             style={{
-              width: 2,
-              height: 2,
-              background: ch === "." ? "transparent" : ch === "+" ? "#fff" : color,
+              width: 3,
+              height: 3,
+              background: ch === "." ? "transparent" : ch === "+" ? "#fff" : ch === "o" ? "#fff4c8" : color,
             }}
           />
         )),
