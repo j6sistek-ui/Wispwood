@@ -1230,6 +1230,107 @@ function PixelButton({
   );
 }
 
+function PixelSprite({ rows, palette, px = 3 }: { rows: string[]; palette: Record<string, string>; px?: number }) {
+  const w = rows[0]?.length ?? 1;
+  return (
+    <span className="inline-grid shrink-0" style={{ gridTemplateColumns: `repeat(${w}, ${px}px)` }}>
+      {rows.flatMap((row, y) =>
+        [...row].map((ch, x) => (
+          <span
+            key={`${x}-${y}`}
+            style={{ width: px, height: px, background: palette[ch] ?? "transparent" }}
+          />
+        )),
+      )}
+    </span>
+  );
+}
+
+const SMITH_ROWS = [
+  "....hhhh....",
+  "...hssshh...",
+  "..hskkksh...",
+  "..hskeesh...",
+  "...hsssh....",
+  "....nnn.....",
+  "...nrrrn....",
+  "..nrrrrrn...",
+  ".nnrrrrrnn..",
+  "..nrrrrrn...",
+  "..n.nnn.n...",
+  "..b.....b...",
+  ".bb.....bb..",
+  ".b.......b..",
+  "bbb.....bbb.",
+];
+
+const SMITH_PALETTE: Record<string, string> = {
+  h: "#3a2a22",
+  s: "#c4a07a",
+  k: "#8a5a3a",
+  e: "#1a1010",
+  n: "#6a4030",
+  r: "#c45a48",
+  b: "#2a1c14",
+};
+
+const ANVIL_ROWS = [
+  "..............",
+  "..oooooooooo..",
+  ".oIIIIIIIIIo.",
+  "ooooIIIIIIIIoo",
+  "...oIIIIIo....",
+  "....oIIIIo....",
+  "...oooooooo...",
+  "..oo......oo..",
+  ".oooooooooooo.",
+];
+
+const ANVIL_PALETTE: Record<string, string> = {
+  o: "#2a2c2a",
+  I: "#8a9090",
+};
+
+function Forge({ engine }: { engine: GameEngine | null }) {
+  return (
+    <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-bg/80 px-3 py-4 pointer-events-auto">
+      <div className="pointer-events-auto w-full max-w-sm border-4 border-[#8a5a32] bg-[#16110d] p-4">
+        <div className="h-2 bg-[#c45a48]" />
+        <p className="mt-2 text-center font-pixel text-pixel text-[#e08a3c]">THE FORGE</p>
+        <div className="mt-3 flex items-end gap-3">
+          <PixelSprite rows={SMITH_ROWS} palette={SMITH_PALETTE} px={3} />
+          <div className="min-w-0 flex-1 border-2 border-[#c45a48] bg-[#2a1c14] px-2 py-2">
+            <p className="font-pixel text-[8px] text-[#e8c070]">BRANN</p>
+            <p className="mt-2 font-pixel text-[10px] leading-relaxed text-fg">I'm ready to forge.</p>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-center">
+          <PixelSprite rows={ANVIL_ROWS} palette={ANVIL_PALETTE} px={4} />
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {["Ore", "Rune", "Hammer"].map((slot) => (
+            <div key={slot} className="border-2 border-[#5a4030] bg-[#1c1612] py-3 text-center">
+              <p className="font-pixel text-[8px] text-[#8a6a4a]">{slot}</p>
+              <p className="mt-2 font-pixel text-[10px] text-muted">—</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            type="button"
+            data-ui
+            className="h-11 border-2 border-[#5a4030] bg-[#2a1c14] font-pixel text-[10px] text-[#8a6a4a]"
+          >
+            Forge
+          </button>
+          <p className="text-center font-pixel text-[8px] text-muted">The coals wait</p>
+          <PixelButton onClick={() => engine?.closeForge()}>Back</PixelButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Pause({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   return (
     <div className="absolute inset-0 grid place-items-center bg-bg/70 pointer-events-auto">
