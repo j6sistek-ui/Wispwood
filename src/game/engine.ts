@@ -4,6 +4,7 @@ import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
+import { FUSIONS, drawFusionSigil, fusionGlyph } from "./fusions";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
@@ -71,23 +72,9 @@ export type FusedSpell = {
   blurb: string;
 };
 
-const FUSION_BOOK: Record<string, { name: string; color: string; blurb: string }> = {
-  "bolt+boom": { name: "Thunderclap", color: "#ffbf3a", blurb: "Bolt and a blast together" },
-  "bolt+ember": { name: "Stormember", color: "#ff9a3c", blurb: "Fire that cracks like lightning" },
-  "bolt+frost": { name: "Shattervolt", color: "#c5eaf6", blurb: "Ice lances with a stun trail" },
-  "bolt+vine": { name: "Thundervine", color: "#b6e070", blurb: "Homing wraps and a bolt" },
-  "bolt+void": { name: "Stormhole", color: "#c8a4ff", blurb: "Orbiting void with a bolt" },
-  "boom+ember": { name: "Firecracker", color: "#ff5a2a", blurb: "Blast that leaves a burn" },
-  "boom+frost": { name: "Shatterburst", color: "#eaf8fd", blurb: "Ice explosion, then freeze" },
-  "boom+vine": { name: "Bloomblast", color: "#8fd46a", blurb: "Blast that wraps the ring" },
-  "boom+void": { name: "Collapse", color: "#4a2068", blurb: "Void and a knockback blast" },
-  "ember+frost": { name: "Cinderfrost", color: "#e08a9c", blurb: "Weave fire and a triple ice" },
-  "ember+vine": { name: "Pyrethorn", color: "#c45a48", blurb: "Fire plus wrapping vines" },
-  "ember+void": { name: "Ashorbit", color: "#a85a38", blurb: "Burning void around you" },
-  "frost+vine": { name: "Frostroot", color: "#9ad8c8", blurb: "Ice that roots and slows" },
-  "frost+void": { name: "Rimevoid", color: "#9aa0ea", blurb: "Cold orbit that holds them" },
-  "vine+void": { name: "Nightbriar", color: "#3d7a6a", blurb: "Void orbit and vine wraps" },
-};
+const FUSION_BOOK: Record<string, { name: string; color: string; blurb: string }> = Object.fromEntries(
+  Object.entries(FUSIONS).map(([k, v]) => [k, { name: v.name, color: v.color, blurb: v.blurb }]),
+);
 
 export function isCoreSpell(spell: Spell): spell is CoreSpell {
   return (CORE_SPELLS as readonly string[]).includes(spell);
@@ -182,6 +169,8 @@ type Bullet = {
   home: Enemy | null;
   ability: CraftAbility;
   hits: number;
+  fuse: string;
+  mark: number;
 };
 
 type Enemy = {
@@ -1012,9 +1001,8 @@ export class GameEngine {
 
   private dmgOf(spell: Spell): number {
     if (spell === "fuse" && this.fused) {
-      const a = spellDamage(this.fused.a, this.upgrades[this.fused.a].damage) * this.tuneOf(this.fused.a).dmg;
-      const b = spellDamage(this.fused.b, this.upgrades[this.fused.b].damage) * this.tuneOf(this.fused.b).dmg;
-      return (a + b) * this.tuneOf("fuse").dmg;
+      const def = FUSIONS[fusionKey(this.fused.a, this.fused.b)];
+      return ((def?.damage ?? 32) + this.upgrades.fuse.damage * 3) * this.tuneOf("fuse").dmg;
     }
     return spellDamage(spell, this.upgrades[spell].damage, this.crafted) * this.tuneOf(spell).dmg;
   }
@@ -1422,16 +1410,16 @@ export class GameEngine {
     if (this.spell === "craft" && !this.crafted) return;
     if (this.spell === "fuse" && !this.fused) return;
     const speedUp = this.upgrades[this.spell].speed;
-    const baseCd =
-      this.spell === "fuse" && this.fused
-        ? Math.max(this.spellCd(this.fused.a), this.spellCd(this.fused.b)) * 0.85
-        : this.spellCd(this.spell);
+    const baseCd = this.spellCd(this.spell);
     this.fireCd = Math.max(0.05, (baseCd * (1 - speedUp * 0.025)) / this.tuneOf(this.spell).reload);
     this.castCurrent();
     if (this.hasRelic("echoflint") && Math.random() < 0.22) this.castCurrent();
   }
 
   private spellCd(spell: Spell) {
+    if (spell === "fuse" && this.fused) {
+      return FUSIONS[fusionKey(this.fused.a, this.fused.b)]?.cooldown ?? 0.7;
+    }
     if (spell === "craft" && this.crafted) return this.crafted.cooldown;
     if (spell === "bolt") return BOLT_CD * (this.hasRelic("stormquill") ? 0.65 : 1);
     if (spell === "void") return VOID_CD;
@@ -1440,11 +1428,10 @@ export class GameEngine {
   }
 
   private castCurrent() {
-    const boomish =
-      this.spell === "boom" || (this.spell === "fuse" && (this.fused?.a === "boom" || this.fused?.b === "boom"));
+    const key = this.fused ? fusionKey(this.fused.a, this.fused.b) : "";
+    const boomish = this.spell === "boom" || (this.spell === "fuse" && (key.includes("boom") || key === "bolt+boom"));
     if (this.spell === "fuse" && this.fused) {
-      this.castSpell(this.fused.a);
-      this.castSpell(this.fused.b);
+      this.shootFusion();
     } else {
       this.castSpell(this.spell);
     }
@@ -1482,6 +1469,543 @@ export class GameEngine {
       this.spawnShot(spell, 0);
       this.audio.fire();
     }
+  }
+
+  private fuseKey() {
+    return this.fused ? fusionKey(this.fused.a, this.fused.b) : "";
+  }
+
+  private spawnFuseShot(key: string, x: number, y: number, dirX: number, dirY: number, extra?: Partial<Bullet>) {
+    const def = FUSIONS[key];
+    const t = this.tuneOf("fuse");
+    const m = Math.hypot(dirX, dirY) || 1;
+    dirX /= m;
+    dirY /= m;
+    const b = this.allocBullet();
+    b.alive = true;
+    b.spell = "fuse";
+    b.fuse = key;
+    b.x = x;
+    b.y = y;
+    b.ox = x;
+    b.oy = y;
+    b.dirX = dirX;
+    b.dirY = dirY;
+    b.ang = Math.atan2(dirY, dirX);
+    b.dist = 0;
+    b.trail = 0;
+    b.hits = 0;
+    b.mark = 0;
+    b.orbit = extra?.orbit ?? 0;
+    b.home = extra?.home ?? null;
+    b.form = extra?.form ?? "single";
+    b.color = def?.color ?? "#e8c070";
+    b.ttl = extra?.ttl ?? 0.9;
+    b.r = (extra?.r ?? 12) * t.size;
+    b.speed = (extra?.speed ?? BULLET_SPEED) * t.move;
+    b.vx = dirX * b.speed;
+    b.vy = dirY * b.speed;
+    if (extra?.vx != null) b.vx = extra.vx;
+    if (extra?.vy != null) b.vy = extra.vy;
+    this.burstSparks(b.x, b.y, 3, def?.color2 ?? b.color);
+    return b;
+  }
+
+  private shootFusion() {
+    if (!this.fused) return;
+    const key = this.fuseKey();
+    const def = FUSIONS[key];
+    if (!def) return;
+    const t = this.tuneOf("fuse");
+    const px = this.player.x + this.aim.x * 26;
+    const py = this.player.y + this.aim.y * 22;
+    const size = t.size;
+    if (key === "ember+frost") {
+      this.spawnFuseShot(key, px, py, this.aim.x, this.aim.y, { ttl: 1.15, r: 16, speed: 520 });
+      this.audio.fire();
+      this.audio.ice();
+    } else if (key === "bolt+ember") {
+      this.spawnFuseShot(key, px, py, this.aim.x, this.aim.y, { ttl: 0.55, r: 10, speed: 900, hits: 0 });
+      this.audio.bolt();
+    } else if (key === "ember+void") {
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        this.spawnFuseShot(key, this.player.x, this.player.y, Math.cos(a), Math.sin(a), {
+          ttl: 2.1,
+          r: 14,
+          speed: 8,
+          orbit: 36,
+          ang: a,
+        });
+      }
+      this.audio.bolt();
+    } else if (key === "ember+vine") {
+      this.spawnFuseShot(key, px, py, this.aim.x, this.aim.y, { ttl: 0.85, r: 13, speed: 640 });
+      this.audio.fire();
+    } else if (key === "boom+ember") {
+      this.spawnFuseShot(key, px, py, this.aim.x, this.aim.y, { ttl: 0.55, r: 11, speed: 420 });
+      this.audio.fire();
+    } else if (key === "bolt+frost") {
+      for (const side of [-22, 0, 22]) {
+        this.spawnFuseShot(key, px - this.aim.y * side, py + this.aim.x * side, this.aim.x, this.aim.y, {
+          ttl: 0.7,
+          r: 9,
+          speed: 780,
+        });
+      }
+      this.audio.bolt();
+      this.audio.ice();
+    } else if (key === "frost+void") {
+      const reach = 190 * size;
+      this.spawnFuseShot(key, this.player.x + this.aim.x * reach, this.player.y + this.aim.y * reach, 0, 1, {
+        ttl: 1.35,
+        r: 16,
+        speed: 0,
+        vx: 0,
+        vy: 0,
+      });
+      this.audio.ice();
+    } else if (key === "frost+vine") {
+      this.spawnFuseShot(key, px, py, this.aim.x, this.aim.y, { ttl: 1.1, r: 12, speed: 560 });
+      this.audio.ice();
+    } else if (key === "boom+frost") {
+      this.spawnFuseShot(key, px, py, this.aim.x, this.aim.y, { ttl: 0.95, r: 20, speed: 380 });
+      this.audio.ice();
+    } else if (key === "bolt+void") {
+      const reach = 200 * size;
+      this.spawnFuseShot(key, this.player.x + this.aim.x * reach, this.player.y + this.aim.y * reach, this.aim.x, this.aim.y, {
+        ttl: 0.55,
+        r: 10,
+        speed: 0,
+        vx: 0,
+        vy: 0,
+      });
+      this.audio.bolt();
+    } else if (key === "bolt+vine") {
+      this.castLivewire();
+    } else if (key === "bolt+boom") {
+      const reach = 210 * size;
+      this.spawnFuseShot(key, this.player.x + this.aim.x * reach, this.player.y + this.aim.y * reach, 0, 1, {
+        ttl: 0.48,
+        r: 14,
+        speed: 0,
+        vx: 0,
+        vy: 0,
+      });
+      this.audio.bolt();
+    } else if (key === "vine+void") {
+      const b = this.spawnFuseShot(key, px, py, this.aim.x, this.aim.y, { ttl: 1.6, r: 18, speed: 9, orbit: 78 });
+      b.ang = Math.atan2(this.aim.y, this.aim.x);
+      this.audio.ice();
+    } else if (key === "boom+void") {
+      this.spawnFuseShot(key, px, py, this.aim.x, this.aim.y, { ttl: 1.15, r: 18, speed: 260 });
+      this.audio.bolt();
+    } else if (key === "boom+vine") {
+      this.spawnFuseShot(key, px, py, this.aim.x, this.aim.y, { ttl: 1.35, r: 15, speed: 480 });
+      this.audio.fire();
+    }
+  }
+
+  private castLivewire() {
+    const dmg = this.dmgOf("fuse");
+    let srcX = this.player.x;
+    let srcY = this.player.y;
+    const used = new Set<Enemy>();
+    for (let i = 0; i < 5; i++) {
+      let best: Enemy | null = null;
+      let bestD = 210 * 210;
+      for (const e of this.enemies) {
+        if (!e.alive || used.has(e)) continue;
+        const d = (e.x - srcX) ** 2 + (e.y - srcY) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = e;
+        }
+      }
+      if (!best) break;
+      used.add(best);
+      this.hurtEnemy(best, dmg, best.x - srcX, best.y - srcY, "bolt");
+      this.wrapEnemy(best);
+      best.stun = Math.max(best.stun, 0.45);
+      this.spawnArc((srcX + best.x) / 2, (srcY + best.y) / 2);
+      this.burstSparks(best.x, best.y, 6, "#b6e070");
+      const vis = this.spawnFuseShot("bolt+vine", (srcX + best.x) / 2, (srcY + best.y) / 2, 0, 1, {
+        ttl: 0.18,
+        r: 8,
+        speed: 0,
+        vx: 0,
+        vy: 0,
+      });
+      vis.ox = srcX;
+      vis.oy = srcY;
+      vis.dirX = best.x;
+      vis.dirY = best.y;
+      srcX = best.x;
+      srcY = best.y;
+    }
+    this.audio.bolt();
+  }
+
+  private fuseStrike(b: Bullet, e: Enemy, dx: number, dy: number) {
+    const key = b.fuse;
+    const dmg = this.dmgOf("fuse");
+    if (key === "ember+frost") {
+      this.hurtEnemy(e, dmg, dx, dy, "ember");
+      e.burn = Math.max(e.burn, 2.4);
+      e.freeze = Math.max(e.freeze, 1.1);
+    } else if (key === "bolt+ember") {
+      this.hurtEnemy(e, dmg, dx, dy, "bolt");
+      e.burn = Math.max(e.burn, 1.6);
+      e.stun = Math.max(e.stun, 0.25);
+    } else if (key === "ember+void") {
+      this.hurtEnemy(e, dmg, dx, dy, "void");
+      e.burn = Math.max(e.burn, 1.8);
+    } else if (key === "ember+vine") {
+      this.hurtEnemy(e, dmg, dx, dy, "vine");
+      e.burn = Math.max(e.burn, 1.4);
+      this.wrapEnemy(e);
+    } else if (key === "boom+ember") {
+      this.hurtEnemy(e, dmg, dx, dy, "boom");
+      e.burn = Math.max(e.burn, 2);
+    } else if (key === "bolt+frost") {
+      this.hurtEnemy(e, dmg, dx, dy, "frost");
+      e.stun = Math.max(e.stun, 0.7);
+      e.freeze = Math.max(e.freeze, 0.8);
+    } else if (key === "frost+void") {
+      this.hurtEnemy(e, dmg, dx, dy, "frost");
+      e.freeze = Math.max(e.freeze, 1.6);
+    } else if (key === "frost+vine") {
+      this.hurtEnemy(e, dmg, dx, dy, "vine");
+      e.freeze = Math.max(e.freeze, 1.8);
+      this.wrapEnemy(e);
+    } else if (key === "boom+frost") {
+      this.hurtEnemy(e, dmg, dx, dy, "boom");
+      e.freeze = Math.max(e.freeze, 1.4);
+    } else if (key === "bolt+void") {
+      this.hurtEnemy(e, dmg, dx, dy, "bolt");
+      e.stun = Math.max(e.stun, 0.5);
+    } else if (key === "bolt+boom") {
+      this.hurtEnemy(e, dmg, dx, dy, "boom");
+      e.stun = Math.max(e.stun, 0.8);
+    } else if (key === "vine+void") {
+      this.hurtEnemy(e, dmg, dx, dy, "void");
+      this.wrapEnemy(e);
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + 8);
+    } else if (key === "boom+void") {
+      this.hurtEnemy(e, dmg, dx, dy, "void");
+    } else if (key === "boom+vine") {
+      this.hurtEnemy(e, dmg, dx, dy, "boom");
+      this.wrapEnemy(e);
+    } else {
+      this.hurtEnemy(e, dmg, dx, dy, "ember");
+    }
+  }
+
+  private fuseBurst(b: Bullet, radius: number, extra?: (e: Enemy) => void) {
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (!circleHit(b.x, b.y, radius, e.x, e.y, e.r)) continue;
+      this.fuseStrike(b, e, e.x - b.x, e.y - b.y);
+      extra?.(e);
+    }
+    this.spawnBurst(b.x, b.y, "fuse");
+    this.burstSparks(b.x, b.y, 10, FUSIONS[b.fuse]?.color2 ?? "#e8c070");
+  }
+
+  private updateFusion(b: Bullet, dt: number) {
+    const key = b.fuse;
+    const t = this.tuneOf("fuse");
+    b.trail += dt;
+    b.mark += dt;
+    if (key === "ember+frost") {
+      b.dist += b.speed * dt;
+      const wave = Math.sin(b.dist * 0.045) * 28;
+      b.x = b.ox + b.dirX * b.dist + -b.dirY * wave;
+      b.y = b.oy + b.dirY * b.dist + b.dirX * wave;
+      if (b.trail >= 0.05) {
+        b.trail = 0;
+        this.burstSparks(b.x, b.y, 1, Math.random() > 0.5 ? "#f0b8c8" : "#9ad8ea");
+        if (Math.random() > 0.6) this.dropHazard(b.x, b.y, "dust", "#f0b8c8", 22);
+      }
+    } else if (key === "bolt+ember") {
+      if (b.mark >= 0.11 && b.hits < 3) {
+        b.mark = 0;
+        b.hits += 1;
+        b.x += b.dirX * 78;
+        b.y += b.dirY * 78;
+        this.burstSparks(b.x, b.y, 8, "#ff9a3c");
+        this.spawnArc(b.x, b.y);
+        this.fuseBurst(b, 42);
+      }
+    } else if (key === "ember+void") {
+      b.orbit = 36 + Math.sin(b.mark * 3.2) * 70;
+      b.ang += b.speed * dt;
+      b.x = this.player.x + Math.cos(b.ang) * b.orbit;
+      b.y = this.player.y + Math.sin(b.ang) * b.orbit;
+      if (b.trail >= 0.08) {
+        b.trail = 0;
+        this.burstSparks(b.x, b.y, 1, "#7a48b8");
+      }
+    } else if (key === "ember+vine") {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.ang += 10 * dt;
+    } else if (key === "boom+ember") {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      if (b.trail >= 0.04) {
+        b.trail = 0;
+        this.burstSparks(b.x, b.y, 2, "#f0d24a");
+      }
+    } else if (key === "bolt+frost") {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      if (b.trail >= 0.05) {
+        b.trail = 0;
+        this.spawnArc(b.x, b.y);
+        this.spawnFlake(b.x, b.y, false);
+      }
+    } else if (key === "frost+void") {
+      b.r = (16 + b.mark * 70) * t.size;
+      if (b.mark > 0.7) {
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          const dx = b.x - e.x;
+          const dy = b.y - e.y;
+          const d = Math.hypot(dx, dy) || 1;
+          if (d < b.r + e.r + 40) {
+            e.kvx += (dx / d) * 520 * dt;
+            e.kvy += (dy / d) * 520 * dt;
+            e.knockT = Math.max(e.knockT, 0.2);
+          }
+        }
+      }
+    } else if (key === "frost+vine") {
+      const home = b.home?.alive ? b.home : this.nearestEnemy(b.x, b.y);
+      if (home) {
+        const dx = home.x - b.x;
+        const dy = home.y - b.y;
+        const dm = Math.hypot(dx, dy) || 1;
+        b.dirX += (dx / dm) * 6 * dt;
+        b.dirY += (dy / dm) * 6 * dt;
+        const nm = Math.hypot(b.dirX, b.dirY) || 1;
+        b.dirX /= nm;
+        b.dirY /= nm;
+        b.vx = b.dirX * b.speed;
+        b.vy = b.dirY * b.speed;
+      }
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.ang += 8 * dt;
+    } else if (key === "boom+frost") {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.ang += 7 * dt;
+    } else if (key === "bolt+void") {
+      if (b.mark >= 0.16 && b.hits < 8) {
+        b.hits += 1;
+        b.mark = 0;
+        const a = (b.hits / 8) * Math.PI * 2;
+        const tx = b.x + Math.cos(a) * 90 * t.size;
+        const ty = b.y + Math.sin(a) * 90 * t.size;
+        this.spawnArc(tx, ty);
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          const d = Math.abs((e.x - b.x) * Math.cos(a) + (e.y - b.y) * Math.sin(a));
+          const perp = Math.abs((e.x - b.x) * -Math.sin(a) + (e.y - b.y) * Math.cos(a));
+          if (d < 95 * t.size && perp < 18 + e.r) this.fuseStrike(b, e, Math.cos(a), Math.sin(a));
+        }
+      }
+    } else if (key === "bolt+vine") {
+      /* visual only */
+    } else if (key === "bolt+boom") {
+      if (b.mark >= 0.34 && b.hits === 0) {
+        b.hits = 1;
+        this.fuseBurst(b, 110 * t.size, (e) => {
+          e.stun = Math.max(e.stun, 0.9);
+        });
+        this.trauma = Math.min(1, this.trauma + 0.5);
+      }
+    } else if (key === "vine+void") {
+      if (b.mark < 0.45) {
+        b.ang += 10 * dt;
+        b.x = this.player.x + Math.cos(b.ang) * b.orbit;
+        b.y = this.player.y + Math.sin(b.ang) * b.orbit;
+      } else {
+        const home = this.nearestEnemy(b.x, b.y);
+        if (home) {
+          const dx = home.x - b.x;
+          const dy = home.y - b.y;
+          const dm = Math.hypot(dx, dy) || 1;
+          b.vx = (dx / dm) * 720 * t.move;
+          b.vy = (dy / dm) * 720 * t.move;
+        }
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+      }
+    } else if (key === "boom+void") {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.r = (18 + b.mark * 40) * t.size;
+      b.ang -= 5 * dt;
+    } else if (key === "boom+vine") {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.ang += 9 * dt;
+    } else {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+    }
+
+    b.ttl -= dt;
+    if (b.ttl <= 0) {
+      if (key === "boom+ember") this.starfallPop(b);
+      else if (key === "ember+vine") this.briarLash(b);
+      else if (key === "boom+frost") this.glacierCrack(b);
+      else if (key === "boom+void") this.fuseBurst(b, 130 * t.size);
+      else if (key === "frost+void") this.fuseBurst(b, b.r);
+      else if (key === "boom+vine" && b.hits < 3) {
+        this.podHop(b);
+        return;
+      }
+      b.alive = false;
+      return;
+    }
+
+    if (b.x < -40 || b.y < -40 || b.x > ARENA + 40 || b.y > ARENA + 40) {
+      b.alive = false;
+      return;
+    }
+
+    if (key === "bolt+boom" || key === "bolt+void" || key === "frost+void" || key === "bolt+vine") return;
+
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (key === "ember+void" && e.voidIcd > 0) continue;
+      if (!circleHit(b.x, b.y, b.r, e.x, e.y, e.r)) continue;
+      if (key === "ember+vine") {
+        this.fuseStrike(b, e, b.vx, b.vy);
+        this.briarLash(b);
+        b.alive = false;
+        break;
+      }
+      if (key === "boom+ember") {
+        this.starfallPop(b);
+        b.alive = false;
+        break;
+      }
+      if (key === "boom+frost") {
+        this.glacierCrack(b);
+        b.alive = false;
+        break;
+      }
+      if (key === "boom+void") {
+        this.fuseBurst(b, 130 * t.size);
+        b.alive = false;
+        break;
+      }
+      if (key === "boom+vine") {
+        this.podHop(b);
+        break;
+      }
+      if (key === "frost+vine") {
+        this.fuseStrike(b, e, b.vx, b.vy);
+        this.dropHazard(e.x, e.y, "web", "#9ad8c8", 46);
+        b.alive = false;
+        break;
+      }
+      if (key === "bolt+frost") {
+        this.fuseStrike(b, e, b.vx, b.vy);
+        for (let i = 0; i < 4; i++) {
+          const a = Math.atan2(b.vy, b.vx) + (i - 1.5) * 0.45;
+          this.spawnFuseShot(key, e.x, e.y, Math.cos(a), Math.sin(a), { ttl: 0.28, r: 6, speed: 520 });
+        }
+        b.alive = false;
+        break;
+      }
+      this.fuseStrike(b, e, b.vx || b.dirX, b.vy || b.dirY);
+      if (key === "ember+void") e.voidIcd = 0.2;
+      else if (key !== "ember+frost") {
+        b.alive = false;
+        break;
+      }
+    }
+  }
+
+  private starfallPop(b: Bullet) {
+    const t = this.tuneOf("fuse");
+    this.fuseBurst(b, 36 * t.size);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + this.animT;
+      this.spawnFuseShot(b.fuse, b.x, b.y, Math.cos(a), Math.sin(a), { ttl: 0.4, r: 7, speed: 560 });
+    }
+  }
+
+  private briarLash(b: Bullet) {
+    const dmg = this.dmgOf("fuse") * 0.7;
+    let n = 0;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (Math.hypot(e.x - b.x, e.y - b.y) > 150) continue;
+      this.hurtEnemy(e, dmg, e.x - b.x, e.y - b.y, "vine");
+      e.burn = Math.max(e.burn, 1.2);
+      this.wrapEnemy(e);
+      this.spawnArc((b.x + e.x) / 2, (b.y + e.y) / 2);
+      n += 1;
+      if (n >= 3) break;
+    }
+    this.burstSparks(b.x, b.y, 8, "#c45a48");
+  }
+
+  private glacierCrack(b: Bullet) {
+    const t = this.tuneOf("fuse");
+    this.fuseBurst(b, 48 * t.size);
+    const base = Math.atan2(b.dirY, b.dirX);
+    for (let i = 0; i < 7; i++) {
+      const a = base + (i - 3) * 0.22;
+      this.spawnFuseShot(b.fuse, b.x, b.y, Math.cos(a), Math.sin(a), { ttl: 0.35, r: 8, speed: 640 });
+    }
+  }
+
+  private podHop(b: Bullet) {
+    const t = this.tuneOf("fuse");
+    this.fuseBurst(b, 70 * t.size);
+    b.hits += 1;
+    if (b.hits >= 3) {
+      b.alive = false;
+      return;
+    }
+    b.ttl = 0.42;
+    b.x += b.dirX * 70;
+    b.y += b.dirY * 70;
+    b.vx = b.dirX * b.speed;
+    b.vy = b.dirY * b.speed;
+  }
+
+  private drawFusionShot(b: Bullet) {
+    const look = Math.max(0.4, (b.r / 12) * this.tuneOf("fuse").size);
+    const def = FUSIONS[b.fuse];
+    if (b.fuse === "bolt+vine") {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.strokeStyle = def?.color2 ?? "#ffe27a";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(b.ox, b.oy);
+      ctx.lineTo(b.dirX, b.dirY);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (b.fuse === "bolt+boom" && b.hits === 0) {
+      this.drawGlow(b.x, b.y, 28 + b.mark * 80, "#ffbf3a");
+    }
+    if (b.fuse === "frost+void") {
+      this.drawGlow(b.x, b.y, b.r, "#6a70c8");
+    }
+    if (b.fuse === "boom+void") {
+      this.drawGlow(b.x, b.y, b.r, "#4a2068");
+    }
+    drawFusionSigil(this.ctx, b.fuse, b.x, b.y, b.ang || Math.atan2(b.vy, b.vx), this.animT + b.mark, look);
   }
 
   private shootBoom() {
@@ -1756,6 +2280,8 @@ export class GameEngine {
       dead.home = null;
       dead.orbit = 0;
       dead.form = "single";
+      dead.fuse = "";
+      dead.mark = 0;
       return dead;
     }
     if (this.bullets.length >= MAX_BULLETS) {
@@ -1765,6 +2291,8 @@ export class GameEngine {
       oldest.hits = 0;
       oldest.home = null;
       oldest.orbit = 0;
+      oldest.fuse = "";
+      oldest.mark = 0;
       return oldest;
     }
     const b: Bullet = {
@@ -1790,6 +2318,8 @@ export class GameEngine {
       home: null,
       ability: "seek",
       hits: 0,
+      fuse: "",
+      mark: 0,
     };
     this.bullets.push(b);
     return b;
@@ -1826,6 +2356,10 @@ export class GameEngine {
   private updateBullets(dt: number) {
     for (const b of this.bullets) {
       if (!b.alive) continue;
+      if (b.spell === "fuse") {
+        this.updateFusion(b, dt);
+        continue;
+      }
       if (b.spell === "void") {
         b.ang += b.speed * dt;
         b.x = this.player.x + Math.cos(b.ang) * b.orbit;
