@@ -7,7 +7,7 @@ import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
-export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft";
+export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft" | "fuse";
 export type SpellStat = "speed" | "damage";
 export type SpellTuneStat = "move" | "reload" | "size" | "dmg";
 export type SpellUpgrades = { speed: number; damage: number };
@@ -60,6 +60,49 @@ export type CraftedSpell = {
   ability: CraftAbility;
 };
 
+export const FUSE_COST = 2000;
+export const CORE_SPELLS = ["ember", "frost", "bolt", "void", "vine", "boom"] as const;
+export type CoreSpell = (typeof CORE_SPELLS)[number];
+export type FusedSpell = {
+  a: CoreSpell;
+  b: CoreSpell;
+  name: string;
+  color: string;
+  blurb: string;
+};
+
+const FUSION_BOOK: Record<string, { name: string; color: string; blurb: string }> = {
+  "bolt+boom": { name: "Thunderclap", color: "#ffbf3a", blurb: "Bolt and a blast together" },
+  "bolt+ember": { name: "Stormember", color: "#ff9a3c", blurb: "Fire that cracks like lightning" },
+  "bolt+frost": { name: "Shattervolt", color: "#c5eaf6", blurb: "Ice lances with a stun trail" },
+  "bolt+vine": { name: "Thundervine", color: "#b6e070", blurb: "Homing wraps and a bolt" },
+  "bolt+void": { name: "Stormhole", color: "#c8a4ff", blurb: "Orbiting void with a bolt" },
+  "boom+ember": { name: "Firecracker", color: "#ff5a2a", blurb: "Blast that leaves a burn" },
+  "boom+frost": { name: "Shatterburst", color: "#eaf8fd", blurb: "Ice explosion, then freeze" },
+  "boom+vine": { name: "Bloomblast", color: "#8fd46a", blurb: "Blast that wraps the ring" },
+  "boom+void": { name: "Collapse", color: "#4a2068", blurb: "Void and a knockback blast" },
+  "ember+frost": { name: "Cinderfrost", color: "#e08a9c", blurb: "Weave fire and a triple ice" },
+  "ember+vine": { name: "Pyrethorn", color: "#c45a48", blurb: "Fire plus wrapping vines" },
+  "ember+void": { name: "Ashorbit", color: "#a85a38", blurb: "Burning void around you" },
+  "frost+vine": { name: "Frostroot", color: "#9ad8c8", blurb: "Ice that roots and slows" },
+  "frost+void": { name: "Rimevoid", color: "#9aa0ea", blurb: "Cold orbit that holds them" },
+  "vine+void": { name: "Nightbriar", color: "#3d7a6a", blurb: "Void orbit and vine wraps" },
+};
+
+export function isCoreSpell(spell: Spell): spell is CoreSpell {
+  return (CORE_SPELLS as readonly string[]).includes(spell);
+}
+
+export function fusionKey(a: Spell, b: Spell) {
+  return [a, b].sort().join("+");
+}
+
+export function fusionOf(a: Spell, b: Spell): FusedSpell | null {
+  if (!isCoreSpell(a) || !isCoreSpell(b) || a === b) return null;
+  const recipe = FUSION_BOOK[fusionKey(a, b)] ?? { name: "Fused", color: "#e8c070", blurb: "Two spells, one cast" };
+  return { a, b, ...recipe };
+}
+
 export const MAX_SPELL_UP = 20;
 
 export function upgradeCost(level: number) {
@@ -73,6 +116,7 @@ export function spellDamage(spell: Spell, damageUp: number, crafted?: CraftedSpe
   if (spell === "vine") return 12 + damageUp * 2;
   if (spell === "boom") return 100 + damageUp * 4;
   if (spell === "craft") return (crafted?.damage ?? 10) + 5 + damageUp * 2;
+  if (spell === "fuse") return 0;
   return 19 + damageUp * 2;
 }
 
@@ -97,6 +141,7 @@ export type HudState = {
   vineUnlocked: boolean;
   boomUnlocked: boolean;
   crafted: CraftedSpell | null;
+  fused: FusedSpell | null;
   sandbox: boolean;
   max: boolean;
   trinkoo: number;
@@ -316,6 +361,7 @@ function emptyUpgrades(): Record<Spell, SpellUpgrades> {
     vine: { speed: 0, damage: 0 },
     boom: { speed: 0, damage: 0 },
     craft: { speed: 0, damage: 0 },
+    fuse: { speed: 0, damage: 0 },
   };
 }
 
@@ -328,6 +374,7 @@ function emptyTunes(): Record<Spell, SpellTune> {
     vine: { move: 1, reload: 1, size: 1, dmg: 1 },
     boom: { move: 1, reload: 1, size: 1, dmg: 1 },
     craft: { move: 1, reload: 1, size: 1, dmg: 1 },
+    fuse: { move: 1, reload: 1, size: 1, dmg: 1 },
   };
 }
 
@@ -340,6 +387,7 @@ function maxUpgrades(): Record<Spell, SpellUpgrades> {
     vine: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
     boom: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
     craft: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
+    fuse: { speed: MAX_SPELL_UP, damage: MAX_SPELL_UP },
   };
 }
 
@@ -384,6 +432,7 @@ export class GameEngine {
   richRun = false;
   maxRun = false;
   crafted: CraftedSpell | null = null;
+  fused: FusedSpell | null = null;
   trinkoo = 0;
   runTrinkoo = 0;
   ownedRelics: RelicId[] = [];
@@ -468,12 +517,14 @@ export class GameEngine {
         vine: { ...this.upgrades.vine },
         boom: { ...this.upgrades.boom },
         craft: { ...this.upgrades.craft },
+        fuse: { ...this.upgrades.fuse },
       },
       boltUnlocked: this.boltUnlocked,
       voidUnlocked: this.voidUnlocked,
       vineUnlocked: this.vineUnlocked,
       boomUnlocked: this.boomUnlocked,
       crafted: this.crafted ? { ...this.crafted } : null,
+      fused: this.fused ? { ...this.fused } : null,
       sandbox: this.richRun,
       max: this.maxRun,
       trinkoo: this.maxRun ? 999999 : this.trinkoo,
@@ -496,6 +547,7 @@ export class GameEngine {
         vine: { ...this.tunes.vine },
         boom: { ...this.tunes.boom },
         craft: { ...this.tunes.craft },
+        fuse: { ...this.tunes.fuse },
       },
     };
   }
@@ -679,6 +731,7 @@ export class GameEngine {
     if (spell === "vine" && !this.vineUnlocked) return;
     if (spell === "boom" && !this.boomUnlocked) return;
     if (spell === "craft" && !this.crafted) return;
+    if (spell === "fuse" && !this.fused) return;
     this.setSpell(spell);
   }
 
@@ -688,9 +741,33 @@ export class GameEngine {
     if (spell === "vine" && !this.vineUnlocked) return;
     if (spell === "boom" && !this.boomUnlocked) return;
     if (spell === "craft" && !this.crafted) return;
+    if (spell === "fuse" && !this.fused) return;
     if (this.spell === spell) return;
     this.spell = spell;
     this.emit();
+  }
+
+  fuseSpells(a: Spell, b: Spell): "poor" | "locked" | "same" | "ok" {
+    const recipe = fusionOf(a, b);
+    if (!recipe) return "same";
+    if (!this.spellReady(a) || !this.spellReady(b)) return "locked";
+    if (this.gold < FUSE_COST) return "poor";
+    this.gold -= FUSE_COST;
+    this.fused = recipe;
+    this.spell = "fuse";
+    this.audio.pickup();
+    this.floatAt(this.player.x, this.player.y - 40, recipe.name, recipe.color);
+    this.emit();
+    return "ok";
+  }
+
+  private spellReady(spell: Spell) {
+    if (spell === "bolt") return this.boltUnlocked;
+    if (spell === "void") return this.voidUnlocked;
+    if (spell === "vine") return this.vineUnlocked;
+    if (spell === "boom") return this.boomUnlocked;
+    if (spell === "ember" || spell === "frost") return true;
+    return false;
   }
 
   openWheel() {
@@ -803,6 +880,7 @@ export class GameEngine {
 
   upgradeSpell(spell: Spell, stat: SpellStat): boolean {
     if (this.richRun) return false;
+    if (spell === "fuse" || spell === "craft") return false;
     if (spell === "bolt" && !this.boltUnlocked) return false;
     if (spell === "void" && !this.voidUnlocked) return false;
     if (spell === "vine" && !this.vineUnlocked) return false;
@@ -933,6 +1011,9 @@ export class GameEngine {
   }
 
   private dmgOf(spell: Spell) {
+    if (spell === "fuse" && this.fused) {
+      return (this.dmgOf(this.fused.a) + this.dmgOf(this.fused.b)) * this.tuneOf("fuse").dmg;
+    }
     return spellDamage(spell, this.upgrades[spell].damage, this.crafted) * this.tuneOf(spell).dmg;
   }
 
@@ -1047,6 +1128,7 @@ export class GameEngine {
     this.vineUnlocked = false;
     this.boomUnlocked = false;
     this.crafted = null;
+    this.fused = null;
     this.spell = "ember";
     this.wave = 0;
     this.toSpawn = 0;
@@ -1276,6 +1358,7 @@ export class GameEngine {
     if (this.input.has("Digit4") || this.input.has("Numpad4")) this.chooseSpell("void");
     if (this.input.has("Digit5") || this.input.has("Numpad5")) this.chooseSpell("vine");
     if (this.input.has("Digit6") || this.input.has("Numpad6")) this.chooseSpell("boom");
+    if (this.input.has("Digit7") || this.input.has("Numpad7")) this.chooseSpell("fuse");
   }
 
   private aimFrom(actions: Actions) {
@@ -1335,28 +1418,46 @@ export class GameEngine {
     if (this.spell === "vine" && !this.vineUnlocked) return;
     if (this.spell === "boom" && !this.boomUnlocked) return;
     if (this.spell === "craft" && !this.crafted) return;
+    if (this.spell === "fuse" && !this.fused) return;
     const speedUp = this.upgrades[this.spell].speed;
     const baseCd =
-      this.spell === "craft" && this.crafted
-        ? this.crafted.cooldown
-        : this.spell === "bolt"
-          ? BOLT_CD * (this.hasRelic("stormquill") ? 0.65 : 1)
-          : this.spell === "void"
-            ? VOID_CD
-            : this.spell === "boom"
-              ? BOOM_CD * (this.hasRelic("blastcap") ? 0.65 : 1)
-            : FIRE_CD;
+      this.spell === "fuse" && this.fused
+        ? Math.max(this.spellCd(this.fused.a), this.spellCd(this.fused.b)) * 0.85
+        : this.spellCd(this.spell);
     this.fireCd = Math.max(0.05, (baseCd * (1 - speedUp * 0.025)) / this.tuneOf(this.spell).reload);
     this.castCurrent();
     if (this.hasRelic("echoflint") && Math.random() < 0.22) this.castCurrent();
   }
 
+  private spellCd(spell: Spell) {
+    if (spell === "craft" && this.crafted) return this.crafted.cooldown;
+    if (spell === "bolt") return BOLT_CD * (this.hasRelic("stormquill") ? 0.65 : 1);
+    if (spell === "void") return VOID_CD;
+    if (spell === "boom") return BOOM_CD * (this.hasRelic("blastcap") ? 0.65 : 1);
+    return FIRE_CD;
+  }
+
   private castCurrent() {
-    if (this.spell === "void") {
+    const boomish =
+      this.spell === "boom" || (this.spell === "fuse" && (this.fused?.a === "boom" || this.fused?.b === "boom"));
+    if (this.spell === "fuse" && this.fused) {
+      this.castSpell(this.fused.a);
+      this.castSpell(this.fused.b);
+    } else {
+      this.castSpell(this.spell);
+    }
+    this.player.vx -= this.aim.x * (boomish ? 420 : 36);
+    this.player.vy -= this.aim.y * (boomish ? 420 : 36);
+    if (boomish) this.markPlayerKnock(-this.aim.x, -this.aim.y, 0.28);
+    this.trauma = Math.min(1, this.trauma + (boomish ? 0.42 : 0.08));
+  }
+
+  private castSpell(spell: Spell) {
+    if (spell === "void") {
       this.spawnVoid();
-    } else if (this.spell === "boom") {
+    } else if (spell === "boom") {
       this.shootBoom();
-    } else if (this.spell === "craft" && this.crafted) {
+    } else if (spell === "craft" && this.crafted) {
       this.shootCraft(this.crafted);
       if (this.crafted.ability === "dash") {
         this.player.vx += this.aim.x * 280;
@@ -1364,25 +1465,21 @@ export class GameEngine {
         this.markPlayerKnock(this.aim.x, this.aim.y, 0.18);
       }
       if (this.crafted.ability === "veil") this.player.invuln = Math.max(this.player.invuln, 0.35);
-    } else if (this.spell === "frost") {
-      this.spawnShot(this.spell, -16);
-      this.spawnShot(this.spell, 0);
-      this.spawnShot(this.spell, 16);
+    } else if (spell === "frost") {
+      this.spawnShot(spell, -16);
+      this.spawnShot(spell, 0);
+      this.spawnShot(spell, 16);
       this.audio.ice();
-    } else if (this.spell === "bolt") {
-      this.spawnShot(this.spell, 0);
+    } else if (spell === "bolt") {
+      this.spawnShot(spell, 0);
       this.audio.bolt();
-    } else if (this.spell === "vine") {
+    } else if (spell === "vine") {
       this.shootVine();
       this.audio.ice();
-    } else {
-      this.spawnShot(this.spell, 0);
+    } else if (spell === "ember") {
+      this.spawnShot(spell, 0);
       this.audio.fire();
     }
-    this.player.vx -= this.aim.x * (this.spell === "boom" ? 420 : 36);
-    this.player.vy -= this.aim.y * (this.spell === "boom" ? 420 : 36);
-    if (this.spell === "boom") this.markPlayerKnock(-this.aim.x, -this.aim.y, 0.28);
-    this.trauma = Math.min(1, this.trauma + (this.spell === "boom" ? 0.42 : 0.08));
   }
 
   private shootBoom() {

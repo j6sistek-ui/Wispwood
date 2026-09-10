@@ -23,12 +23,14 @@ const idleHud: HudState = {
     vine: { speed: 0, damage: 0 },
     boom: { speed: 0, damage: 0 },
     craft: { speed: 0, damage: 0 },
+    fuse: { speed: 0, damage: 0 },
   },
   boltUnlocked: false,
   voidUnlocked: false,
   vineUnlocked: false,
   boomUnlocked: false,
   crafted: null,
+  fused: null,
   sandbox: false,
   max: false,
   trinkoo: 0,
@@ -48,6 +50,7 @@ const idleHud: HudState = {
     vine: { move: 1, reload: 1, size: 1, dmg: 1 },
     boom: { move: 1, reload: 1, size: 1, dmg: 1 },
     craft: { move: 1, reload: 1, size: 1, dmg: 1 },
+    fuse: { move: 1, reload: 1, size: 1, dmg: 1 },
   },
 };
 

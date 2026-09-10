@@ -1,6 +1,6 @@
 import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
 import type { HudState } from "@/game/engine";
-import { MAX_SPELL_UP, spellDamage, upgradeCost, type SpellTuneStat } from "@/game/engine";
+import { FUSE_COST, isCoreSpell, MAX_SPELL_UP, spellDamage, upgradeCost, type SpellTuneStat } from "@/game/engine";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
 import { rarityTint, wheelChoices, pickLegendary, spellFlavor, WHEEL_RUNES } from "@/game/spell-prompt";
@@ -1214,13 +1214,14 @@ function Pause({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   );
 }
 
-function spellName(spell: Spell, crafted?: CraftedSpell | null) {
+function spellName(spell: Spell, crafted?: CraftedSpell | null, fused?: { name: string } | null) {
   if (spell === "frost") return "Ice";
   if (spell === "bolt") return "Bolt";
   if (spell === "void") return "Void";
   if (spell === "vine") return "Vine";
   if (spell === "boom") return "Explosion";
   if (spell === "craft") return crafted?.name || "Rune";
+  if (spell === "fuse") return fused?.name || "Fused";
   return "Ember";
 }
 
@@ -1391,17 +1392,37 @@ function FortuneWheel({ engine, hud }: { engine: GameEngine | null; hud: HudStat
 }
 
 function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
-  const pages: Spell[] = hud.crafted
-    ? ["ember", "frost", "bolt", "void", "vine", "boom", "craft"]
-    : ["ember", "frost", "bolt", "void", "vine", "boom"];
+  const pages: Spell[] = [
+    "ember",
+    "frost",
+    "bolt",
+    "void",
+    "vine",
+    "boom",
+    ...(hud.fused ? (["fuse"] as const) : []),
+    ...(hud.crafted ? (["craft"] as const) : []),
+  ];
   const [page, setPage] = useState(() => {
     const i = pages.indexOf(hud.spell);
     return i < 0 ? 0 : i;
   });
   const [tuning, setTuning] = useState(false);
+  const [fuseFrom, setFuseFrom] = useState<Spell | null>(null);
   const lastTap = useRef(0);
   const spell = pages[page] ?? "ember";
-  const dmg = Math.round(spellDamage(spell, hud.upgrades[spell].damage, hud.crafted) * (hud.sandbox ? hud.tunes[spell].dmg : 1));
+  const dmg = Math.round(
+    spell === "fuse" && hud.fused
+      ? (spellDamage(hud.fused.a, hud.upgrades[hud.fused.a].damage) +
+          spellDamage(hud.fused.b, hud.upgrades[hud.fused.b].damage)) *
+          (hud.sandbox ? hud.tunes.fuse.dmg : 1)
+      : spellDamage(spell, hud.upgrades[spell].damage, hud.crafted) * (hud.sandbox ? hud.tunes[spell].dmg : 1),
+  );
+
+  useEffect(() => {
+    if (!hud.fused) return;
+    const i = pages.indexOf("fuse");
+    if (i >= 0) setPage(i);
+  }, [hud.fused?.name]);
 
   const flip = (dir: -1 | 1) => {
     const next = page + dir;
@@ -1410,11 +1431,21 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
     setPage(next);
   };
 
+  const unlocked =
+    (spell !== "bolt" || hud.boltUnlocked) &&
+    (spell !== "void" || hud.voidUnlocked) &&
+    (spell !== "vine" || hud.vineUnlocked) &&
+    (spell !== "boom" || hud.boomUnlocked) &&
+    (spell !== "craft" || Boolean(hud.crafted)) &&
+    (spell !== "fuse" || Boolean(hud.fused));
+
   const onPageClick = () => {
-    if (spell === "bolt" && !hud.boltUnlocked) return;
-    if (spell === "void" && !hud.voidUnlocked) return;
-    if (spell === "vine" && !hud.vineUnlocked) return;
-    if (spell === "boom" && !hud.boomUnlocked) return;
+    if (!unlocked) return;
+    if (fuseFrom && isCoreSpell(spell) && spell !== fuseFrom) {
+      engine?.fuseSpells(fuseFrom, spell);
+      setFuseFrom(null);
+      return;
+    }
     const now = performance.now();
     if (now - lastTap.current < 380) {
       lastTap.current = 0;
@@ -1427,31 +1458,39 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
   };
 
   const lines =
-    spell === "craft"
+    spell === "fuse" && hud.fused
       ? [
-          `${hud.crafted?.rarity ?? "common"}`,
+          `${spellName(hud.fused.a)} + ${spellName(hud.fused.b)}`,
           `${dmg} damage`,
-          hud.crafted ? spellFlavor(hud.crafted) : "a bolt",
+          hud.fused.blurb,
         ]
-      : spell === "void" && !hud.voidUnlocked
-        ? ["Locked", "300 gold", "This night"]
-        : spell === "bolt" && !hud.boltUnlocked
-        ? ["Locked", "100 gold", "This night"]
-        : spell === "vine" && !hud.vineUnlocked
-        ? ["Locked", "1777 gold", "This night"]
-        : spell === "boom" && !hud.boomUnlocked
-        ? ["Locked", "2500 gold", "This night"]
-        : spell === "ember"
-          ? [`${dmg} damage`, "Soft weave, pops on turns", "Pops deal little dmg"]
-          : spell === "frost"
-            ? [`${dmg} dmg x3`, "Slows what it hits", "Double-tap to tune"]
-            : spell === "void"
-              ? [`${dmg} damage`, "Orbits you 2s", "2.5s wait"]
-              : spell === "vine"
-                ? [`${dmg} damage`, "Auto-wraps if close", "Homing per wrap"]
-              : spell === "boom"
-                ? [`${dmg} damage`, "Pixel blast knockback", "0.20s wait"]
-              : [`${dmg} damage`, "Yellow stun trail", "1.5s wait"];
+      : fuseFrom && isCoreSpell(spell) && spell !== fuseFrom && unlocked
+        ? ["Fuse with this", `${FUSE_COST} gold`, spellName(fuseFrom)]
+        : spell === "craft"
+        ? [
+            `${hud.crafted?.rarity ?? "common"}`,
+            `${dmg} damage`,
+            hud.crafted ? spellFlavor(hud.crafted) : "a bolt",
+          ]
+        : spell === "void" && !hud.voidUnlocked
+          ? ["Locked", "300 gold", "This night"]
+          : spell === "bolt" && !hud.boltUnlocked
+            ? ["Locked", "100 gold", "This night"]
+            : spell === "vine" && !hud.vineUnlocked
+              ? ["Locked", "1777 gold", "This night"]
+              : spell === "boom" && !hud.boomUnlocked
+                ? ["Locked", "2500 gold", "This night"]
+                : spell === "ember"
+                  ? [`${dmg} damage`, "Soft weave, pops on turns", "Pops deal little dmg"]
+                  : spell === "frost"
+                    ? [`${dmg} dmg x3`, "Slows what it hits", "Double-tap to tune"]
+                    : spell === "void"
+                      ? [`${dmg} damage`, "Orbits you 2s", "2.5s wait"]
+                      : spell === "vine"
+                        ? [`${dmg} damage`, "Auto-wraps if close", "Homing per wrap"]
+                        : spell === "boom"
+                          ? [`${dmg} damage`, "Pixel blast knockback", "0.20s wait"]
+                          : [`${dmg} damage`, "Yellow stun trail", "1.5s wait"];
 
   return (
     <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-bg/80 px-3 py-2 pointer-events-auto">
@@ -1489,11 +1528,13 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
                 <span className="mt-2">
                   {spell === "craft" && hud.crafted ? (
                     <SpellGlyph color={hud.crafted.color} name={hud.crafted.name} />
+                  ) : spell === "fuse" && hud.fused ? (
+                    <SpellGlyph color={hud.fused.color} name={hud.fused.name} />
                   ) : (
                     <CoreGlyph spell={spell} />
                   )}
                 </span>
-                <p className="mt-2 text-pixel">{spellName(spell, hud.crafted)}</p>
+                <p className="mt-2 text-pixel">{spellName(spell, hud.crafted, hud.fused)}</p>
                 {hud.spell === spell ? <p className="mt-2 text-pixel-sm">Prepared</p> : null}
               </div>
               <button
@@ -1511,7 +1552,9 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
             </div>
           )}
         </div>
-        {hud.sandbox ? (
+        {fuseFrom ? (
+          <p className="font-pixel text-[8px] text-gold">Pick another book spell. {FUSE_COST}g</p>
+        ) : hud.sandbox ? (
           <p className="font-pixel text-[8px] text-muted">Double-tap a page to tune. Free.</p>
         ) : (
           <p className="font-pixel text-pixel-sm tabular-nums text-gold">{hud.gold}g</p>
@@ -1520,6 +1563,23 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
           <PixelButton onClick={() => flip(-1)}>Prev</PixelButton>
           <PixelButton onClick={() => flip(1)}>Next</PixelButton>
         </div>
+        {unlocked && isCoreSpell(spell) && !tuning ? (
+          <div className="w-full max-w-xs">
+            {fuseFrom === spell ? (
+              <PixelButton onClick={() => setFuseFrom(null)}>Cancel fuse</PixelButton>
+            ) : (
+              <PixelButton
+                primary
+                onClick={() => {
+                  setTuning(false);
+                  setFuseFrom(spell);
+                }}
+              >
+                {hud.gold < FUSE_COST ? `Need ${FUSE_COST}g` : `Fuse ${FUSE_COST}g`}
+              </PixelButton>
+            )}
+          </div>
+        ) : null}
         {hud.sandbox ? null : spell === "bolt" && !hud.boltUnlocked ? (
           <div className="w-full max-w-xs">
             <PixelButton primary onClick={() => engine?.unlockBolt()}>
