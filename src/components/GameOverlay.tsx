@@ -1,6 +1,7 @@
 import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
 import type { HudState } from "@/game/engine";
-import { FUSE_COST, isCoreSpell, MAX_SPELL_UP, spellDamage, upgradeCost, type SpellTuneStat } from "@/game/engine";
+import { FUSE_COST, fusionKey, isCoreSpell, MAX_SPELL_UP, spellDamage, upgradeCost, type SpellTuneStat } from "@/game/engine";
+import { fusionGlyph, FUSIONS } from "@/game/fusions";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
 import { rarityTint, wheelChoices, pickLegendary, spellFlavor, WHEEL_RUNES } from "@/game/spell-prompt";
@@ -894,6 +895,27 @@ function CoreGlyph({ spell }: { spell: Spell }) {
   );
 }
 
+function FusionGlyph({ fuseKey, color }: { fuseKey: string; color: string }) {
+  const rows = fusionGlyph(fuseKey);
+  const w = rows[0]?.length ?? 9;
+  return (
+    <span className="inline-grid" style={{ gridTemplateColumns: `repeat(${w}, 2px)` }}>
+      {rows.flatMap((row, y) =>
+        [...row].map((ch, x) => (
+          <span
+            key={`${x}-${y}`}
+            style={{
+              width: 2,
+              height: 2,
+              background: ch === "." ? "transparent" : ch === "+" ? "#fff" : ch === "o" ? "#fff4c8" : color,
+            }}
+          />
+        )),
+      )}
+    </span>
+  );
+}
+
 function SpellGlyph({ color, name }: { color: string; name: string }) {
   const rows = glyphFor(name);
   return (
@@ -1414,9 +1436,8 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
   const spell = pages[page] ?? "ember";
   const dmg = Math.round(
     spell === "fuse" && hud.fused
-      ? (spellDamage(hud.fused.a, hud.upgrades[hud.fused.a].damage) +
-          spellDamage(hud.fused.b, hud.upgrades[hud.fused.b].damage)) *
-          (hud.sandbox ? hud.tunes.fuse.dmg : 1)
+      ? ((FUSIONS[fusionKey(hud.fused.a, hud.fused.b)]?.damage ?? 32) + hud.upgrades.fuse.damage * 3) *
+        (hud.sandbox ? hud.tunes.fuse.dmg : 1)
       : spellDamage(spell, hud.upgrades[spell].damage, hud.crafted) * (hud.sandbox ? hud.tunes[spell].dmg : 1),
   );
 
@@ -1531,7 +1552,7 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
                   {spell === "craft" && hud.crafted ? (
                     <SpellGlyph color={hud.crafted.color} name={hud.crafted.name} />
                   ) : spell === "fuse" && hud.fused ? (
-                    <SpellGlyph color={hud.fused.color} name={hud.fused.name} />
+                    <FusionGlyph fuseKey={fusionKey(hud.fused.a, hud.fused.b)} color={hud.fused.color} />
                   ) : (
                     <CoreGlyph spell={spell} />
                   )}

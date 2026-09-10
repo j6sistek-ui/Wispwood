@@ -4,7 +4,7 @@ import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
-import { FUSIONS, drawFusionSigil, fusionGlyph } from "./fusions";
+import { FUSIONS, drawFusionSigil } from "./fusions";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
@@ -1491,10 +1491,10 @@ export class GameEngine {
     b.oy = y;
     b.dirX = dirX;
     b.dirY = dirY;
-    b.ang = Math.atan2(dirY, dirX);
+    b.ang = extra?.ang ?? Math.atan2(dirY, dirX);
     b.dist = 0;
     b.trail = 0;
-    b.hits = 0;
+    b.hits = extra?.hits ?? 0;
     b.mark = 0;
     b.orbit = extra?.orbit ?? 0;
     b.home = extra?.home ?? null;
@@ -1725,7 +1725,6 @@ export class GameEngine {
       if (b.trail >= 0.05) {
         b.trail = 0;
         this.burstSparks(b.x, b.y, 1, Math.random() > 0.5 ? "#f0b8c8" : "#9ad8ea");
-        if (Math.random() > 0.6) this.dropHazard(b.x, b.y, "dust", "#f0b8c8", 22);
       }
     } else if (key === "bolt+ember") {
       if (b.mark >= 0.11 && b.hits < 3) {
@@ -1859,14 +1858,16 @@ export class GameEngine {
 
     b.ttl -= dt;
     if (b.ttl <= 0) {
-      if (key === "boom+ember") this.starfallPop(b);
-      else if (key === "ember+vine") this.briarLash(b);
-      else if (key === "boom+frost") this.glacierCrack(b);
-      else if (key === "boom+void") this.fuseBurst(b, 130 * t.size);
-      else if (key === "frost+void") this.fuseBurst(b, b.r);
-      else if (key === "boom+vine" && b.hits < 3) {
-        this.podHop(b);
-        return;
+      if (b.form !== "shard") {
+        if (key === "boom+ember") this.starfallPop(b);
+        else if (key === "ember+vine") this.briarLash(b);
+        else if (key === "boom+frost") this.glacierCrack(b);
+        else if (key === "boom+void") this.fuseBurst(b, 130 * t.size);
+        else if (key === "frost+void") this.fuseBurst(b, b.r);
+        else if (key === "boom+vine" && b.hits < 3) {
+          this.podHop(b);
+          return;
+        }
       }
       b.alive = false;
       return;
@@ -1883,6 +1884,11 @@ export class GameEngine {
       if (!e.alive) continue;
       if (key === "ember+void" && e.voidIcd > 0) continue;
       if (!circleHit(b.x, b.y, b.r, e.x, e.y, e.r)) continue;
+      if (b.form === "shard") {
+        this.fuseStrike(b, e, b.vx, b.vy);
+        b.alive = false;
+        break;
+      }
       if (key === "ember+vine") {
         this.fuseStrike(b, e, b.vx, b.vy);
         this.briarLash(b);
@@ -1918,7 +1924,7 @@ export class GameEngine {
         this.fuseStrike(b, e, b.vx, b.vy);
         for (let i = 0; i < 4; i++) {
           const a = Math.atan2(b.vy, b.vx) + (i - 1.5) * 0.45;
-          this.spawnFuseShot(key, e.x, e.y, Math.cos(a), Math.sin(a), { ttl: 0.28, r: 6, speed: 520 });
+          this.spawnFuseShot(key, e.x, e.y, Math.cos(a), Math.sin(a), { ttl: 0.28, r: 6, speed: 520, form: "shard" });
         }
         b.alive = false;
         break;
@@ -1937,7 +1943,7 @@ export class GameEngine {
     this.fuseBurst(b, 36 * t.size);
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 + this.animT;
-      this.spawnFuseShot(b.fuse, b.x, b.y, Math.cos(a), Math.sin(a), { ttl: 0.4, r: 7, speed: 560 });
+      this.spawnFuseShot(b.fuse, b.x, b.y, Math.cos(a), Math.sin(a), { ttl: 0.4, r: 7, speed: 560, form: "shard" });
     }
   }
 
@@ -1963,7 +1969,7 @@ export class GameEngine {
     const base = Math.atan2(b.dirY, b.dirX);
     for (let i = 0; i < 7; i++) {
       const a = base + (i - 3) * 0.22;
-      this.spawnFuseShot(b.fuse, b.x, b.y, Math.cos(a), Math.sin(a), { ttl: 0.35, r: 8, speed: 640 });
+      this.spawnFuseShot(b.fuse, b.x, b.y, Math.cos(a), Math.sin(a), { ttl: 0.35, r: 8, speed: 640, form: "shard" });
     }
   }
 
@@ -3867,6 +3873,10 @@ export class GameEngine {
     const ctx = this.ctx;
     for (const b of this.bullets) {
       if (!b.alive) continue;
+      if (b.spell === "fuse") {
+        this.drawFusionShot(b);
+        continue;
+      }
       const ang = Math.atan2(b.vy, b.vx);
       const look = this.shotLook(b);
       if (b.spell === "frost") {
