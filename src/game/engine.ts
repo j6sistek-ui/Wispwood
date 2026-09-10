@@ -7,7 +7,7 @@ import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 import { FUSIONS, drawFusionSigil } from "./fusions";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
 
-export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "dead";
+export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "forge" | "dead";
 export type Spell = "ember" | "frost" | "bolt" | "void" | "vine" | "boom" | "craft" | "fuse";
 export type SpellStat = "speed" | "damage";
 export type SpellTuneStat = "move" | "reload" | "size" | "dmg";
@@ -399,6 +399,7 @@ export class GameEngine {
   private listeners: Array<(h: HudState) => void> = [];
   private bookLatch = false;
   private pauseLatch = false;
+  private forgeLatch = false;
 
   player = { x: ARENA / 2, y: ARENA / 2, hp: 100, maxHp: 100, invuln: 0, face: "down" as Dir, frame: 0, moving: false, vx: 0, vy: 0, knockT: 0, knockX: 0, knockY: 1 };
   private ghosts = new Map<string, { name: string; x: number; y: number; face: Dir; hp: number; frame: number; ttl: number }>();
@@ -688,6 +689,10 @@ export class GameEngine {
       this.closeWheel();
       return;
     }
+    if (this.phase === "forge") {
+      this.closeForge();
+      return;
+    }
     if (this.phase === "playing") {
       this.phase = "paused";
       this.emit();
@@ -769,6 +774,23 @@ export class GameEngine {
     if (this.phase !== "wheel") return;
     this.phase = "playing";
     this.emit();
+  }
+
+  openForge() {
+    if (this.phase !== "playing" && this.phase !== "paused") return;
+    this.phase = "forge";
+    this.emit();
+  }
+
+  closeForge() {
+    if (this.phase !== "forge") return;
+    this.phase = "playing";
+    this.emit();
+  }
+
+  toggleForge() {
+    if (this.phase === "forge") this.closeForge();
+    else this.openForge();
   }
 
   spinWheel(): "poor" | "miss" | "craft" | "jackpot" {
@@ -1338,9 +1360,14 @@ export class GameEngine {
     const pauseNow = this.input.has("Escape") || this.input.has("KeyP");
     if (pauseNow && !this.pauseLatch) {
       if (this.phase === "book") this.closeBook();
+      else if (this.phase === "forge") this.closeForge();
       else if (this.phase === "playing" || this.phase === "paused") this.togglePause();
     }
     this.pauseLatch = pauseNow;
+
+    const forgeNow = this.input.has("KeyG");
+    if (forgeNow && !this.forgeLatch) this.toggleForge();
+    this.forgeLatch = forgeNow;
 
     if (this.input.has("Digit1") || this.input.has("Numpad1")) this.chooseSpell("ember");
     if (this.input.has("Digit2") || this.input.has("Numpad2")) this.chooseSpell("frost");
@@ -3664,7 +3691,7 @@ export class GameEngine {
       for (const e of this.enemies) {
         if (e.alive) drawables.push({ y: e.y, draw: () => this.drawEnemy(e) });
       }
-      if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel") {
+      if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel" || this.phase === "forge") {
         drawables.push({ y: this.player.y, draw: () => this.drawPlayer() });
         for (const g of this.ghosts.values()) {
           drawables.push({ y: g.y, draw: () => this.drawGhost(g) });
@@ -3676,7 +3703,7 @@ export class GameEngine {
       this.drawBlasts();
       this.drawBossShots();
       this.drawFx();
-      if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel") this.drawLight();
+      if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel" || this.phase === "forge") this.drawLight();
     }
     ctx.restore();
   }

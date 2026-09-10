@@ -112,6 +112,7 @@ export function GameOverlay({ engine, hud }: Props) {
       {hud.phase === "paused" ? <Pause engine={engine} hud={hud} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
       {hud.phase === "wheel" ? <FortuneWheel engine={engine} hud={hud} /> : null}
+      {hud.phase === "forge" ? <Forge engine={engine} /> : null}
       {hud.phase === "dead" ? <Dead engine={engine} hud={hud} /> : null}
       {spawnOpen && hud.sandbox && (hud.phase === "playing" || hud.phase === "paused") ? (
         <SpawnMenu engine={engine} hud={hud} onClose={() => setSpawnOpen(false)} />
@@ -191,7 +192,7 @@ function Hud({
         </p>
       ) : null}
 
-      <div className="pointer-events-auto mx-auto mt-2 flex justify-center gap-2" data-ui>
+      <div className="pointer-events-auto mx-auto mt-2 flex max-w-sm flex-wrap justify-center gap-2" data-ui>
         <button
           type="button"
           data-ui
@@ -217,6 +218,15 @@ function Hud({
         >
           Wheel
           <span className="text-gold">100g</span>
+        </button>
+        <button
+          type="button"
+          data-ui
+          onClick={() => engine?.toggleForge()}
+          className="flex h-10 min-w-[5.5rem] items-center justify-center gap-1.5 border-2 border-[#c45a48] bg-bg px-3 font-pixel text-[9px] text-fg"
+        >
+          Forge
+          <span className="text-[#e08a3c]">Brann</span>
         </button>
         {hud.sandbox ? (
           <button
