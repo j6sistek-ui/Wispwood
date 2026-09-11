@@ -1063,6 +1063,14 @@ export class GameEngine {
     this.persist();
   }
 
+  private grantForgeDrop(x: number, y: number) {
+    const piece = rollForgePiece();
+    this.forgeBag[piece.id] = (this.forgeBag[piece.id] ?? 0) + 1;
+    this.floatAt(x, y - 48, piece.name, piece.color);
+    this.audio.pickup();
+    this.persist();
+  }
+
 
   nudgePlayer(dx: number, dy: number) {
     this.player.x = clamp(this.player.x + dx, 80, ARENA - 80);

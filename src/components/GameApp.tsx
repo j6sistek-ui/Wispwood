@@ -37,6 +37,7 @@ const idleHud: HudState = {
   runTrinkoo: 0,
   ownedRelics: [],
   equipped: [null, null, null],
+  forgeBag: {},
   sandboxPlaying: false,
   sandboxEdit: 0,
   sandboxDeck: [{ count: 0, label: "Wave 1 empty" }],

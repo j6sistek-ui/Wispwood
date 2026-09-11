@@ -113,7 +113,7 @@ export function GameOverlay({ engine, hud }: Props) {
       {hud.phase === "paused" ? <Pause engine={engine} hud={hud} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
       {hud.phase === "wheel" ? <FortuneWheel engine={engine} hud={hud} /> : null}
-      {hud.phase === "forge" ? <Forge engine={engine} /> : null}
+      {hud.phase === "forge" ? <Forge engine={engine} hud={hud} /> : null}
       {hud.phase === "dead" ? <Dead engine={engine} hud={hud} /> : null}
       {spawnOpen && hud.sandbox && (hud.phase === "playing" || hud.phase === "paused") ? (
         <SpawnMenu engine={engine} hud={hud} onClose={() => setSpawnOpen(false)} />
@@ -1293,13 +1293,14 @@ const ANVIL_PALETTE: Record<string, string> = {
   I: "#8a9090",
 };
 
-function Forge({ engine }: { engine: GameEngine | null }) {
+function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   const [tab, setTab] = useState<ForgeKind>("ore");
   const [picked, setPicked] = useState<Partial<Record<ForgeKind, ForgePiece>>>({});
   const pieces = FORGE_CATALOG[tab];
   const ore = picked.ore;
   const crystal = picked.crystal;
   const hammer = picked.hammer;
+  const ownedCount = Object.values(hud.forgeBag).reduce((a, n) => a + n, 0);
 
   return (
     <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-bg/80 px-3 py-4 pointer-events-auto">
@@ -1316,6 +1317,7 @@ function Forge({ engine }: { engine: GameEngine | null }) {
         <div className="flex justify-center">
           <PixelSprite rows={ANVIL_ROWS} palette={ANVIL_PALETTE} px={4} />
         </div>
+        <p className="text-center font-pixel text-[8px] text-[#8a6a4a]">{ownedCount} in the bag. Buff wisps drop more.</p>
         <div className="grid grid-cols-3 gap-2">
           {(
             [
@@ -1343,23 +1345,28 @@ function Forge({ engine }: { engine: GameEngine | null }) {
         </div>
         <div className="max-h-[32vh] overflow-y-auto overscroll-contain border-2 border-[#5a4030] bg-[#1c1612] p-1">
           {pieces.map((p) => {
+            const have = hud.forgeBag[p.id] ?? 0;
             const on = picked[tab]?.id === p.id;
             return (
               <button
                 key={p.id}
                 type="button"
                 data-ui
-                onClick={() => setPicked((cur) => ({ ...cur, [tab]: p }))}
-                className="mb-1 flex w-full items-center gap-2 border border-[#3a2a22] bg-[#16110d] px-2 py-1.5 text-left last:mb-0"
+                disabled={have <= 0}
+                onClick={() => have > 0 && setPicked((cur) => ({ ...cur, [tab]: p }))}
+                className="mb-1 flex w-full items-center gap-2 border border-[#3a2a22] bg-[#16110d] px-2 py-1.5 text-left last:mb-0 disabled:opacity-40"
                 style={{ outline: on ? `2px solid ${p.color}` : undefined }}
               >
                 <span className="h-3 w-3 shrink-0 border border-[#5a4030]" style={{ background: p.color }} />
-                <span className="min-w-0">
-                  <span className="block font-pixel text-[9px]" style={{ color: p.color }}>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-pixel text-[9px]" style={{ color: have ? p.color : "#5a5a5a" }}>
                     {p.name}
                   </span>
-                  <span className="mt-0.5 block font-pixel text-[7px] leading-relaxed text-muted">{p.blurb}</span>
+                  <span className="mt-0.5 block font-pixel text-[7px] leading-relaxed text-muted">
+                    {have > 0 ? p.blurb : "Not found"}
+                  </span>
                 </span>
+                <span className="font-pixel text-[8px] text-[#e8c070]">{have > 0 ? `x${have}` : "—"}</span>
               </button>
             );
           })}
