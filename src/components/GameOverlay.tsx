@@ -707,6 +707,7 @@ function SpawnMenu({
   const [tab, setTab] = useState<"foes" | "waves" | "relics" | "runes" | "you">("foes");
   const foes = [
     { kind: "wisp" as const, label: "Wisp" },
+    { kind: "buffwisp" as const, label: "Buff wisp" },
     { kind: "runner" as const, label: "Runner" },
     { kind: "brute" as const, label: "Brute" },
     { kind: "elite" as const, label: "Elite" },

@@ -107,7 +107,7 @@ export function spellDamage(spell: Spell, damageUp: number, crafted?: CraftedSpe
   return 19 + damageUp * 2;
 }
 
-export type FoeKind = "wisp" | "runner" | "brute" | "elite";
+export type FoeKind = "wisp" | "runner" | "brute" | "elite" | "buffwisp";
 export type SandboxUnit = { kind: FoeKind } | { boss: number };
 
 export type HudState = {
@@ -144,7 +144,7 @@ export type HudState = {
 };
 
 type Dir = "down" | "left" | "right" | "up";
-type EnemyKind = "wisp" | "runner" | "brute" | "elite" | "boss";
+type EnemyKind = "wisp" | "runner" | "brute" | "elite" | "buffwisp" | "boss";
 
 type Bullet = {
   alive: boolean;
@@ -305,6 +305,7 @@ function sandboxWaveLabel(units: SandboxUnit[], index: number) {
 }
 
 function goldFor(kind: EnemyKind) {
+  if (kind === "buffwisp") return 48;
   if (kind === "elite") return 35;
   if (kind === "brute") return 16;
   if (kind === "runner") return 7;
@@ -312,6 +313,7 @@ function goldFor(kind: EnemyKind) {
 }
 
 function coinCountFor(kind: EnemyKind) {
+  if (kind === "buffwisp") return 12;
   if (kind === "elite") return 9;
   if (kind === "brute") return 5;
   if (kind === "runner") return 3;
@@ -1174,7 +1176,7 @@ export class GameEngine {
     this.cam.y = this.player.y - this.view.h / 2;
   }
 
-  spawnFoe(kind: "wisp" | "runner" | "brute" | "elite") {
+  spawnFoe(kind: FoeKind) {
     if (this.phase !== "playing" && this.phase !== "paused") return;
     this.spawnEnemy(kind);
   }
@@ -1297,11 +1299,14 @@ export class GameEngine {
     }
     this.toSpawn = 5 + this.wave * 3;
     this.floatAt(this.player.x, this.player.y - 40, `Night ${this.wave}`);
-    if (this.wave > 0 && this.wave % 5 === 0) {
-      const id = (Math.floor(this.wave / 5) - 1) % BOSSES.length;
+    if (this.wave > 0 && this.wave % 10 === 0) {
+      const id = (Math.floor(this.wave / 10) - 1) % BOSSES.length;
       this.placeBoss(id);
       this.toSpawn = 8;
       this.floatAt(this.player.x, this.player.y - 72, `BOSS ${BOSSES[id]!.name}`, BOSSES[id]!.color2);
+    } else if (this.wave % 10 === 5) {
+      this.spawnEnemy("buffwisp");
+      this.floatAt(this.player.x, this.player.y - 72, "BUFF WISP", "#e8c070");
     }
     this.emit();
   }
@@ -2764,7 +2769,7 @@ export class GameEngine {
 
   private killEnemy(e: Enemy) {
     e.alive = false;
-    const pts = e.kind === "boss" ? 400 : e.kind === "elite" ? 80 : e.kind === "brute" ? 40 : e.kind === "runner" ? 18 : 12;
+    const pts = e.kind === "boss" ? 400 : e.kind === "buffwisp" ? 120 : e.kind === "elite" ? 80 : e.kind === "brute" ? 40 : e.kind === "runner" ? 18 : 12;
     this.score += pts;
     if (this.score > this.best) {
       this.best = this.score;
@@ -2841,7 +2846,7 @@ export class GameEngine {
     else this.spawnEnemy(unit.kind);
   }
 
-  private spawnEnemy(kind?: "wisp" | "runner" | "brute" | "elite") {
+  private spawnEnemy(kind?: FoeKind) {
     const e = this.allocEnemy();
     const edge = Math.floor(Math.random() * 4);
     const t = Math.random();
@@ -2877,7 +2882,11 @@ export class GameEngine {
     e.kvx = 0;
     e.kvy = 0;
     e.bossId = -1;
-    if (e.kind === "elite") {
+    if (e.kind === "buffwisp") {
+      e.r = 38;
+      e.speed = 70 + this.wave * 3;
+      e.maxHp = 140 + this.wave * 18;
+    } else if (e.kind === "elite") {
       e.r = 26;
       e.speed = 90 + this.wave * 3;
       e.maxHp = 72 + this.wave * 14;
@@ -2896,6 +2905,7 @@ export class GameEngine {
     }
     e.hp = e.maxHp;
     if (e.kind === "elite") this.floatAt(e.x, e.y - 28, "Nightbound");
+    if (e.kind === "buffwisp") this.floatAt(e.x, e.y - 36, "Buff Wisp", "#e8c070");
   }
 
   private placeBoss(id: number) {
@@ -2910,7 +2920,7 @@ export class GameEngine {
     e.y = clamp(this.player.y + Math.sin(ang) * spread, 90, ARENA - 90);
     e.r = def.r;
     e.speed = def.speed;
-    e.maxHp = def.hp + Math.max(0, this.wave - 5) * 40;
+    e.maxHp = def.hp + Math.max(0, this.wave - 10) * 40;
     e.hp = e.maxHp;
     e.flash = 0;
     e.frame = 0;
@@ -3058,7 +3068,7 @@ export class GameEngine {
         e.y = r.y;
       }
       if (e.stun <= 0 && this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, this.bodyR())) {
-        const hit = e.kind === "elite" ? 22 : e.kind === "brute" ? 18 : e.kind === "runner" ? 10 : 8;
+        const hit = e.kind === "buffwisp" ? 16 : e.kind === "elite" ? 22 : e.kind === "brute" ? 18 : e.kind === "runner" ? 10 : 8;
         this.hurtLantern(hit, px - e.x, py - e.y, 220);
       }
     }
@@ -3768,8 +3778,9 @@ export class GameEngine {
       return;
     }
     const img = this.assets!.wisp[Math.floor(e.frame) % 4]!;
-    const s = e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
+    const s = e.kind === "buffwisp" ? 118 : e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
     if (e.flash > 0) this.ctx.filter = "brightness(2.4)";
+    else if (e.kind === "buffwisp") this.ctx.filter = "saturate(1.8) brightness(1.25) hue-rotate(-8deg)";
     else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
     else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
     else if (e.freeze > 0) this.ctx.filter = "hue-rotate(160deg) saturate(0.85) brightness(1.15)";
