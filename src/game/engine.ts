@@ -333,7 +333,7 @@ function sandboxWaveLabel(units: SandboxUnit[], index: number) {
 }
 
 function goldFor(kind: EnemyKind) {
-  if (kind === "buffwisp") return 48;
+  if (kind === "buffwisp") return 200;
   if (kind === "elite") return 35;
   if (kind === "brute") return 16;
   if (kind === "runner") return 7;
@@ -341,7 +341,7 @@ function goldFor(kind: EnemyKind) {
 }
 
 function coinCountFor(kind: EnemyKind) {
-  if (kind === "buffwisp") return 12;
+  if (kind === "buffwisp") return 20;
   if (kind === "elite") return 9;
   if (kind === "brute") return 5;
   if (kind === "runner") return 3;
