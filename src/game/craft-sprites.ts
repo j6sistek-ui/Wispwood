@@ -183,12 +183,12 @@ export const CORE_GLYPHS: Record<string, string[]> = {
 };
 
 export const CORE_COLOR: Record<string, string> = {
-  ember: "#e08a3c",
-  frost: "#9ad8ea",
-  bolt: "#f0d24a",
-  void: "#7a48b8",
-  vine: "#6fbf6a",
-  boom: "#ff9a3c",
+  ember: "#ff7a32",
+  frost: "#7ef6ff",
+  bolt: "#ffe94a",
+  void: "#d070ff",
+  vine: "#4dff78",
+  boom: "#ff5a22",
 };
 
 export function coreGlyph(spell: string): string[] {
@@ -211,24 +211,24 @@ export function drawCoreSigil(
   let sy = 1;
   let pixel = 4;
   if (spell === "ember") {
-    sx = sy = 1.15 + Math.sin(t * 14) * 0.12;
-    rot += Math.sin(t * 9) * 0.15;
+    sx = sy = 1.28 + Math.sin(t * 16) * 0.18;
+    rot += Math.sin(t * 11) * 0.22;
   } else if (spell === "frost") {
-    rot += t * 4;
-    sx = sy = 1.05;
+    rot += t * 6;
+    sx = sy = 1.18;
   } else if (spell === "bolt") {
-    sx = 1.8;
-    sy = 0.85;
+    sx = 2.1;
+    sy = 0.78;
     pixel = 3;
   } else if (spell === "void") {
-    rot += t * 8;
-    sx = sy = 2.2 + Math.sin(t * 10) * 0.12;
+    rot += t * 10;
+    sx = sy = 2.4 + Math.sin(t * 12) * 0.16;
     pixel = 5;
   } else if (spell === "vine") {
-    rot += Math.sin(t * 10) * 0.45;
-    sx = 1.25;
+    rot += Math.sin(t * 12) * 0.55;
+    sx = 1.4;
   } else if (spell === "boom") {
-    sx = sy = 1.4 + Math.abs(Math.sin(t * 8)) * 0.35;
+    sx = sy = 1.55 + Math.abs(Math.sin(t * 10)) * 0.45;
   }
   drawPixelGlyph(ctx, rows, color, x, y, rot, sx * scale, sy * scale, Math.max(2, pixel * scale));
 }

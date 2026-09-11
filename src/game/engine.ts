@@ -295,8 +295,8 @@ const BOLT_SPEED = 1280;
 const MAX_BULLETS = 140;
 const MAX_ENEMIES = 64;
 const MAX_PICKUPS = 16;
-const MAX_SPARKS = 72;
-const MAX_ARCS = 18;
+const MAX_SPARKS = 160;
+const MAX_ARCS = 28;
 const MAX_HAZARDS = 64;
 const MAX_BOSS_SHOTS = 48;
 
@@ -374,6 +374,17 @@ export const OMEN_BLURB: Record<NightOmen, string> = {
 function omenForNight(wave: number): NightOmen {
   if (wave <= 1) return "calm";
   return OMEN_CYCLE[(wave - 2) % OMEN_CYCLE.length]!;
+}
+
+function spellTint(spell: Spell) {
+  if (spell === "frost") return "#7ef6ff";
+  if (spell === "bolt") return "#ffe94a";
+  if (spell === "void") return "#d070ff";
+  if (spell === "vine") return "#4dff78";
+  if (spell === "boom") return "#ff5a22";
+  if (spell === "craft") return "#ff8ad8";
+  if (spell === "fuse") return "#ffd36a";
+  return "#ff7a32";
 }
 
 function circleHit(ax: number, ay: number, ar: number, bx: number, by: number, br: number) {
@@ -1208,9 +1219,10 @@ export class GameEngine {
               e.burn = Math.max(e.burn, 2.4);
             }
           }
-          this.burstSparks(art.x, art.y, 16, art.color);
+          this.burstSparks(art.x, art.y, 28, art.color);
+          this.burstSparks(art.x, art.y, 12, "#fff4c8");
           art.alive = false;
-        }
+        } else if (Math.random() < 0.55) this.burstSparks(art.x, art.y, 1, art.color2);
       } else if (k === "glacier") {
         if (art.phase < 0) continue;
         for (const e of this.enemies) {
@@ -1387,6 +1399,7 @@ export class GameEngine {
       const k = art.kind;
       const x = Math.round(art.x);
       const y = Math.round(art.y);
+      this.drawGlow(x, y, k === "meteor" || k === "beacon" || k === "eclipse" ? 36 : 22, art.color2);
       if (k === "meteor") {
         ctx.fillStyle = art.color;
         ctx.fillRect(x - 8, y - 8, 16, 16);
@@ -2258,7 +2271,9 @@ export class GameEngine {
     this.player.vx -= this.aim.x * (boomish ? 420 : 36);
     this.player.vy -= this.aim.y * (boomish ? 420 : 36);
     if (boomish) this.markPlayerKnock(-this.aim.x, -this.aim.y, 0.28);
-    this.trauma = Math.min(1, this.trauma + (boomish ? 0.42 : 0.08));
+    this.trauma = Math.min(1, this.trauma + (boomish ? 0.48 : 0.12));
+    const tint = this.spell === "fuse" && this.fused ? this.fused.color : this.spell === "craft" && this.crafted ? this.crafted.color : spellTint(this.spell);
+    this.burstSparks(this.player.x + this.aim.x * 22, this.player.y + this.aim.y * 18, boomish ? 14 : 7, tint);
   }
 
   private castSpell(spell: Spell) {
@@ -3051,13 +3066,18 @@ export class GameEngine {
     b.ability = "seek";
     b.hits = 0;
     b.form = "single";
-    this.burstSparks(b.x, b.y, 3, spell === "frost" ? "#c5eaf6" : spell === "bolt" ? "#f0d24a" : spell === "vine" ? "#6fbf6a" : "#e8c070");
-    if (spell === "frost") this.spawnFlake(b.x, b.y, true);
-    if (spell === "vine") this.burstSparks(b.x, b.y, 1, "#3d7a45");
+    this.burstSparks(b.x, b.y, 7, spellTint(spell));
+    if (spell === "frost") {
+      this.spawnFlake(b.x, b.y, true);
+      this.spawnFlake(b.x + px * 6, b.y + py * 6, true);
+    }
+    if (spell === "vine") this.burstSparks(b.x, b.y, 4, "#b8ff9a");
     if (spell === "bolt") {
       this.spawnArc(b.x, b.y);
-      this.burstSparks(b.x, b.y, 2, "#ffe27a");
+      this.spawnArc(b.x + this.aim.x * 18, b.y + this.aim.y * 18);
+      this.burstSparks(b.x, b.y, 6, "#fff4c8");
     }
+    if (spell === "ember") this.burstSparks(b.x, b.y, 5, "#ffd36a");
   }
 
   private shootVine() {
@@ -3364,7 +3384,7 @@ export class GameEngine {
 
   private hurtEnemy(e: Enemy, dmg: number, vx: number, vy: number, spell: Spell, raw = false) {
     e.hp -= dmg;
-    e.flash = 0.08;
+    e.flash = 0.16;
     if (!raw) {
     if (spell === "ember") e.burn = this.hasRelic("emberheart") ? 5 : 3;
     if (spell === "craft" && this.crafted?.extra === "burn") e.burn = this.hasRelic("emberheart") ? 5 : 3;
@@ -3389,10 +3409,12 @@ export class GameEngine {
     e.knockT = spell === "void" ? 0.4 : spell === "boom" ? 0.12 : 0.18;
     this.spawnKnockDust(e.x, e.y, nx, ny, spell === "boom" ? 4 : 6);
     if (spell === "void") e.stun = Math.max(e.stun, 0.35);
-    this.hitstop = 0.035;
-    this.trauma = Math.min(1, this.trauma + 0.18);
+    this.hitstop = 0.05;
+    this.trauma = Math.min(1, this.trauma + 0.26);
     this.audio.hit();
     this.spawnBurst(e.x, e.y, spell);
+    this.burstSparks(e.x, e.y, spell === "boom" ? 16 : 10, spellTint(spell));
+    this.floatAt(e.x, e.y - 14, `${dmg}`, spellTint(spell));
     if (e.hp <= 0) this.killEnemy(e);
   }
 
@@ -4313,16 +4335,16 @@ export class GameEngine {
       const s = this.allocSpark();
       if (!s) return;
       const a = Math.random() * Math.PI * 2;
-      const sp = 40 + Math.random() * 90;
+      const sp = 80 + Math.random() * 170;
       s.alive = true;
       s.x = x;
       s.y = y;
       s.vx = Math.cos(a) * sp;
       s.vy = Math.sin(a) * sp;
-      s.ttl = 0.28 + Math.random() * 0.2;
+      s.ttl = 0.22 + Math.random() * 0.28;
       s.max = s.ttl;
-      s.size = 2 + Math.random() * 3;
-      s.color = color;
+      s.size = 2.4 + Math.random() * 4.2;
+      s.color = i % 3 === 0 ? "#fff4c8" : color;
       s.kind = "dot";
     }
   }
@@ -4623,7 +4645,7 @@ export class GameEngine {
     }
     const img = this.assets!.wisp[Math.floor(e.frame) % 4]!;
     const s = e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
-    if (e.flash > 0) this.ctx.filter = "brightness(2.4)";
+    if (e.flash > 0) this.ctx.filter = "brightness(3.4) saturate(1.6)";
     else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
     else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
     else if (e.freeze > 0) this.ctx.filter = "hue-rotate(160deg) saturate(0.85) brightness(1.15)";
@@ -4639,7 +4661,7 @@ export class GameEngine {
   }
 
   private drawBuffWispEnemy(e: Enemy) {
-    if (e.flash > 0) this.ctx.filter = "brightness(2.4)";
+    if (e.flash > 0) this.ctx.filter = "brightness(3.4) saturate(1.6)";
     else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
     else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
     else if (e.freeze > 0) this.ctx.filter = "hue-rotate(160deg) saturate(0.85) brightness(1.15)";
@@ -4757,8 +4779,10 @@ export class GameEngine {
 
   private drawPickup(p: Pickup) {
     const img = this.assets!.pickup[Math.floor(p.frame) % 4]!;
-    const bob = Math.sin(this.animT * 4 + p.x) * 3;
-    this.ctx.drawImage(img, p.x - 16, p.y - 20 + bob, 32, 32);
+    const bob = Math.sin(this.animT * 6 + p.x) * 4;
+    const pulse = 1 + Math.sin(this.animT * 8) * 0.12;
+    this.drawGlow(p.x, p.y - 8 + bob, 22, "#ffe14a");
+    this.ctx.drawImage(img, p.x - 16 * pulse, p.y - 20 + bob, 32 * pulse, 32 * pulse);
   }
 
   private shotLook(b: Bullet) {
@@ -4772,11 +4796,25 @@ export class GameEngine {
     for (const b of this.bullets) {
       if (!b.alive) continue;
       if (b.spell === "fuse") {
+        this.drawGlow(b.x, b.y, Math.max(18, b.r * 2.4), b.color || "#ffd36a");
         this.drawFusionShot(b);
         continue;
       }
       const ang = Math.atan2(b.vy, b.vx);
       const look = this.shotLook(b);
+      const glow =
+        b.spell === "frost"
+          ? "#7ef6ff"
+          : b.spell === "bolt"
+            ? "#ffe94a"
+            : b.spell === "void"
+              ? "#d070ff"
+              : b.spell === "vine"
+                ? "#4dff78"
+                : b.spell === "craft"
+                  ? b.color
+                  : "#ff7a32";
+      this.drawGlow(b.x, b.y, Math.max(16, b.r * (b.spell === "void" ? 1.8 : 2.6)), glow);
       if (b.spell === "frost") {
         drawCoreSigil(this.ctx, "frost", b.x, b.y, ang, this.animT, look);
         continue;
@@ -4935,6 +4973,8 @@ export class GameEngine {
     const ctx = this.ctx;
     const ang = Math.atan2(dirY, dirX);
     const fade = 1 - k;
+    this.drawGlow(x, y, radius * 0.95, "#ff9a3c");
+    this.drawGlow(x, y, radius * 0.38, "#fff4c8");
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(ang);
@@ -5015,13 +5055,12 @@ export class GameEngine {
       if (!b.alive) continue;
       ctx.globalAlpha = 1 - b.t / 0.28;
       const hit = 42 + b.t * 70;
-      const tint =
-        b.spell === "frost" ? "#9ad8ea" : b.spell === "bolt" ? "#f0d24a" : b.spell === "vine" ? "#6fbf6a" : b.spell === "void" ? "#9a7ab8" : undefined;
+      const tint = spellTint(b.spell);
       this.drawTinted(this.impactFrame(b.t * 8), b.x, b.y, hit, hit, b.t * 6, tint);
       if (b.spell === "boom") this.drawBoomBurst(b.x, b.y, 28 + b.t * 140);
       ctx.globalAlpha = 1;
     }
-    ctx.font = "8px \"Press Start 2P\", monospace";
+    ctx.font = "10px \"Press Start 2P\", monospace";
     ctx.textAlign = "center";
     for (const f of this.floaters) {
       if (!f.alive) continue;
@@ -5088,14 +5127,15 @@ export class GameEngine {
     const ctx = this.ctx;
     const px = this.player.x;
     const py = this.player.y;
-    const g = ctx.createRadialGradient(px, py - 8, 30, px, py - 8, 380);
+    const g = ctx.createRadialGradient(px, py - 8, 24, px, py - 8, 420);
     g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(0.42, "rgba(8,10,9,0.18)");
-    g.addColorStop(1, "rgba(8,10,9,0.72)");
+    g.addColorStop(0.5, "rgba(8,10,9,0.08)");
+    g.addColorStop(1, "rgba(8,10,9,0.52)");
     ctx.fillStyle = g;
     ctx.fillRect(this.cam.x - 40, this.cam.y - 40, this.view.w * VIEW_ZOOM + 80, this.view.h * VIEW_ZOOM + 80);
-    const glow = ctx.createRadialGradient(px, py - 6, 4, px, py - 6, 120);
-    glow.addColorStop(0, "rgba(232, 196, 120, 0.2)");
+    const glow = ctx.createRadialGradient(px, py - 6, 4, px, py - 6, 150);
+    glow.addColorStop(0, "rgba(255, 226, 122, 0.42)");
+    glow.addColorStop(0.4, "rgba(255, 154, 60, 0.16)");
     glow.addColorStop(1, "rgba(232, 196, 120, 0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
