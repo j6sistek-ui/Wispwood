@@ -914,73 +914,70 @@ export class GameEngine {
     const w = this.currentWeapon();
     if (!w) return;
     this.swingCd = w.cooldown;
-    this.swingDur = 0.3 + w.arc * 0.08;
+    this.swingDur = w.stance === "maul" ? 0.28 : w.stance === "spear" ? 0.2 : 0.22;
     this.swingT = this.swingDur;
     this.swingAng = Math.atan2(this.aim.y, this.aim.x);
     this.swingHit.clear();
     this.audio.fire();
-    this.player.vx -= this.aim.x * 12;
-    this.player.vy -= this.aim.y * 12;
-    this.trauma = Math.min(1, this.trauma + 0.04);
-    const hx = this.player.x + this.aim.x * w.reach * 0.7;
-    const hy = this.player.y + this.aim.y * w.reach * 0.7;
-    this.burstSparks(hx, hy, 4, w.color2);
+    const lunge = w.stance === "spear" ? 210 : w.stance === "maul" ? 90 : 140;
+    this.player.vx = this.aim.x * lunge;
+    this.player.vy = this.aim.y * lunge;
+    this.trauma = Math.min(1, this.trauma + 0.05);
   }
 
   private swingProgress() {
     if (this.swingT <= 0 || this.swingDur <= 0) return 1;
     const u = 1 - this.swingT / this.swingDur;
-    return 1 - (1 - u) * (1 - u) * (1 - u);
+    return u * u * (3 - 2 * u);
   }
 
   private swingFacing(w: ForgedWeapon, p = this.swingProgress()) {
-    const wind = -w.arc * 0.55;
-    const follow = w.arc * 0.7;
+    const wind = -w.arc * 0.42;
+    const follow = w.arc * 0.48;
     return this.swingAng + wind + (follow - wind) * p;
   }
 
   private tickSwing() {
     const w = this.currentWeapon();
     if (!w) return;
+    const p = this.swingProgress();
+    if (p < 0.28 || p > 0.78) return;
     const dir = this.swingFacing(w);
     const reach = w.reach;
+    let hit = false;
     for (const e of this.enemies) {
       if (!e.alive || this.swingHit.has(e)) continue;
       const dx = e.x - this.player.x;
       const dy = e.y - this.player.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > reach + e.r) continue;
+      if (dist > reach + e.r || dist < 8) continue;
       const rel = Math.atan2(dy, dx) - dir;
       const a = ((rel + Math.PI) % (Math.PI * 2)) - Math.PI;
-      if (Math.abs(a) > 0.55) continue;
+      if (Math.abs(a) > 0.36) continue;
       this.swingHit.add(e);
-      this.hitWithWeapon(e, w, dx, dy);
+      this.hitWithWeapon(e, w);
+      hit = true;
     }
+    if (hit) this.hitstop = Math.max(this.hitstop, w.stance === "maul" ? 0.09 : 0.055);
   }
 
-  private hitWithWeapon(e: Enemy, w: ForgedWeapon, dx: number, dy: number) {
-    const spell: Spell =
-      w.extra === "burn"
-        ? "ember"
-        : w.extra === "slow"
-          ? "frost"
-          : w.extra === "stun"
-            ? "bolt"
-            : w.extra === "wrap"
-              ? "vine"
-              : w.extra === "knock"
-                ? "void"
-                : "ember";
-    this.hurtEnemy(e, w.damage, dx, dy, spell);
-    if (w.extra === "burn") e.burn = Math.max(e.burn, 2.2);
-    if (w.extra === "slow") e.freeze = Math.max(e.freeze, 1.1);
-    if (w.extra === "stun") e.stun = Math.max(e.stun, 0.55);
+  private hitWithWeapon(e: Enemy, w: ForgedWeapon) {
+    const scale = e.kind === "boss" ? 1.5 : e.kind === "buffwisp" ? 1.3 : e.kind === "elite" ? 1.15 : 1;
+    const dmg = Math.round(w.damage * scale);
+    this.hurtEnemy(e, dmg, this.aim.x, this.aim.y, "ember");
+    const shove = w.extra === "knock" ? 160 : w.stance === "maul" ? 90 : 50;
+    const m = Math.hypot(this.aim.x, this.aim.y) || 1;
+    e.kvx = (this.aim.x / m) * shove;
+    e.kvy = (this.aim.y / m) * shove;
+    e.knockT = Math.min(e.knockT, 0.16);
+    if (w.extra === "burn") e.burn = Math.max(e.burn, 2.6);
+    if (w.extra === "slow") e.freeze = Math.max(e.freeze, 1.35);
+    if (w.extra === "stun") e.stun = Math.max(e.stun, 0.7);
     if (w.extra === "wrap") this.wrapEnemy(e);
-    if (w.extra === "leech") this.player.hp = Math.min(this.player.maxHp, this.player.hp + 4);
-    if (w.ore === "goldvein") {
-      this.gold += 1;
-      this.floatAt(e.x, e.y - 20, "+1", "#f0d24a");
-    }
+    if (w.extra === "leech") this.player.hp = Math.min(this.player.maxHp, this.player.hp + 6);
+    const gold = w.ore === "goldvein" ? 6 : 3;
+    this.gold += gold;
+    this.floatAt(e.x, e.y - 20, `+${gold}`, "#f0d24a");
   }
 
   private castWeaponAbility(w: ForgedWeapon) {
@@ -992,7 +989,7 @@ export class GameEngine {
     this.audio.bolt();
     this.floatAt(px, py - 44, ABILITY_LABEL[a], w.color2);
     this.trauma = Math.min(1, this.trauma + 0.16);
-    const dmg = Math.round(w.damage * 1.15);
+    const dmg = Math.round(w.damage * 1.65);
     const tx = clamp(px + ax * 140, 80, ARENA - 80);
     const ty = clamp(py + ay * 140, 80, ARENA - 80);
     if (a === "meteor") {
@@ -1112,8 +1109,10 @@ export class GameEngine {
     if (!e.alive || art.hits.has(e)) return;
     art.hits.add(e);
     this.hurtEnemy(e, art.dmg, e.x - art.x, e.y - art.y, "ember");
-    e.kvx += ((e.x - art.x) / (Math.hypot(e.x - art.x, e.y - art.y) || 1)) * 80 * knock;
-    e.kvy += ((e.y - art.y) / (Math.hypot(e.x - art.x, e.y - art.y) || 1)) * 80 * knock;
+    const m = Math.hypot(e.x - art.x, e.y - art.y) || 1;
+    e.kvx += ((e.x - art.x) / m) * 36 * knock;
+    e.kvy += ((e.y - art.y) / m) * 36 * knock;
+    e.knockT = Math.min(0.2, Math.max(e.knockT, 0.1));
   }
 
   private updateWeaponArts(dt: number) {
