@@ -1308,7 +1308,7 @@ function Forge({ engine }: { engine: GameEngine | null }) {
           <PixelSprite rows={ANVIL_ROWS} palette={ANVIL_PALETTE} px={4} />
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
-          {["Ore", "Rune", "Hammer"].map((slot) => (
+          {["Ore", "Magic crystal", "Hammer"].map((slot) => (
             <div key={slot} className="border-2 border-[#5a4030] bg-[#1c1612] py-3 text-center">
               <p className="font-pixel text-[8px] text-[#8a6a4a]">{slot}</p>
               <p className="mt-2 font-pixel text-[10px] text-muted">—</p>
