@@ -42,6 +42,7 @@ const idleHud: HudState = {
   weapon: null,
   weapons: [],
   abilityReady: true,
+  abilityWait: 0,
   sandboxPlaying: false,
   sandboxEdit: 0,
   sandboxDeck: [{ count: 0, label: "Wave 1 empty" }],

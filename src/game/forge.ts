@@ -46,7 +46,7 @@ export const FORGE_CRYSTALS: ForgePiece[] = [
 
 export const FORGE_HAMMERS: ForgePiece[] = [
   { id: "ember-mallet", kind: "hammer", name: "Ember mallet", color: "#e08a3c", blurb: "Head never cools" },
-  { id: "ice-peen", kind: "hammer", name: "Ice peen", color: "#9ad8ea", blurb: "Rings like a bell" },
+  { id: "ice-peen", kind: "hammer", name: "Ice pick", color: "#9ad8ea", blurb: "Rings like a bell" },
   { id: "storm-hammer", kind: "hammer", name: "Storm hammer", color: "#f0d24a", blurb: "Sparks on the anvil" },
   { id: "void-maul", kind: "hammer", name: "Void maul", color: "#7a48b8", blurb: "Hits, then pulls" },
   { id: "thorn-hammer", kind: "hammer", name: "Thorn hammer", color: "#6fbf6a", blurb: "Handle grows barbs" },
@@ -55,7 +55,7 @@ export const FORGE_HAMMERS: ForgePiece[] = [
   { id: "night-maul", kind: "hammer", name: "Night maul", color: "#4a4c48", blurb: "Works best after dusk" },
   { id: "root-mallet", kind: "hammer", name: "Root mallet", color: "#8a6a38", blurb: "Grown, not made" },
   { id: "bone-hammer", kind: "hammer", name: "Bone hammer", color: "#ecece8", blurb: "Light, and mean" },
-  { id: "moon-peen", kind: "hammer", name: "Moon peen", color: "#d8c4f0", blurb: "Leaves a pale mark" },
+  { id: "moon-peen", kind: "hammer", name: "Moon pick", color: "#d8c4f0", blurb: "Leaves a pale mark" },
   { id: "ash-sledge", kind: "hammer", name: "Ash sledge", color: "#8aa0b8", blurb: "Dust on every strike" },
   { id: "rime-hammer", kind: "hammer", name: "Rime hammer", color: "#c5eaf6", blurb: "Freezes the spark" },
   { id: "bramble-maul", kind: "hammer", name: "Bramble maul", color: "#3d7a45", blurb: "Catches what it hits" },

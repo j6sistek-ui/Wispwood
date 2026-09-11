@@ -143,6 +143,7 @@ export type HudState = {
   weapon: ForgedWeapon | null;
   weapons: ForgedWeapon[];
   abilityReady: boolean;
+  abilityWait: number;
   sandboxPlaying: boolean;
   sandboxEdit: number;
   sandboxDeck: Array<{ count: number; label: string }>;
@@ -431,6 +432,9 @@ export class GameEngine {
   private forgeLatch = false;
   private handsLatch = false;
   private abilityLatch = false;
+  private cycleLatch = false;
+  private muteLatch = false;
+  private heldPause = false;
 
   player = { x: ARENA / 2, y: ARENA / 2, hp: 100, maxHp: 100, invuln: 0, face: "down" as Dir, frame: 0, moving: false, vx: 0, vy: 0, knockT: 0, knockX: 0, knockY: 1 };
   private ghosts = new Map<string, { name: string; x: number; y: number; face: Dir; hp: number; frame: number; ttl: number }>();
@@ -570,6 +574,7 @@ export class GameEngine {
       weapon: this.currentWeapon(),
       weapons: this.weapons.map((w) => ({ ...w })),
       abilityReady: this.abilityT <= 0,
+      abilityWait: this.abilityT,
       sandboxPlaying: this.sandboxPlaying,
       sandboxEdit: this.sandboxEdit,
       sandboxDeck: this.sandboxDeck.map((units, i) => ({
@@ -601,7 +606,7 @@ export class GameEngine {
   }
 
   private persist() {
-    if (this.maxRun) return;
+    if (this.maxRun || this.richRun) return;
     writeSave({
       version: 2,
       best: this.best,
@@ -678,6 +683,7 @@ export class GameEngine {
 
   play(mode: boolean | "sandbox" | "max" = false) {
     this.audio.unlock();
+    this.captureMeta();
     this.maxRun = mode === "max";
     this.richRun = mode === true || mode === "sandbox";
     this.resetRun();
@@ -757,13 +763,14 @@ export class GameEngine {
 
   openBook() {
     if (this.phase !== "playing" && this.phase !== "paused") return;
+    this.heldPause = this.phase === "paused";
     this.phase = "book";
     this.emit();
   }
 
   closeBook() {
     if (this.phase !== "book") return;
-    this.phase = "playing";
+    this.phase = this.heldPause ? "paused" : "playing";
     this.emit();
   }
 
@@ -820,25 +827,28 @@ export class GameEngine {
 
   openWheel() {
     if (this.phase !== "playing" && this.phase !== "paused" && this.phase !== "book") return;
+    if (this.phase === "paused") this.heldPause = true;
+    if (this.phase === "playing") this.heldPause = false;
     this.phase = "wheel";
     this.emit();
   }
 
   closeWheel() {
     if (this.phase !== "wheel") return;
-    this.phase = "playing";
+    this.phase = this.heldPause ? "paused" : "playing";
     this.emit();
   }
 
   openForge() {
     if (this.phase !== "playing" && this.phase !== "paused") return;
+    this.heldPause = this.phase === "paused";
     this.phase = "forge";
     this.emit();
   }
 
   closeForge() {
     if (this.phase !== "forge") return;
-    this.phase = "playing";
+    this.phase = this.heldPause ? "paused" : "playing";
     this.emit();
   }
 
@@ -872,10 +882,14 @@ export class GameEngine {
       this.hands = "weapon";
     } else {
       this.weaponIndex = (this.weaponIndex + 1) % this.weapons.length;
-      if (this.weaponIndex === 0 && this.weapons.length > 0) {
-        /* stay on weapons, wrap */
-      }
     }
+    this.emit();
+  }
+
+  equipWeapon(i: number) {
+    if (!this.weapons[i]) return;
+    this.weaponIndex = i;
+    this.hands = "weapon";
     this.emit();
   }
 
@@ -924,8 +938,9 @@ export class GameEngine {
       return;
     }
     for (const e of this.enemies) e.bladeCd = Math.max(0, e.bladeCd - dt);
-    if (actions.fire && speed > 2) {
+    if (actions.fire && speed > 2 && this.swingCd <= 0) {
       this.swingT = Math.min(0.14, 0.05 + speed * 0.012);
+      this.swingCd = Math.max(0.12, w.cooldown * 0.45);
       this.sweepBlade(w, this.prevBladeAng, ang, speed);
     }
     if (pressed && this.swingCd <= 0) {
@@ -958,16 +973,13 @@ export class GameEngine {
       const dx = e.x - this.player.x;
       const dy = e.y - this.player.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > reach + e.r || dist < 10) continue;
+      if (dist > reach + e.r) continue;
       if (!this.onBladeArc(from, to, Math.atan2(dy, dx))) continue;
       e.bladeCd = w.stance === "maul" ? 0.38 : 0.26;
       this.hitWithWeapon(e, w, power);
       hit = true;
     }
-    if (hit) {
-      this.hitstop = Math.max(this.hitstop, w.stance === "maul" ? 0.08 : 0.045);
-      this.audio.hit();
-    }
+    if (hit) this.hitstop = Math.max(this.hitstop, w.stance === "maul" ? 0.08 : 0.045);
   }
 
   private pokeBlade(w: ForgedWeapon) {
@@ -995,7 +1007,7 @@ export class GameEngine {
   private hitWithWeapon(e: Enemy, w: ForgedWeapon, power = 1) {
     const scale = e.kind === "boss" ? 1.5 : e.kind === "buffwisp" ? 1.3 : e.kind === "elite" ? 1.15 : 1;
     const dmg = Math.round(w.damage * scale * power);
-    this.hurtEnemy(e, dmg, this.aim.x, this.aim.y, "ember");
+    this.hurtEnemy(e, dmg, this.aim.x, this.aim.y, "ember", true);
     const shove = (w.extra === "knock" ? 160 : w.stance === "maul" ? 90 : 50) * Math.min(1.2, power);
     const m = Math.hypot(this.aim.x, this.aim.y) || 1;
     e.kvx = (this.aim.x / m) * shove;
@@ -1006,9 +1018,10 @@ export class GameEngine {
     if (w.extra === "stun") e.stun = Math.max(e.stun, 0.7);
     if (w.extra === "wrap") this.wrapEnemy(e);
     if (w.extra === "leech") this.player.hp = Math.min(this.player.maxHp, this.player.hp + 6);
-    const gold = w.ore === "goldvein" ? 6 : 3;
-    this.gold += gold;
-    this.floatAt(e.x, e.y - 20, `+${gold}`, "#f0d24a");
+    if (w.ore === "goldvein") {
+      this.gold += 4;
+      this.floatAt(e.x, e.y - 20, "+4", "#f0d24a");
+    }
   }
 
   private castWeaponAbility(w: ForgedWeapon) {
@@ -1587,6 +1600,11 @@ export class GameEngine {
     this.resetRun();
     this.maxRun = false;
     this.richRun = false;
+    this.trinkoo = this.metaSave.trinkoo;
+    this.ownedRelics = [...this.metaSave.ownedRelics];
+    this.equipped = [...this.metaSave.equipped];
+    this.forgeBag = { ...this.metaSave.forgeBag };
+    this.weapons = this.metaSave.weapons.map((w) => ({ ...w }));
     this.phase = "title";
     this.audio.stopBed();
     this.emit();
@@ -1847,6 +1865,14 @@ export class GameEngine {
     this.spawnT = 0;
     this.waveGap = 0.4;
     this.fireCd = 0;
+    this.abilityT = 0;
+    this.swingCd = 0;
+    this.swingT = 0;
+    this.fireHeld = false;
+    this.bladeSmear = 0;
+    this.prevBladeAng = 0;
+    this.hands = "spell";
+    this.weaponIndex = 0;
     this.hitstop = 0;
     this.trauma = 0;
     this.animT = 0;
@@ -1949,6 +1975,7 @@ export class GameEngine {
     const cols = 5;
     for (let i = 0; i < BOSSES.length; i++) {
       const e = this.placeBoss(i);
+      if (!e) continue;
       const col = i % cols;
       const row = Math.floor(i / cols);
       e.x = 420 + col * 140;
@@ -2070,6 +2097,7 @@ export class GameEngine {
     if (pauseNow && !this.pauseLatch) {
       if (this.phase === "book") this.closeBook();
       else if (this.phase === "forge") this.closeForge();
+      else if (this.phase === "wheel") this.closeWheel();
       else if (this.phase === "playing" || this.phase === "paused") this.togglePause();
     }
     this.pauseLatch = pauseNow;
@@ -2086,6 +2114,14 @@ export class GameEngine {
     if (abilityNow && !this.abilityLatch) this.useWeaponAbility();
     this.abilityLatch = abilityNow;
 
+    const cycleNow = this.input.has("Tab") || this.input.has("KeyE");
+    if (cycleNow && !this.cycleLatch) this.cycleWeapon();
+    this.cycleLatch = cycleNow;
+
+    const muteNow = this.input.has("KeyM");
+    if (muteNow && !this.muteLatch) this.toggleMute();
+    this.muteLatch = muteNow;
+
     if (this.input.has("Digit1") || this.input.has("Numpad1")) this.chooseSpell("ember");
     if (this.input.has("Digit2") || this.input.has("Numpad2")) this.chooseSpell("frost");
     if (this.input.has("Digit3") || this.input.has("Numpad3")) this.chooseSpell("bolt");
@@ -2093,6 +2129,7 @@ export class GameEngine {
     if (this.input.has("Digit5") || this.input.has("Numpad5")) this.chooseSpell("vine");
     if (this.input.has("Digit6") || this.input.has("Numpad6")) this.chooseSpell("boom");
     if (this.input.has("Digit7") || this.input.has("Numpad7")) this.chooseSpell("fuse");
+    if (this.input.has("Digit8") || this.input.has("Numpad8")) this.chooseSpell("craft");
   }
 
   private aimFrom(actions: Actions) {
@@ -3286,9 +3323,10 @@ export class GameEngine {
     }
   }
 
-  private hurtEnemy(e: Enemy, dmg: number, vx: number, vy: number, spell: Spell) {
+  private hurtEnemy(e: Enemy, dmg: number, vx: number, vy: number, spell: Spell, raw = false) {
     e.hp -= dmg;
     e.flash = 0.08;
+    if (!raw) {
     if (spell === "ember") e.burn = this.hasRelic("emberheart") ? 5 : 3;
     if (spell === "craft" && this.crafted?.extra === "burn") e.burn = this.hasRelic("emberheart") ? 5 : 3;
     if (spell === "frost" || (spell === "craft" && this.crafted?.extra === "slow")) {
@@ -3299,6 +3337,7 @@ export class GameEngine {
     if (spell === "bolt" || (spell === "craft" && this.crafted?.extra === "stun")) {
       e.stun = 1.25;
       this.floatAt(e.x, e.y - 22, "stun", spell === "craft" ? (this.crafted?.color ?? "#f0d24a") : "#f0d24a");
+    }
     }
     const m = Math.hypot(vx, vy) || 1;
     const nx = vx / m;
@@ -3561,6 +3600,7 @@ export class GameEngine {
 
   private spawnEnemy(kind?: FoeKind) {
     const e = this.allocEnemy();
+    if (!e) return;
     const edge = Math.floor(Math.random() * 4);
     const t = Math.random();
     e.alive = true;
@@ -3588,6 +3628,7 @@ export class GameEngine {
     e.lunging = 0;
     e.voidIcd = 0;
     e.vineIcd = 0;
+    e.bladeCd = 0;
     e.wrapped = 0;
     e.knockT = 0;
     e.knockX = 0;
@@ -3624,6 +3665,7 @@ export class GameEngine {
   private placeBoss(id: number) {
     const def = BOSSES[id] ?? BOSSES[0]!;
     const e = this.allocEnemy();
+    if (!e) return;
     e.alive = true;
     e.kind = "boss";
     e.bossId = BOSSES.indexOf(def);
@@ -3645,6 +3687,7 @@ export class GameEngine {
     e.lunging = 0;
     e.voidIcd = 0;
     e.vineIcd = 0;
+    e.bladeCd = 0;
     e.wrapped = 0;
     e.knockT = 0;
     e.knockX = 0;
@@ -3665,10 +3708,10 @@ export class GameEngine {
     return "wisp";
   }
 
-  private allocEnemy(): Enemy {
+  private allocEnemy(): Enemy | null {
     const dead = this.enemies.find((e) => !e.alive);
     if (dead) return dead;
-    if (this.enemies.length >= MAX_ENEMIES) return this.enemies[0]!;
+    if (this.enemies.length >= MAX_ENEMIES) return null;
     const e: Enemy = {
       alive: false,
       x: 0,
@@ -3707,6 +3750,7 @@ export class GameEngine {
     for (let i = 0; i < this.enemies.length; i++) {
       const e = this.enemies[i]!;
       if (!e.alive) continue;
+      if (e.speed <= 0 && e.kind !== "boss") continue;
       e.frame += dt * (e.freeze > 0 ? 2.2 : 6);
       e.flash = Math.max(0, e.flash - dt);
       e.contact = Math.max(0, e.contact - dt);
@@ -3715,7 +3759,7 @@ export class GameEngine {
       e.voidIcd = Math.max(0, e.voidIcd - dt);
       e.vineIcd = Math.max(0, e.vineIcd - dt);
       e.wrapped = Math.max(0, e.wrapped - dt);
-      if (this.spell === "vine" && e.vineIcd <= 0 && e.wrapped <= 0) {
+      if (this.hands === "spell" && this.spell === "vine" && e.vineIcd <= 0 && e.wrapped <= 0) {
         const reach = (this.hasRelic("thornlace") ? 118 : 72) + e.r;
         if (Math.hypot(e.x - px, e.y - py) < reach) this.wrapEnemy(e);
       }
@@ -3798,6 +3842,7 @@ export class GameEngine {
       e.y = clamp(e.y + e.kvy * dt, pad, ARENA - pad);
       return;
     }
+    if (e.speed <= 0) return;
     const slow = e.freeze > 0 ? 0.7 : 1;
     if (def.move === "bounce") {
       e.x += e.kvx * dt * slow;
@@ -4383,8 +4428,8 @@ export class GameEngine {
     const k = 1 - Math.exp(-5.2 * dt);
     this.cam.x += (tx - this.cam.x) * k;
     this.cam.y += (ty - this.cam.y) * k;
-    this.cam.x = clamp(this.cam.x, 0, Math.max(0, ARENA - vw));
-    this.cam.y = clamp(this.cam.y, 0, Math.max(0, ARENA - vh));
+    this.cam.x = Math.round(clamp(this.cam.x, 0, Math.max(0, ARENA - vw)));
+    this.cam.y = Math.round(clamp(this.cam.y, 0, Math.max(0, ARENA - vh)));
   }
 
   private draw() {
@@ -4394,11 +4439,12 @@ export class GameEngine {
     const oy = (Math.random() - 0.5) * shake;
     ctx.fillStyle = "#0c0d0c";
     ctx.fillRect(0, 0, this.view.w, this.view.h);
-    ctx.imageSmoothingEnabled = false;
     if ((this.phase === "title" || this.phase === "boot") && this.assets) {
+      ctx.imageSmoothingEnabled = true;
       this.drawTitleCover();
       return;
     }
+    ctx.imageSmoothingEnabled = false;
     ctx.save();
     ctx.translate(ox, oy);
     ctx.scale(1 / VIEW_ZOOM, 1 / VIEW_ZOOM);
@@ -4427,8 +4473,8 @@ export class GameEngine {
       this.drawBlasts();
       this.drawBossShots();
       this.drawWeaponArts();
-      this.drawFx();
       if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel" || this.phase === "forge") this.drawLight();
+      this.drawFx();
     }
     ctx.restore();
   }
@@ -4470,7 +4516,7 @@ export class GameEngine {
     this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
     this.ctx.globalAlpha = 1;
     if (this.hands === "weapon") this.drawHeldWeapon();
-    if (this.spell === "vine") this.drawVineAura(this.player.x, this.player.y);
+    if (this.hands === "spell" && this.spell === "vine") this.drawVineAura(this.player.x, this.player.y);
   }
 
   private drawGhost(g: { name: string; x: number; y: number; face: Dir; hp: number; frame: number }) {

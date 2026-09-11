@@ -29,12 +29,13 @@ const GAME_CODES = new Set([
   "Digit2",
   "Digit3",
   "Digit4",
-  "Digit5",
-  "Numpad1",
-  "Numpad2",
-  "Numpad3",
-  "Numpad4",
-  "Numpad5",
+  "KeyG",
+  "KeyE",
+  "Digit6",
+  "Digit7",
+  "Numpad6",
+  "Digit8",
+  "Numpad8",
 ]);
 
 function isTypingTarget(target: EventTarget | null) {
@@ -131,10 +132,10 @@ export class Input {
           this.touchAim.x = rs.x;
           this.touchAim.y = rs.y;
           this.touchAim.active = true;
+        } else {
+          this.touchAim.active = false;
         }
-        if (pad.buttons[0]?.pressed || (pad.buttons[7]?.value ?? 0) > 0.4) {
-          this.pointer.down = true;
-        }
+        this.pointer.down = Boolean(pad.buttons[0]?.pressed || (pad.buttons[7]?.value ?? 0) > 0.4);
       }
     }
 
