@@ -986,61 +986,433 @@ export class GameEngine {
   private castWeaponAbility(w: ForgedWeapon) {
     const px = this.player.x;
     const py = this.player.y;
+    const ax = this.aim.x;
+    const ay = this.aim.y;
     const a = w.ability;
     this.audio.bolt();
-    if (a === "heal") {
-      this.player.hp = Math.min(this.player.maxHp, this.player.hp + 18);
-      this.floatAt(px, py - 36, "+hp", w.color2);
+    this.floatAt(px, py - 44, ABILITY_LABEL[a], w.color2);
+    this.trauma = Math.min(1, this.trauma + 0.16);
+    const dmg = Math.round(w.damage * 1.15);
+    const tx = clamp(px + ax * 140, 80, ARENA - 80);
+    const ty = clamp(py + ay * 140, 80, ARENA - 80);
+    if (a === "meteor") {
+      this.spawnArt("meteor", tx, ty - 220, 0, 520, tx, ty, 18, 1.2, dmg, w);
+    } else if (a === "glacier") {
+      for (let i = 0; i < 6; i++) {
+        this.spawnArt("glacier", px + ax * (40 + i * 28), py + ay * (40 + i * 28), 0, 0, ax, ay, 16, 0.9, dmg, w, -i * 0.1);
+      }
+    } else if (a === "skewer") {
+      this.spawnArt("skewer", px + ax * 24, py + ay * 24, ax * 640, ay * 640, ax, ay, 10, 0.7, dmg, w);
+    } else if (a === "rift") {
+      this.spawnArt("rift", tx, ty, 0, 0, ax, ay, 22, 1.35, dmg, w);
+    } else if (a === "lash") {
+      this.spawnArt("lash", px + ax * 20, py + ay * 20, ax * 520, ay * 520, ax, ay, 12, 0.7, dmg, w);
+    } else if (a === "mine") {
+      this.spawnArt("mine", px, py, 0, 0, ax, ay, 14, 1.15, dmg * 1.4, w);
+    } else if (a === "beacon") {
+      this.spawnArt("beacon", px, py, 0, 0, ax, ay, 28, 2.4, Math.round(dmg * 0.45), w);
+    } else if (a === "echo") {
+      for (let i = 1; i <= 3; i++) this.spawnArt("echo", px, py, ax, ay, ax, ay, w.reach, 0.85, dmg, w, -i * 0.18);
+    } else if (a === "pact") {
+      const e = this.nearestFoe(px, py, 240);
+      if (e) this.spawnArt("pact", e.x, e.y, 0, 0, e.x, e.y, 18, 1.8, dmg, w);
+      else this.floatAt(px, py - 28, "no mark", w.color2);
+    } else if (a === "tomb") {
+      const e = this.nearestFoe(px, py, 160);
+      if (e) {
+        e.stun = 1.8;
+        e.freeze = 1.8;
+        e.kvx = 0;
+        e.kvy = 0;
+        this.spawnArt("tomb", e.x, e.y, 0, 0, e.x, e.y, e.r + 10, 1.6, dmg * 1.3, w);
+      } else this.floatAt(px, py - 28, "no grave", w.color2);
+    } else if (a === "undertow") {
+      this.spawnArt("undertow", px + ax * 20, py + ay * 20, ax * 280, ay * 280, ax, ay, 20, 1.2, dmg, w);
+    } else if (a === "orbs") {
+      for (let i = 0; i < 3; i++) this.spawnArt("orbs", px, py, 0, 0, i * ((Math.PI * 2) / 3), 0, 11, 2.2, Math.round(dmg * 0.55), w);
+    } else if (a === "garden") {
+      for (let i = -2; i <= 2; i++) {
+        const ang = Math.atan2(ay, ax) + i * 0.28;
+        this.spawnArt("garden", px, py, Math.cos(ang) * 220, Math.sin(ang) * 220, Math.cos(ang), Math.sin(ang), 10, 0.85, dmg, w, i);
+      }
+    } else if (a === "eclipse") {
+      this.spawnArt("eclipse", px + ax * 36, py + ay * 36, 0, 0, ax, ay, 26, 2.1, Math.round(dmg * 0.6), w);
+    } else if (a === "ward") {
+      this.spawnArt("ward", px + ax * 48, py + ay * 48, 0, 0, ax, ay, 20, 3.2, Math.round(dmg * 0.5), w);
     }
-    if (a === "veil") this.player.invuln = Math.max(this.player.invuln, 0.7);
-    if (a === "dash") {
-      this.player.vx += this.aim.x * 420;
-      this.player.vy += this.aim.y * 420;
-      this.markPlayerKnock(this.aim.x, this.aim.y, 0.2);
-    }
-    const radius = a === "burst" || a === "nova" ? 110 : a === "wave" ? 130 : 96;
-    const ring =
-      a === "wrap" ||
-      a === "nova" ||
-      a === "burst" ||
-      a === "stunring" ||
-      a === "mist" ||
-      a === "freeze" ||
-      a === "wave" ||
-      a === "pull" ||
-      a === "leech" ||
-      a === "chain" ||
-      a === "spark" ||
-      a === "bloom";
-    if (ring) {
-      for (const e of this.enemies) {
-        if (!e.alive) continue;
-        const dx = e.x - px;
-        const dy = e.y - py;
-        const dist = Math.hypot(dx, dy);
-        if (a === "wave") {
-          const dot = (dx * this.aim.x + dy * this.aim.y) / (dist || 1);
-          if (dot < 0.35 || dist > radius + e.r) continue;
-        } else if (dist > radius + e.r) continue;
-        const asSpell: Spell =
-          a === "freeze" ? "frost" : a === "spark" || a === "chain" ? "bolt" : a === "wrap" ? "vine" : a === "burst" ? "boom" : "ember";
-        this.hurtEnemy(e, Math.round(w.damage * 0.85), dx, dy, asSpell);
-        if (a === "wrap") this.wrapEnemy(e);
-        if (a === "stunring" || a === "spark" || a === "chain") e.stun = Math.max(e.stun, 0.8);
-        if (a === "freeze" || a === "mist") e.freeze = Math.max(e.freeze, 1.4);
-        if (a === "nova") e.burn = Math.max(e.burn, 2);
-        if (a === "leech") this.player.hp = Math.min(this.player.maxHp, this.player.hp + 3);
-        if (a === "pull") {
-          e.kvx -= (dx / (dist || 1)) * 280;
-          e.kvy -= (dy / (dist || 1)) * 280;
-          e.knockT = Math.max(e.knockT, 0.25);
-        }
-        if (a === "bloom") this.dropHazard(e.x, e.y, "spore", w.color2, 32);
+  }
+
+  private nearestFoe(x: number, y: number, reach: number): Enemy | null {
+    let best: Enemy | null = null;
+    let bestD = reach;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
       }
     }
-    this.spawnBurst(px + this.aim.x * 40, py + this.aim.y * 40, a === "freeze" ? "frost" : a === "burst" ? "boom" : "ember");
-    this.burstSparks(px + this.aim.x * 36, py + this.aim.y * 36, 12, w.color2);
-    this.trauma = Math.min(1, this.trauma + 0.22);
+    return best;
+  }
+
+  private spawnArt(
+    kind: WeaponAbility,
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    ox: number,
+    oy: number,
+    r: number,
+    ttl: number,
+    dmg: number,
+    w: ForgedWeapon,
+    phase = 0,
+  ) {
+    const dead = this.weaponArts.find((a) => !a.alive);
+    const art: WeaponArt = dead ?? {
+      alive: true,
+      kind,
+      x,
+      y,
+      vx,
+      vy,
+      ox,
+      oy,
+      r,
+      ttl,
+      max: ttl,
+      dmg,
+      color: w.color,
+      color2: w.color2,
+      phase,
+      hits: new Set(),
+    };
+    art.alive = true;
+    art.kind = kind;
+    art.x = x;
+    art.y = y;
+    art.vx = vx;
+    art.vy = vy;
+    art.ox = ox;
+    art.oy = oy;
+    art.r = r;
+    art.ttl = ttl;
+    art.max = ttl;
+    art.dmg = dmg;
+    art.color = w.color;
+    art.color2 = w.color2;
+    art.phase = phase;
+    art.hits = new Set();
+    if (!dead) this.weaponArts.push(art);
+  }
+
+  private artHit(art: WeaponArt, e: Enemy, knock = 1) {
+    if (!e.alive || art.hits.has(e)) return;
+    art.hits.add(e);
+    this.hurtEnemy(e, art.dmg, e.x - art.x, e.y - art.y, "ember");
+    e.kvx += ((e.x - art.x) / (Math.hypot(e.x - art.x, e.y - art.y) || 1)) * 80 * knock;
+    e.kvy += ((e.y - art.y) / (Math.hypot(e.x - art.x, e.y - art.y) || 1)) * 80 * knock;
+  }
+
+  private updateWeaponArts(dt: number) {
+    for (const art of this.weaponArts) {
+      if (!art.alive) continue;
+      art.ttl -= dt;
+      art.phase += dt;
+      const k = art.kind;
+      if (k === "meteor") {
+        art.vy += 900 * dt;
+        art.x += art.vx * dt;
+        art.y += art.vy * dt;
+        if (art.y >= art.oy) {
+          art.y = art.oy;
+          for (const e of this.enemies) {
+            if (e.alive && Math.hypot(e.x - art.x, e.y - art.y) < 70 + e.r) {
+              art.hits.delete(e);
+              this.artHit(art, e, 2.2);
+              e.burn = Math.max(e.burn, 2.4);
+            }
+          }
+          this.burstSparks(art.x, art.y, 16, art.color);
+          art.alive = false;
+        }
+      } else if (k === "glacier") {
+        if (art.phase < 0) continue;
+        for (const e of this.enemies) {
+          if (e.alive && Math.hypot(e.x - art.x, e.y - art.y) < art.r + e.r) {
+            this.artHit(art, e, 0.4);
+            e.freeze = Math.max(e.freeze, 1.2);
+          }
+        }
+      } else if (k === "skewer") {
+        art.x += art.vx * dt;
+        art.y += art.vy * dt;
+        for (const e of this.enemies) {
+          if (!e.alive || Math.hypot(e.x - art.x, e.y - art.y) > art.r + e.r) continue;
+          if (!art.hits.has(e)) {
+            this.artHit(art, e, 0.2);
+            art.vx = 0;
+            art.vy = 0;
+            art.ttl = Math.max(art.ttl, 0.55);
+          } else if (art.phase > 0.2) {
+            art.phase = 0;
+            art.hits.delete(e);
+            this.artHit(art, e, 0);
+            e.stun = Math.max(e.stun, 0.35);
+          }
+        }
+      } else if (k === "rift") {
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          const dx = art.x - e.x;
+          const dy = art.y - e.y;
+          const d = Math.hypot(dx, dy) || 1;
+          if (d < 130) {
+            e.kvx += (dx / d) * 420 * dt;
+            e.kvy += (dy / d) * 420 * dt;
+          }
+          if (d < 36 + e.r) this.artHit(art, e, 0);
+        }
+        if (art.ttl <= 0) {
+          art.hits.clear();
+          for (const e of this.enemies) {
+            if (e.alive && Math.hypot(e.x - art.x, e.y - art.y) < 80 + e.r) this.artHit(art, e, 2.4);
+          }
+        }
+      } else if (k === "lash") {
+        const t = art.max - art.ttl;
+        art.x += art.vx * dt + Math.cos(t * 18) * art.oy * 90 * dt;
+        art.y += art.vy * dt + Math.sin(t * 18) * art.ox * 90 * dt;
+        for (const e of this.enemies) {
+          if (!e.alive || Math.hypot(e.x - art.x, e.y - art.y) > art.r + e.r) continue;
+          this.artHit(art, e, 0);
+          e.kvx += (this.player.x - e.x) * 2.4;
+          e.kvy += (this.player.y - e.y) * 2.4;
+        }
+      } else if (k === "mine") {
+        if (art.ttl <= 0) {
+          for (const e of this.enemies) {
+            if (e.alive && Math.hypot(e.x - art.x, e.y - art.y) < 92 + e.r) this.artHit(art, e, 2.8);
+          }
+          this.burstSparks(art.x, art.y, 20, art.color2);
+        }
+      } else if (k === "beacon") {
+        art.x = this.player.x;
+        art.y = this.player.y;
+        if (Math.floor(art.phase * 6) !== Math.floor((art.phase - dt) * 6)) art.hits.clear();
+        for (const e of this.enemies) {
+          if (e.alive && Math.hypot(e.x - art.x, e.y - art.y) < art.r + e.r) this.artHit(art, e, 0.2);
+        }
+      } else if (k === "echo") {
+        if (art.phase < 0) continue;
+        if (art.phase > 0 && art.hits.size === 0) {
+          const ang = Math.atan2(art.oy, art.ox);
+          for (const e of this.enemies) {
+            if (!e.alive) continue;
+            const dx = e.x - art.x;
+            const dy = e.y - art.y;
+            if (Math.hypot(dx, dy) > art.r + e.r) continue;
+            const rel = Math.atan2(dy, dx) - ang;
+            const a = ((rel + Math.PI) % (Math.PI * 2)) - Math.PI;
+            if (Math.abs(a) < 0.8) this.artHit(art, e, 1.4);
+          }
+        }
+      } else if (k === "pact") {
+        const e = this.enemies.find((o) => o.alive && Math.hypot(o.x - art.ox, o.y - art.oy) < 80) ?? this.nearestFoe(art.x, art.y, 200);
+        if (!e) {
+          art.alive = false;
+          continue;
+        }
+        art.x = e.x;
+        art.y = e.y;
+        art.ox = e.x;
+        art.oy = e.y;
+        if (Math.floor(art.phase * 4) !== Math.floor((art.phase - dt) * 4)) {
+          art.hits.delete(e);
+          this.artHit(art, e, 0);
+          this.player.hp = Math.min(this.player.maxHp, this.player.hp + 3);
+        }
+      } else if (k === "tomb") {
+        const e = this.nearestFoe(art.x, art.y, 40);
+        if (e) {
+          e.x = art.x;
+          e.y = art.y;
+          e.stun = Math.max(e.stun, 0.2);
+          e.kvx = 0;
+          e.kvy = 0;
+        }
+        if (art.ttl <= 0 && e) {
+          art.hits.clear();
+          this.artHit(art, e, 2);
+          this.burstSparks(art.x, art.y, 12, art.color2);
+        }
+      } else if (k === "undertow") {
+        if (art.ttl < art.max * 0.45 && art.phase > 0) {
+          art.vx *= -1;
+          art.vy *= -1;
+          art.phase = -1;
+          art.hits.clear();
+        }
+        art.x += art.vx * dt;
+        art.y += art.vy * dt;
+        for (const e of this.enemies) {
+          if (e.alive && Math.hypot(e.x - art.x, e.y - art.y) < art.r + e.r) this.artHit(art, e, 1.1);
+        }
+      } else if (k === "orbs") {
+        const ang = art.phase * 4 + art.ox;
+        art.x = this.player.x + Math.cos(ang) * 48;
+        art.y = this.player.y + Math.sin(ang) * 48;
+        if (Math.floor(art.phase * 8) !== Math.floor((art.phase - dt) * 8)) art.hits.clear();
+        for (const e of this.enemies) {
+          if (e.alive && Math.hypot(e.x - art.x, e.y - art.y) < art.r + e.r) this.artHit(art, e, 0.6);
+        }
+      } else if (k === "garden") {
+        art.x += art.vx * dt;
+        art.y += art.vy * dt;
+        art.vx *= 0.96;
+        art.vy *= 0.96;
+        if (art.ttl < 0.25) {
+          for (const e of this.enemies) {
+            if (e.alive && Math.hypot(e.x - art.x, e.y - art.y) < 40 + e.r) this.artHit(art, e, 0.8);
+          }
+        }
+      } else if (k === "eclipse") {
+        art.x = this.player.x + this.aim.x * 40;
+        art.y = this.player.y + this.aim.y * 40;
+        if (Math.floor(art.phase * 10) !== Math.floor((art.phase - dt) * 10)) art.hits.clear();
+        for (const e of this.enemies) {
+          if (e.alive && Math.hypot(e.x - art.x, e.y - art.y) < art.r + e.r) this.artHit(art, e, 0.5);
+        }
+      } else if (k === "ward") {
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          const dx = art.x - e.x;
+          const dy = art.y - e.y;
+          const d = Math.hypot(dx, dy) || 1;
+          if (d < 160) {
+            e.kvx += (dx / d) * 70 * dt;
+            e.kvy += (dy / d) * 70 * dt;
+          }
+          if (d < 50 + e.r && Math.floor(art.phase * 3) !== Math.floor((art.phase - dt) * 3)) {
+            art.hits.delete(e);
+            this.artHit(art, e, 0.3);
+          }
+        }
+      }
+      if (art.ttl <= 0) art.alive = false;
+    }
+  }
+
+  private drawWeaponArts() {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    for (const art of this.weaponArts) {
+      if (!art.alive) continue;
+      const k = art.kind;
+      const x = Math.round(art.x);
+      const y = Math.round(art.y);
+      if (k === "meteor") {
+        ctx.fillStyle = art.color;
+        ctx.fillRect(x - 8, y - 8, 16, 16);
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 4, y - 4, 8, 8);
+      } else if (k === "glacier") {
+        const h = Math.min(36, art.phase * 90);
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 5, y - h, 10, h);
+        ctx.fillStyle = "#fff4c8";
+        ctx.fillRect(x - 2, y - h, 4, 6);
+      } else if (k === "skewer") {
+        ctx.strokeStyle = art.color2;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(x - art.ox * 18, y - art.oy * 18);
+        ctx.lineTo(x + art.ox * 18, y + art.oy * 18);
+        ctx.stroke();
+      } else if (k === "rift") {
+        const s = 10 + Math.sin(art.phase * 10) * 6;
+        ctx.fillStyle = "#1a1018";
+        ctx.fillRect(x - s, y - s, s * 2, s * 2);
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 3, y - 3, 6, 6);
+      } else if (k === "lash") {
+        ctx.strokeStyle = art.color2;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(this.player.x, this.player.y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.fillStyle = art.color;
+        ctx.fillRect(x - 5, y - 5, 10, 10);
+      } else if (k === "mine") {
+        const blink = Math.floor(art.phase * 8) % 2 === 0;
+        ctx.fillStyle = blink ? "#c45a48" : art.color;
+        ctx.fillRect(x - 8, y - 8, 16, 16);
+        ctx.fillStyle = "#1a1010";
+        ctx.fillRect(x - 2, y - 2, 4, 4);
+      } else if (k === "beacon") {
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 10, y - 70, 20, 70);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#fff4c8";
+        ctx.fillRect(x - 4, y - 74, 8, 8);
+      } else if (k === "echo") {
+        ctx.globalAlpha = 0.45;
+        drawWeaponGlyph(ctx, "ember-mallet", x, y, Math.atan2(art.oy, art.ox), 3, art.color, art.color2, true);
+        ctx.globalAlpha = 1;
+      } else if (k === "pact") {
+        ctx.strokeStyle = art.color2;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.player.x, this.player.y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.fillStyle = "#c45a78";
+        ctx.fillRect(x - 6, y - 6, 12, 12);
+      } else if (k === "tomb") {
+        ctx.fillStyle = "#3a3c3a";
+        ctx.fillRect(x - 16, y - 22, 32, 28);
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 10, y - 16, 20, 8);
+      } else if (k === "undertow") {
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 16, y - 6, 32, 12);
+        ctx.fillStyle = "#6a8ec8";
+        ctx.fillRect(x - 10, y - 3, 20, 6);
+      } else if (k === "orbs") {
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 6, y - 6, 12, 12);
+        ctx.fillStyle = "#fff4c8";
+        ctx.fillRect(x - 2, y - 2, 4, 4);
+      } else if (k === "garden") {
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 5, y - 8, 10, 10);
+        ctx.fillStyle = "#6fbf6a";
+        ctx.fillRect(x - 2, y, 4, 8);
+      } else if (k === "eclipse") {
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = "#1a1018";
+        ctx.fillRect(x - 18, y - 18, 36, 36);
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 6, y - 6, 12, 12);
+        ctx.globalAlpha = 1;
+      } else if (k === "ward") {
+        ctx.fillStyle = "#6a4a30";
+        ctx.fillRect(x - 3, y - 4, 6, 16);
+        ctx.fillStyle = art.color2;
+        ctx.fillRect(x - 8, y - 16, 16, 12);
+        const pulse = 8 + Math.sin(art.phase * 6) * 4;
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = "#e8c070";
+        ctx.fillRect(x - pulse, y - pulse, pulse * 2, pulse * 2);
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
   }
 
   private drawHeldWeapon() {
@@ -1466,6 +1838,7 @@ export class GameEngine {
     this.arcs = [];
     this.hazards = [];
     this.bossShots = [];
+    this.weaponArts = [];
     this.playerSlow = 0;
     this.playerStun = 0;
     this.cam.x = this.player.x - this.view.w / 2;
@@ -1653,6 +2026,7 @@ export class GameEngine {
     this.updatePickups(dt);
     this.updateBurns(dt);
     this.updateFx(dt);
+    this.updateWeaponArts(dt);
     this.spawnFlow(dt);
     this.followCam(dt);
     if (this.player.hp <= 0) this.die();
@@ -4025,6 +4399,7 @@ export class GameEngine {
       this.drawBullets();
       this.drawBlasts();
       this.drawBossShots();
+      this.drawWeaponArts();
       this.drawFx();
       if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel" || this.phase === "forge") this.drawLight();
     }
