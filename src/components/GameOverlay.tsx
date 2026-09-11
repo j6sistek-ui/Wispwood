@@ -121,7 +121,7 @@ export function GameOverlay({ engine, hud }: Props) {
       ) : null}
 
       {showSticks ? <TouchSticks engine={engine} /> : null}
-      {hud.phase === "playing" || hud.phase === "paused" ? <WeaponDock engine={engine} hud={hud} /> : null}
+      {hud.phase === "playing" && !spawnOpen ? <WeaponDock engine={engine} hud={hud} /> : null}
     </div>
   );
 }
@@ -138,22 +138,6 @@ function Hud({
   onSpawn?: () => void;
 }) {
   const pct = Math.max(0, hud.hp / hud.maxHp);
-  const spellLabel =
-    hud.spell === "frost"
-      ? "Ice"
-      : hud.spell === "bolt"
-        ? "Bolt"
-        : hud.spell === "void"
-          ? "Void"
-          : hud.spell === "vine"
-            ? "Vine"
-            : hud.spell === "boom"
-              ? "Boom"
-            : hud.spell === "craft"
-              ? (hud.crafted?.name ?? "Rune")
-              : hud.spell === "fuse"
-                ? (hud.fused?.name ?? "Fused")
-              : "Ember";
 
   return (
     <div
@@ -195,12 +179,12 @@ function Hud({
         </p>
       ) : null}
 
-      <div className="pointer-events-auto mx-auto mt-2 flex max-w-sm flex-wrap justify-center gap-2" data-ui>
+      <div className="pointer-events-auto mx-auto mt-2 grid max-w-sm grid-cols-3 gap-1" data-ui>
         <button
           type="button"
           data-ui
           onClick={() => engine?.togglePause()}
-          className="flex h-10 items-center justify-center border-2 border-muted bg-bg px-3 font-pixel text-[9px] text-fg"
+          className="flex h-9 items-center justify-center border-2 border-muted bg-bg font-pixel text-[8px] text-fg"
         >
           Pause
         </button>
@@ -208,39 +192,47 @@ function Hud({
           type="button"
           data-ui
           onClick={() => engine?.toggleBook()}
-          className="flex h-10 min-w-[5.5rem] items-center justify-center gap-1.5 border-2 border-fg bg-bg px-3 font-pixel text-[9px] text-fg"
+          className="flex h-9 items-center justify-center border-2 border-fg bg-bg font-pixel text-[8px] text-fg"
         >
           Book
-          <span className="text-muted">{spellLabel}</span>
         </button>
         <button
           type="button"
           data-ui
           onClick={() => engine?.openWheel()}
-          className="flex h-10 min-w-[6rem] items-center justify-center gap-1.5 border-2 border-gold bg-bg px-3 font-pixel text-[9px] text-fg"
+          className="flex h-9 items-center justify-center border-2 border-gold bg-bg font-pixel text-[8px] text-gold"
         >
           Wheel
-          <span className="text-gold">100g</span>
         </button>
         <button
           type="button"
           data-ui
           onClick={() => engine?.toggleForge()}
-          className="flex h-10 min-w-[5.5rem] items-center justify-center gap-1.5 border-2 border-[#c45a48] bg-bg px-3 font-pixel text-[9px] text-fg"
+          className="flex h-9 items-center justify-center border-2 border-[#c45a48] bg-bg font-pixel text-[8px] text-[#e08a3c]"
         >
           Forge
-          <span className="text-[#e08a3c]">Brann</span>
+        </button>
+        <button
+          type="button"
+          data-ui
+          onClick={() => engine?.toggleHands()}
+          className="flex h-9 items-center justify-center border-2 bg-bg font-pixel text-[8px] text-fg"
+          style={{ borderColor: hud.hands === "weapon" ? "#c45a48" : "#5a5a5a" }}
+        >
+          {hud.hands === "weapon" ? "Arms" : "Spell"}
         </button>
         {hud.sandbox ? (
           <button
             type="button"
             data-ui
             onClick={() => onSpawn?.()}
-            className="flex h-10 items-center justify-center border-2 border-accent bg-bg px-3 font-pixel text-[9px] text-fg"
+            className="flex h-9 items-center justify-center border-2 border-accent bg-bg font-pixel text-[8px] text-fg"
           >
             Menu
           </button>
-        ) : null}
+        ) : (
+          <span />
+        )}
       </div>
     </div>
   );
@@ -1308,26 +1300,10 @@ const SMITH_PALETTE: Record<string, string> = {
   b: "#2a1c14",
 };
 
-const ANVIL_ROWS = [
-  "..............",
-  "..oooooooooo..",
-  ".oIIIIIIIIIo.",
-  "ooooIIIIIIIIoo",
-  "...oIIIIIo....",
-  "....oIIIIo....",
-  "...oooooooo...",
-  "..oo......oo..",
-  ".oooooooooooo.",
-];
-
-const ANVIL_PALETTE: Record<string, string> = {
-  o: "#2a2c2a",
-  I: "#8a9090",
-};
-
 function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   const [tab, setTab] = useState<ForgeKind>("ore");
   const [picked, setPicked] = useState<Partial<Record<ForgeKind, ForgePiece>>>({});
+  const [note, setNote] = useState("");
   const pieces = FORGE_CATALOG[tab];
   const ore = picked.ore;
   const crystal = picked.crystal;
@@ -1335,61 +1311,54 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   const ownedCount = Object.values(hud.forgeBag).reduce((a, n) => a + n, 0);
   const bag = FORGE_PIECES.filter((p) => (hud.forgeBag[p.id] ?? 0) > 0);
 
+  const pick = (p: ForgePiece) => {
+    if ((hud.forgeBag[p.id] ?? 0) <= 0) return;
+    setTab(p.kind);
+    setPicked((cur) => ({ ...cur, [p.kind]: p }));
+    setNote("");
+  };
+
   return (
-    <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-bg/80 px-3 py-4 pointer-events-auto">
-      <div className="pointer-events-auto flex w-full max-w-sm flex-col gap-3 border-4 border-[#8a5a32] bg-[#16110d] p-4">
-        <div className="h-2 bg-[#c45a48]" />
-        <p className="text-center font-pixel text-pixel text-[#e08a3c]">THE FORGE</p>
-        <div className="flex items-end gap-3">
-          <PixelSprite rows={SMITH_ROWS} palette={SMITH_PALETTE} px={3} />
-          <div className="min-w-0 flex-1 border-2 border-[#c45a48] bg-[#2a1c14] px-2 py-2">
-            <p className="font-pixel text-[8px] text-[#e8c070]">BRANN</p>
-            <p className="mt-2 font-pixel text-[10px] leading-relaxed text-fg">I'm ready to forge.</p>
+    <div className="absolute inset-0 z-40 overflow-y-auto bg-bg/85 px-3 py-3 pointer-events-auto">
+      <div className="mx-auto flex w-full max-w-sm flex-col gap-2 border-4 border-[#8a5a32] bg-[#16110d] p-3">
+        <div className="flex items-center gap-2">
+          <PixelSprite rows={SMITH_ROWS} palette={SMITH_PALETTE} px={2} />
+          <div className="min-w-0 flex-1">
+            <p className="font-pixel text-[10px] text-[#e08a3c]">THE FORGE</p>
+            <p className="mt-1 font-pixel text-[8px] text-fg">I'm ready to forge.</p>
           </div>
         </div>
-        <div className="flex justify-center">
-          <PixelSprite rows={ANVIL_ROWS} palette={ANVIL_PALETTE} px={4} />
-        </div>
-        <div className="border-2 border-[#5a4030] bg-[#1c1612] px-2 py-1.5">
+        <div className="border-2 border-[#5a4030] bg-[#1c1612] px-2 py-1">
           <p className="font-pixel text-[7px] text-[#8a6a4a]">BAG {ownedCount}</p>
-          <div className="mt-1 flex gap-1 overflow-x-auto pb-0.5">
+          <div className="mt-1 flex gap-1 overflow-x-auto">
             {bag.length === 0 ? (
-              <p className="font-pixel text-[8px] text-muted">Empty. Hunt buff wisps.</p>
+              <p className="font-pixel text-[8px] text-muted">Empty</p>
             ) : (
-              bag.map((p) => {
-                const n = hud.forgeBag[p.id] ?? 0;
-                const on = picked[p.kind]?.id === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    data-ui
-                    title={p.name}
-                    onClick={() => {
-                      setTab(p.kind);
-                      setPicked((cur) => ({ ...cur, [p.kind]: p }));
-                    }}
-                    className="relative h-7 w-7 shrink-0 border"
-                    style={{
-                      background: p.color,
-                      borderColor: on ? "#fff4c8" : "#5a4030",
-                      outline: on ? `2px solid ${p.color}` : undefined,
-                    }}
-                  >
-                    <span className="absolute -bottom-0.5 -right-0.5 bg-[#16110d] px-0.5 font-pixel text-[7px] leading-none text-[#e8c070]">
-                      {n}
-                    </span>
-                  </button>
-                );
-              })
+              bag.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  data-ui
+                  onClick={() => pick(p)}
+                  className="relative h-7 w-7 shrink-0 border"
+                  style={{
+                    background: p.color,
+                    borderColor: picked[p.kind]?.id === p.id ? "#fff4c8" : "#5a4030",
+                  }}
+                >
+                  <span className="absolute bottom-0 right-0 bg-[#16110d] px-0.5 font-pixel text-[7px] text-[#e8c070]">
+                    {hud.forgeBag[p.id]}
+                  </span>
+                </button>
+              ))
             )}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-1">
           {(
             [
               ["ore", "Ore", ore],
-              ["crystal", "Magic crystal", crystal],
+              ["crystal", "Crystal", crystal],
               ["hammer", "Hammer", hammer],
             ] as const
           ).map(([kind, label, piece]) => (
@@ -1399,34 +1368,23 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
               data-ui
               onClick={() => setTab(kind)}
               className={
-                "border-2 py-2 text-center " +
+                "min-h-[2.75rem] border-2 px-1 py-1 text-center " +
                 (tab === kind ? "border-[#e08a3c] bg-[#2a1c14]" : "border-[#5a4030] bg-[#1c1612]")
               }
             >
               <p className="font-pixel text-[7px] text-[#8a6a4a]">{label}</p>
-              <p className="mt-1 font-pixel text-[8px] leading-tight" style={{ color: piece?.color ?? "#5a5a5a" }}>
+              <p className="mt-1 truncate font-pixel text-[8px]" style={{ color: piece?.color ?? "#5a5a5a" }}>
                 {piece?.name ?? "—"}
               </p>
             </button>
           ))}
         </div>
-        {tab === "hammer" ? (
-          <div className="grid grid-cols-5 gap-1 border-2 border-[#5a4030] bg-[#1c1612] p-1">
-            {FORGE_CATALOG.hammer.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                data-ui
-                onClick={() => (hud.forgeBag[p.id] ?? 0) > 0 && setPicked((cur) => ({ ...cur, hammer: p }))}
-                className="flex flex-col items-center gap-0.5 py-1"
-                title={p.name}
-              >
-                <WeaponMini id={p.id} ore={p.color} crystal="#fff4c8" />
-              </button>
-            ))}
+        {hammer && tab === "hammer" ? (
+          <div className="flex justify-center py-1">
+            <WeaponMini id={hammer.id} ore={ore?.color ?? hammer.color} crystal={crystal?.color ?? "#fff4c8"} px={3} />
           </div>
         ) : null}
-        <div className="max-h-[32vh] overflow-y-auto overscroll-contain border-2 border-[#5a4030] bg-[#1c1612] p-1">
+        <div className="max-h-[28vh] overflow-y-auto overscroll-contain border-2 border-[#5a4030] bg-[#1c1612] p-1">
           {pieces.map((p) => {
             const have = hud.forgeBag[p.id] ?? 0;
             const on = picked[tab]?.id === p.id;
@@ -1436,7 +1394,7 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
                 type="button"
                 data-ui
                 disabled={have <= 0}
-                onClick={() => have > 0 && setPicked((cur) => ({ ...cur, [tab]: p }))}
+                onClick={() => pick(p)}
                 className="mb-1 flex w-full items-center gap-2 border border-[#3a2a22] bg-[#16110d] px-2 py-1.5 text-left last:mb-0 disabled:opacity-40"
                 style={{ outline: on ? `2px solid ${p.color}` : undefined }}
               >
@@ -1445,13 +1403,8 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
                 ) : (
                   <span className="h-3 w-3 shrink-0 border border-[#5a4030]" style={{ background: p.color }} />
                 )}
-                <span className="min-w-0 flex-1">
-                  <span className="block font-pixel text-[9px]" style={{ color: have ? p.color : "#5a5a5a" }}>
-                    {p.name}
-                  </span>
-                  <span className="mt-0.5 block font-pixel text-[7px] leading-relaxed text-muted">
-                    {have > 0 ? p.blurb : "Not found"}
-                  </span>
+                <span className="min-w-0 flex-1 truncate font-pixel text-[8px]" style={{ color: have ? p.color : "#5a5a5a" }}>
+                  {p.name}
                 </span>
                 <span className="font-pixel text-[8px] text-[#e8c070]">{have > 0 ? `x${have}` : "—"}</span>
               </button>
@@ -1465,20 +1418,17 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
           onClick={() => {
             if (!ore || !crystal || !hammer) return;
             const res = engine?.craftForge(ore.id, crystal.id, hammer.id);
-            if (res === "ok") setPicked({});
+            if (res === "ok") {
+              setPicked({});
+              setNote("Forged");
+            } else if (res === "have") setNote("Already forged");
+            else setNote("Need one of each");
           }}
-          className="h-11 border-2 border-[#c45a48] bg-[#2a1c14] font-pixel text-[10px] text-[#e08a3c] disabled:border-[#5a4030] disabled:text-[#8a6a4a]"
+          className="h-11 shrink-0 border-2 border-[#c45a48] bg-[#2a1c14] font-pixel text-[10px] text-[#e08a3c] disabled:border-[#5a4030] disabled:text-[#8a6a4a]"
         >
           Forge
         </button>
-        <p className="text-center font-pixel text-[8px] text-muted">
-          {ore && crystal && hammer ? `${ore.name} + ${crystal.name.split(" ")[0]} + ${hammer.name.split(" ").slice(-1)[0]}` : "Pick one of each. Buff wisps drop stock."}
-        </p>
-        {hammer ? (
-          <div className="flex justify-center border-2 border-[#5a4030] bg-[#1c1612] py-2">
-            <WeaponMini id={hammer.id} ore={ore?.color ?? hammer.color} crystal={crystal?.color ?? "#fff4c8"} px={4} />
-          </div>
-        ) : null}
+        {note ? <p className="text-center font-pixel text-[8px] text-gold">{note}</p> : null}
         <PixelButton onClick={() => engine?.closeForge()}>Back</PixelButton>
       </div>
     </div>
@@ -1486,35 +1436,22 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
 }
 
 function WeaponDock({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
+  if (hud.hands !== "weapon" || !hud.weapon) return null;
   return (
     <div
-      className="pointer-events-auto absolute left-3 flex flex-col gap-2"
-      style={{ bottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
+      className="pointer-events-auto absolute right-3 z-30"
+      style={{ bottom: "max(7rem, calc(env(safe-area-inset-bottom, 0px) + 6.5rem))" }}
       data-ui
     >
       <button
         type="button"
         data-ui
-        onClick={() => engine?.toggleHands()}
-        className="flex h-11 min-w-[5.5rem] items-center justify-center border-2 bg-bg px-3 font-pixel text-[9px] text-fg"
-        style={{ borderColor: hud.hands === "weapon" ? "#c45a48" : "#5a5a5a" }}
+        onClick={() => engine?.useWeaponAbility()}
+        className="flex h-11 min-w-[5.5rem] items-center justify-center border-2 border-[#e08a3c] bg-bg px-3 font-pixel text-[9px] text-fg"
       >
-        Weapon
-        <span className="ml-1 text-[8px]" style={{ color: hud.weapon?.color ?? "#8a8a8a" }}>
-          {hud.hands === "weapon" ? hud.weapon?.name ?? "—" : "Spells"}
-        </span>
+        {ABILITY_LABEL[hud.weapon.ability]}
+        <span className="ml-1 text-[8px] text-muted">{hud.abilityReady ? "ready" : "..."}</span>
       </button>
-      {hud.hands === "weapon" && hud.weapon ? (
-        <button
-          type="button"
-          data-ui
-          onClick={() => engine?.useWeaponAbility()}
-          className="flex h-11 min-w-[5.5rem] items-center justify-center border-2 border-[#e08a3c] bg-bg px-3 font-pixel text-[9px] text-fg"
-        >
-          {ABILITY_LABEL[hud.weapon.ability]}
-          <span className="ml-1 text-[8px] text-muted">{hud.abilityReady ? "ready" : "..."}</span>
-        </button>
-      ) : null}
     </div>
   );
 }
