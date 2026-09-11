@@ -9,6 +9,7 @@ import { glyphFor, coreGlyph, CORE_COLOR } from "@/game/craft-sprites";
 import { BOSSES } from "@/game/bosses";
 import { RELICS, RELIC_COST, relicById, type RelicId } from "@/game/relics";
 import { FORGE_CATALOG, FORGE_PIECES, ABILITY_LABEL, type ForgeKind, type ForgePiece } from "@/game/forge";
+import { weaponGlyph } from "@/game/weapon-sprites";
 import { asset } from "@/game/paths";
 import { useP2PRoom, type P2PRoomHandle } from "@/lib/multiplayer/use-p2p-room";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -1409,6 +1410,22 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
             </button>
           ))}
         </div>
+        {tab === "hammer" ? (
+          <div className="grid grid-cols-5 gap-1 border-2 border-[#5a4030] bg-[#1c1612] p-1">
+            {FORGE_CATALOG.hammer.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                data-ui
+                onClick={() => (hud.forgeBag[p.id] ?? 0) > 0 && setPicked((cur) => ({ ...cur, hammer: p }))}
+                className="flex flex-col items-center gap-0.5 py-1"
+                title={p.name}
+              >
+                <WeaponMini id={p.id} ore={p.color} crystal="#fff4c8" />
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="max-h-[32vh] overflow-y-auto overscroll-contain border-2 border-[#5a4030] bg-[#1c1612] p-1">
           {pieces.map((p) => {
             const have = hud.forgeBag[p.id] ?? 0;
@@ -1423,7 +1440,11 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
                 className="mb-1 flex w-full items-center gap-2 border border-[#3a2a22] bg-[#16110d] px-2 py-1.5 text-left last:mb-0 disabled:opacity-40"
                 style={{ outline: on ? `2px solid ${p.color}` : undefined }}
               >
-                <span className="h-3 w-3 shrink-0 border border-[#5a4030]" style={{ background: p.color }} />
+                {p.kind === "hammer" ? (
+                  <WeaponMini id={p.id} ore={ore?.color ?? p.color} crystal={crystal?.color ?? "#fff4c8"} />
+                ) : (
+                  <span className="h-3 w-3 shrink-0 border border-[#5a4030]" style={{ background: p.color }} />
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block font-pixel text-[9px]" style={{ color: have ? p.color : "#5a5a5a" }}>
                     {p.name}
@@ -1453,6 +1474,11 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
         <p className="text-center font-pixel text-[8px] text-muted">
           {ore && crystal && hammer ? `${ore.name} + ${crystal.name.split(" ")[0]} + ${hammer.name.split(" ").slice(-1)[0]}` : "Pick one of each. Buff wisps drop stock."}
         </p>
+        {hammer ? (
+          <div className="flex justify-center border-2 border-[#5a4030] bg-[#1c1612] py-2">
+            <WeaponMini id={hammer.id} ore={ore?.color ?? hammer.color} crystal={crystal?.color ?? "#fff4c8"} px={4} />
+          </div>
+        ) : null}
         <PixelButton onClick={() => engine?.closeForge()}>Back</PixelButton>
       </div>
     </div>
@@ -1491,6 +1517,10 @@ function WeaponDock({ engine, hud }: { engine: GameEngine | null; hud: HudState 
       ) : null}
     </div>
   );
+}
+
+function WeaponMini({ id, ore, crystal, px = 2 }: { id: string; ore: string; crystal: string; px?: number }) {
+  return <PixelSprite rows={weaponGlyph(id)} palette={{ h: "#2a1c14", H: "#6a4a30", b: ore, c: crystal }} px={px} />;
 }
 
 function Pause({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {

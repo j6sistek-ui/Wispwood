@@ -4,6 +4,7 @@ import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawBuffWisp } from "./buff-wisp";
+import { drawWeaponGlyph } from "./weapon-sprites";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 import { FUSIONS, drawFusionSigil } from "./fusions";
 import { rollForgePiece, parseForgeBag, makeWeapon, weaponKey, pieceById, FORGE_PIECES, type ForgedWeapon } from "./forge";
@@ -1010,31 +1011,20 @@ export class GameEngine {
   private drawHeldWeapon() {
     const w = this.currentWeapon();
     if (!w) return;
-    const ctx = this.ctx;
     const ang = Math.atan2(this.aim.y, this.aim.x);
     const swing = this.swingT > 0 ? (0.5 - this.swingT / 0.18) * w.arc - w.arc * 0.25 : 0;
-    const dir = ang + swing;
-    const len = w.reach * (w.stance === "spear" ? 1 : w.stance === "whip" ? 1.05 : 0.85);
-    const thick = w.stance === "maul" ? 10 : w.stance === "hammer" ? 8 : w.stance === "whip" ? 4 : 5;
-    const ox = this.player.x + Math.cos(dir) * 18;
-    const oy = this.player.y + Math.sin(dir) * 16;
-    ctx.save();
-    ctx.lineCap = "square";
-    ctx.strokeStyle = "#3a2a22";
-    ctx.lineWidth = Math.max(3, thick * 0.45);
-    ctx.beginPath();
-    ctx.moveTo(ox, oy);
-    ctx.lineTo(ox + Math.cos(dir) * len * 0.45, oy + Math.sin(dir) * len * 0.45);
-    ctx.stroke();
-    ctx.strokeStyle = w.color;
-    ctx.lineWidth = thick;
-    ctx.beginPath();
-    ctx.moveTo(ox + Math.cos(dir) * len * 0.42, oy + Math.sin(dir) * len * 0.42);
-    ctx.lineTo(ox + Math.cos(dir) * len, oy + Math.sin(dir) * len);
-    ctx.stroke();
-    ctx.fillStyle = w.color2;
-    ctx.fillRect(ox + Math.cos(dir) * len - 3, oy + Math.sin(dir) * len - 3, 6, 6);
-    ctx.restore();
+    const px = w.stance === "maul" ? 4 : w.stance === "spear" ? 3 : 3;
+    drawWeaponGlyph(
+      this.ctx,
+      w.hammer,
+      this.player.x + this.aim.x * 10,
+      this.player.y + this.aim.y * 8,
+      ang + swing,
+      px,
+      w.color,
+      w.color2,
+      this.swingT > 0.08,
+    );
   }
 
   spinWheel(): "poor" | "miss" | "craft" | "jackpot" {
