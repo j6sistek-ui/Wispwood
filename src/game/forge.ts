@@ -73,3 +73,26 @@ export const FORGE_TABS: Array<{ kind: ForgeKind; label: string }> = [
   { kind: "crystal", label: "Magic crystal" },
   { kind: "hammer", label: "Hammer" },
 ];
+
+export const FORGE_PIECES: ForgePiece[] = [...FORGE_ORES, ...FORGE_CRYSTALS, ...FORGE_HAMMERS];
+
+const PIECE_IDS = new Set(FORGE_PIECES.map((p) => p.id));
+
+export function pieceById(id: string): ForgePiece | undefined {
+  return FORGE_PIECES.find((p) => p.id === id);
+}
+
+export function parseForgeBag(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!PIECE_IDS.has(k)) continue;
+    const n = typeof v === "number" ? Math.floor(v) : 0;
+    if (n > 0) out[k] = n;
+  }
+  return out;
+}
+
+export function rollForgePiece(): ForgePiece {
+  return FORGE_PIECES[Math.floor(Math.random() * FORGE_PIECES.length)]!;
+}

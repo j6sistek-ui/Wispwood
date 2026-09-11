@@ -5,6 +5,7 @@ import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 import { FUSIONS, drawFusionSigil } from "./fusions";
+import { rollForgePiece, parseForgeBag } from "./forge";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "forge" | "dead";
@@ -135,6 +136,7 @@ export type HudState = {
   runTrinkoo: number;
   ownedRelics: RelicId[];
   equipped: Array<RelicId | null>;
+  forgeBag: Record<string, number>;
   sandboxPlaying: boolean;
   sandboxEdit: number;
   sandboxDeck: Array<{ count: number; label: string }>;
@@ -429,7 +431,8 @@ export class GameEngine {
   runTrinkoo = 0;
   ownedRelics: RelicId[] = [];
   equipped: Array<RelicId | null> = emptyLoadout();
-  private metaSave = { trinkoo: 0, ownedRelics: [] as RelicId[], equipped: emptyLoadout() };
+  forgeBag: Record<string, number> = {};
+  private metaSave = { trinkoo: 0, ownedRelics: [] as RelicId[], equipped: emptyLoadout(), forgeBag: {} as Record<string, number> };
   private secondWindUsed = false;
   private sandboxDeck: SandboxUnit[][] = [[]];
   private sandboxEdit = 0;
@@ -472,6 +475,7 @@ export class GameEngine {
     this.trinkoo = save.trinkoo;
     this.ownedRelics = [...save.ownedRelics];
     this.equipped = parseLoadout(save.equipped);
+    this.forgeBag = parseForgeBag(save.forgeBag);
     this.captureMeta();
     this.audio.setMuted(save.muted);
     this.reduced =
@@ -523,6 +527,7 @@ export class GameEngine {
       runTrinkoo: this.runTrinkoo,
       ownedRelics: [...this.ownedRelics],
       equipped: [...this.equipped],
+      forgeBag: { ...this.forgeBag },
       sandboxPlaying: this.sandboxPlaying,
       sandboxEdit: this.sandboxEdit,
       sandboxDeck: this.sandboxDeck.map((units, i) => ({
@@ -563,6 +568,7 @@ export class GameEngine {
       trinkoo: this.maxRun ? this.metaSave.trinkoo : this.trinkoo,
       ownedRelics: this.maxRun ? [...this.metaSave.ownedRelics] : [...this.ownedRelics],
       equipped: this.maxRun ? [...this.metaSave.equipped] : [...this.equipped],
+      forgeBag: this.maxRun ? { ...this.metaSave.forgeBag } : { ...this.forgeBag },
     });
   }
 
@@ -655,6 +661,7 @@ export class GameEngine {
       trinkoo: this.trinkoo,
       ownedRelics: [...this.ownedRelics],
       equipped: [...this.equipped],
+      forgeBag: { ...this.forgeBag },
     };
   }
 
@@ -2797,6 +2804,7 @@ export class GameEngine {
       this.floatAt(e.x, e.y - 30, "+hp", "#c45a4a");
     }
     if (e.kind === "boss") this.grantTrinkoo(5, e.x, e.y);
+    if (e.kind === "buffwisp") this.grantForgeDrop(e.x, e.y);
     this.spawnCoins(e.x, e.y, coins);
     this.burstSparks(e.x, e.y, sparkN, sparkColor);
     if (Math.random() < 0.28) this.spawnPickup(e.x, e.y);
