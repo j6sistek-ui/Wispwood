@@ -170,21 +170,21 @@ const CRYSTAL_ABILITY: Record<string, { ability: WeaponAbility; cd: number }> = 
 };
 
 const HAMMER_STANCE: Record<string, { stance: WeaponStance; reach: number; arc: number; cooldown: number; dmg: number }> = {
-  "ember-mallet": { stance: "hammer", reach: 58, arc: 1.4, cooldown: 0.42, dmg: 22 },
-  "ice-peen": { stance: "blade", reach: 64, arc: 1.1, cooldown: 0.34, dmg: 20 },
-  "storm-hammer": { stance: "hammer", reach: 62, arc: 1.3, cooldown: 0.4, dmg: 24 },
-  "void-maul": { stance: "maul", reach: 70, arc: 1.6, cooldown: 0.62, dmg: 34 },
-  "thorn-hammer": { stance: "whip", reach: 78, arc: 1.8, cooldown: 0.48, dmg: 18 },
-  "blast-sledge": { stance: "maul", reach: 74, arc: 1.5, cooldown: 0.7, dmg: 38 },
-  "gold-hammer": { stance: "hammer", reach: 60, arc: 1.2, cooldown: 0.38, dmg: 21 },
-  "night-maul": { stance: "maul", reach: 72, arc: 1.45, cooldown: 0.58, dmg: 32 },
-  "root-mallet": { stance: "hammer", reach: 56, arc: 1.35, cooldown: 0.44, dmg: 23 },
-  "bone-hammer": { stance: "blade", reach: 54, arc: 0.95, cooldown: 0.28, dmg: 17 },
-  "moon-peen": { stance: "spear", reach: 82, arc: 0.7, cooldown: 0.36, dmg: 26 },
-  "ash-sledge": { stance: "maul", reach: 76, arc: 1.55, cooldown: 0.66, dmg: 36 },
-  "rime-hammer": { stance: "hammer", reach: 60, arc: 1.25, cooldown: 0.4, dmg: 22 },
-  "bramble-maul": { stance: "whip", reach: 80, arc: 1.7, cooldown: 0.52, dmg: 19 },
-  "star-hammer": { stance: "spear", reach: 88, arc: 0.55, cooldown: 0.4, dmg: 30 },
+  "ember-mallet": { stance: "hammer", reach: 62, arc: 1.5, cooldown: 0.4, dmg: 48 },
+  "ice-peen": { stance: "blade", reach: 68, arc: 1.15, cooldown: 0.32, dmg: 44 },
+  "storm-hammer": { stance: "hammer", reach: 66, arc: 1.4, cooldown: 0.38, dmg: 52 },
+  "void-maul": { stance: "maul", reach: 76, arc: 1.7, cooldown: 0.58, dmg: 74 },
+  "thorn-hammer": { stance: "whip", reach: 84, arc: 1.9, cooldown: 0.44, dmg: 42 },
+  "blast-sledge": { stance: "maul", reach: 80, arc: 1.6, cooldown: 0.64, dmg: 84 },
+  "gold-hammer": { stance: "hammer", reach: 64, arc: 1.25, cooldown: 0.36, dmg: 46 },
+  "night-maul": { stance: "maul", reach: 78, arc: 1.55, cooldown: 0.54, dmg: 70 },
+  "root-mallet": { stance: "hammer", reach: 60, arc: 1.4, cooldown: 0.4, dmg: 50 },
+  "bone-hammer": { stance: "blade", reach: 58, arc: 1.0, cooldown: 0.26, dmg: 40 },
+  "moon-peen": { stance: "spear", reach: 88, arc: 0.75, cooldown: 0.34, dmg: 58 },
+  "ash-sledge": { stance: "maul", reach: 82, arc: 1.65, cooldown: 0.6, dmg: 80 },
+  "rime-hammer": { stance: "hammer", reach: 64, arc: 1.3, cooldown: 0.38, dmg: 48 },
+  "bramble-maul": { stance: "whip", reach: 86, arc: 1.8, cooldown: 0.48, dmg: 44 },
+  "star-hammer": { stance: "spear", reach: 94, arc: 0.6, cooldown: 0.36, dmg: 66 },
 };
 
 export function weaponKey(ore: string, crystal: string, hammer: string) {

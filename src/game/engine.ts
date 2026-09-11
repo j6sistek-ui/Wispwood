@@ -444,6 +444,8 @@ export class GameEngine {
   hands: "spell" | "weapon" = "spell";
   private weaponIndex = 0;
   private swingT = 0;
+  private swingDur = 0.34;
+  private swingAng = 0;
   private swingCd = 0;
   private abilityT = 0;
   private swingHit = new Set<Enemy>();
@@ -893,34 +895,48 @@ export class GameEngine {
     const w = this.currentWeapon();
     if (!w) return;
     this.swingCd = w.cooldown;
-    this.swingT = 0.18;
+    this.swingDur = 0.3 + w.arc * 0.08;
+    this.swingT = this.swingDur;
+    this.swingAng = Math.atan2(this.aim.y, this.aim.x);
     this.swingHit.clear();
     this.audio.fire();
-    this.player.vx -= this.aim.x * 40;
-    this.player.vy -= this.aim.y * 40;
-    this.trauma = Math.min(1, this.trauma + 0.08);
+    this.player.vx -= this.aim.x * 12;
+    this.player.vy -= this.aim.y * 12;
+    this.trauma = Math.min(1, this.trauma + 0.04);
+    const hx = this.player.x + this.aim.x * w.reach * 0.7;
+    const hy = this.player.y + this.aim.y * w.reach * 0.7;
+    this.burstSparks(hx, hy, 4, w.color2);
+  }
+
+  private swingProgress() {
+    if (this.swingT <= 0 || this.swingDur <= 0) return 1;
+    const u = 1 - this.swingT / this.swingDur;
+    return 1 - (1 - u) * (1 - u) * (1 - u);
+  }
+
+  private swingFacing(w: ForgedWeapon, p = this.swingProgress()) {
+    const wind = -w.arc * 0.55;
+    const follow = w.arc * 0.7;
+    return this.swingAng + wind + (follow - wind) * p;
   }
 
   private tickSwing() {
     const w = this.currentWeapon();
     if (!w) return;
+    const dir = this.swingFacing(w);
     const reach = w.reach;
-    const ang = Math.atan2(this.aim.y, this.aim.x);
     for (const e of this.enemies) {
       if (!e.alive || this.swingHit.has(e)) continue;
       const dx = e.x - this.player.x;
       const dy = e.y - this.player.y;
       const dist = Math.hypot(dx, dy);
       if (dist > reach + e.r) continue;
-      const rel = Math.atan2(dy, dx) - ang;
+      const rel = Math.atan2(dy, dx) - dir;
       const a = ((rel + Math.PI) % (Math.PI * 2)) - Math.PI;
-      if (Math.abs(a) > w.arc * 0.5 + 0.15) continue;
+      if (Math.abs(a) > 0.55) continue;
       this.swingHit.add(e);
       this.hitWithWeapon(e, w, dx, dy);
     }
-    const hx = this.player.x + this.aim.x * reach * 0.7;
-    const hy = this.player.y + this.aim.y * reach * 0.7;
-    this.burstSparks(hx, hy, 1, w.color2);
   }
 
   private hitWithWeapon(e: Enemy, w: ForgedWeapon, dx: number, dy: number) {
@@ -1011,20 +1027,21 @@ export class GameEngine {
   private drawHeldWeapon() {
     const w = this.currentWeapon();
     if (!w) return;
-    const ang = Math.atan2(this.aim.y, this.aim.x);
-    const swing = this.swingT > 0 ? (0.5 - this.swingT / 0.18) * w.arc - w.arc * 0.25 : 0;
-    const px = w.stance === "maul" ? 4 : w.stance === "spear" ? 3 : 3;
-    drawWeaponGlyph(
-      this.ctx,
-      w.hammer,
-      this.player.x + this.aim.x * 10,
-      this.player.y + this.aim.y * 8,
-      ang + swing,
-      px,
-      w.color,
-      w.color2,
-      this.swingT > 0.08,
-    );
+    const swinging = this.swingT > 0;
+    const ang = swinging ? this.swingFacing(w) : Math.atan2(this.aim.y, this.aim.x);
+    const px = swinging ? 4 : w.stance === "maul" ? 4 : 3;
+    const ox = this.player.x + Math.cos(ang) * 10;
+    const oy = this.player.y + Math.sin(ang) * 8;
+    if (swinging) {
+      const ctx = this.ctx;
+      for (let g = 3; g >= 1; g--) {
+        const p = Math.max(0, this.swingProgress() - g * 0.09);
+        ctx.globalAlpha = 0.16 * (4 - g);
+        drawWeaponGlyph(ctx, w.hammer, ox, oy, this.swingFacing(w, p), px, w.color, w.color2, false);
+      }
+      ctx.globalAlpha = 1;
+    }
+    drawWeaponGlyph(this.ctx, w.hammer, ox, oy, ang, px, w.color, w.color2, swinging && this.swingProgress() > 0.35 && this.swingProgress() < 0.8);
   }
 
   spinWheel(): "poor" | "miss" | "craft" | "jackpot" {
