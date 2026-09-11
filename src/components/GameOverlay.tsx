@@ -9,7 +9,7 @@ import { glyphFor, coreGlyph, CORE_COLOR } from "@/game/craft-sprites";
 import { BOSSES } from "@/game/bosses";
 import { RELICS, RELIC_COST, relicById, type RelicId } from "@/game/relics";
 import { FORGE_CATALOG, FORGE_PIECES, ABILITY_LABEL, type ForgeKind, type ForgePiece } from "@/game/forge";
-import { weaponGlyph } from "@/game/weapon-sprites";
+import { weaponGlyph, pieceGlyph, piecePalette } from "@/game/weapon-sprites";
 import { asset } from "@/game/paths";
 import { useP2PRoom, type P2PRoomHandle } from "@/lib/multiplayer/use-p2p-room";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -892,7 +892,7 @@ function SpawnMenu({
                   onClick={() => engine?.sandboxGivePiece(p.id)}
                   className="mb-1 flex w-full items-center gap-2 border border-border bg-surface px-2 py-1.5 text-left last:mb-0"
                 >
-                  <span className="h-3 w-3 shrink-0 border border-muted" style={{ background: p.color }} />
+                  <PieceMini id={p.id} color={p.color} />
                   <span className="min-w-0 flex-1 font-pixel text-[8px]" style={{ color: p.color }}>
                     {p.name}
                   </span>
@@ -1340,12 +1340,13 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
                   type="button"
                   data-ui
                   onClick={() => pick(p)}
-                  className="relative h-7 w-7 shrink-0 border"
+                  className="relative shrink-0 border p-0.5"
                   style={{
-                    background: p.color,
                     borderColor: picked[p.kind]?.id === p.id ? "#fff4c8" : "#5a4030",
+                    background: "#1c1612",
                   }}
                 >
+                  <PieceMini id={p.id} color={p.color} gem={p.kind === "hammer" ? "#fff4c8" : p.color} />
                   <span className="absolute bottom-0 right-0 bg-[#16110d] px-0.5 font-pixel text-[7px] text-[#e8c070]">
                     {hud.forgeBag[p.id]}
                   </span>
@@ -1373,9 +1374,18 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
               }
             >
               <p className="font-pixel text-[7px] text-[#8a6a4a]">{label}</p>
-              <p className="mt-1 truncate font-pixel text-[8px]" style={{ color: piece?.color ?? "#5a5a5a" }}>
-                {piece?.name ?? "—"}
-              </p>
+              {piece ? (
+                <span className="mt-1 flex justify-center">
+                  <PieceMini
+                    id={piece.id}
+                    color={piece.color}
+                    gem={kind === "hammer" ? crystal?.color ?? "#fff4c8" : piece.color}
+                    ore={kind === "hammer" ? ore?.color ?? piece.color : piece.color}
+                  />
+                </span>
+              ) : (
+                <p className="mt-1 font-pixel text-[8px] text-[#5a5a5a]">—</p>
+              )}
             </button>
           ))}
         </div>
@@ -1401,7 +1411,7 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
                 {p.kind === "hammer" ? (
                   <WeaponMini id={p.id} ore={ore?.color ?? p.color} crystal={crystal?.color ?? "#fff4c8"} />
                 ) : (
-                  <span className="h-3 w-3 shrink-0 border border-[#5a4030]" style={{ background: p.color }} />
+                  <PieceMini id={p.id} color={p.color} />
                 )}
                 <span className="min-w-0 flex-1 truncate font-pixel text-[8px]" style={{ color: have ? p.color : "#5a5a5a" }}>
                   {p.name}
@@ -1456,8 +1466,24 @@ function WeaponDock({ engine, hud }: { engine: GameEngine | null; hud: HudState 
   );
 }
 
+function PieceMini({
+  id,
+  color,
+  gem,
+  ore,
+  px = 2,
+}: {
+  id: string;
+  color: string;
+  gem?: string;
+  ore?: string;
+  px?: number;
+}) {
+  return <PixelSprite rows={pieceGlyph(id)} palette={piecePalette(id, ore ?? color, gem ?? color)} px={px} />;
+}
+
 function WeaponMini({ id, ore, crystal, px = 2 }: { id: string; ore: string; crystal: string; px?: number }) {
-  return <PixelSprite rows={weaponGlyph(id)} palette={{ h: "#2a1c14", H: "#6a4a30", b: ore, c: crystal }} px={px} />;
+  return <PixelSprite rows={weaponGlyph(id)} palette={piecePalette(id, ore, crystal)} px={px} />;
 }
 
 function Pause({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
