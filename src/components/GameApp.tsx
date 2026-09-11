@@ -48,6 +48,7 @@ const idleHud: HudState = {
   sandboxDeck: [{ count: 0, label: "Wave 1 empty" }],
   bodySize: 1,
   bodySpeed: 1,
+  omen: "calm",
   tunes: {
     ember: { move: 1, reload: 1, size: 1, dmg: 1 },
     frost: { move: 1, reload: 1, size: 1, dmg: 1 },

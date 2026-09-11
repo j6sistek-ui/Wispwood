@@ -1,6 +1,6 @@
 import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
 import type { HudState } from "@/game/engine";
-import { FUSE_COST, fusionKey, isCoreSpell, MAX_SPELL_UP, spellDamage, upgradeCost, type SpellTuneStat } from "@/game/engine";
+import { FUSE_COST, fusionKey, isCoreSpell, MAX_SPELL_UP, OMEN_BLURB, OMEN_LABEL, spellDamage, upgradeCost, type SpellTuneStat } from "@/game/engine";
 import { fusionGlyph, FUSIONS } from "@/game/fusions";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
@@ -160,6 +160,11 @@ function Hud({
           <p className="font-pixel text-xl tabular-nums leading-none text-gold">{hud.bestNight}</p>
         </div>
       </div>
+      {hud.sandbox ? null : (
+        <p className="mx-auto mt-1 max-w-sm text-center font-pixel text-[8px] text-[#c8a4ff]">
+          {OMEN_LABEL[hud.omen]} · {OMEN_BLURB[hud.omen]}
+        </p>
+      )}
       <p className="mx-auto mt-1 max-w-sm text-right font-pixel text-[8px] tabular-nums text-gold">
         {hud.gold} gold · {hud.score} pts
       </p>
@@ -637,7 +642,7 @@ function Title({
         )}
         {menu === "home" ? (
           <p className="text-center font-pixel text-[8px] leading-relaxed text-subtle">
-            WASD move · aim to shoot · B book · R arms · F art
+            WASD move · aim to shoot · B book · R arms · F art · nights change
           </p>
         ) : null}
       </div>
@@ -1028,7 +1033,7 @@ function PixelBanner({ text }: { text: string }) {
 function FieldManual() {
   const [page, setPage] = useState(0);
   const pages = [
-    { title: "Field book", kind: "cover" as const, lines: ["Hold the lantern", "Outlast the night", "WASD move · aim shoot", "B book · R arms · F art"] },
+    { title: "Field book", kind: "cover" as const, lines: ["Hold the lantern", "Outlast the night", "Each night shifts the pack", "B book · R arms · F art"] },
     { title: "Ember", kind: "ember" as const, lines: ["Core fire bolt", "Weaves as it flies", "Burns 1/sec for 3s", "Starter spell"] },
     { title: "Ice", kind: "frost" as const, lines: ["Three shots side by side", "Light blue snow trail", "Slows what it hits", "Always in the book"] },
     { title: "Bolt", kind: "bolt" as const, lines: ["Buy for 100g", "Fast yellow lance", "1.5s wait", "Trail stuns foes"] },
@@ -1040,6 +1045,7 @@ function FieldManual() {
     { title: "Trinkoo", kind: "relics" as const, lines: ["+1 trinkoo a survived night", "+5 for a boss", "Roll 10t for a relic", "Wear 3. Shop is on title"] },
     { title: "Forge", kind: "forge" as const, lines: ["Buff wisps drop pieces", "Ore + crystal + hammer", "G opens the forge", "R swaps spell and arms"] },
     { title: "Arms", kind: "arms" as const, lines: ["Drag the aim to swing", "Tap for a poke", "F casts the crystal art", "Tab cycles weapons"] },
+    { title: "Nights", kind: "nights" as const, lines: ["Still dusk then it turns", "Swarm · Ironhide · Gale", "Fangs · Horde", "Read the omen. Play it."] },
   ];
   const cur = pages[page] ?? pages[0]!;
   const flip = (dir: -1 | 1) => {
@@ -1058,6 +1064,8 @@ function FieldManual() {
       <span className="font-pixel text-lg text-[#e08a3c]">G</span>
     ) : cur.kind === "arms" ? (
       <span className="font-pixel text-lg text-[#c45a48]">R</span>
+    ) : cur.kind === "nights" ? (
+      <span className="font-pixel text-lg text-[#c8a4ff]">N</span>
     ) : (
       <CoreGlyph spell={cur.kind} />
     );

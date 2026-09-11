@@ -96,7 +96,7 @@ export function fusionOf(a: Spell, b: Spell): FusedSpell | null {
 export const MAX_SPELL_UP = 20;
 
 export function upgradeCost(level: number) {
-  return Math.floor(10 * Math.pow(1.38, level));
+  return Math.floor(18 * Math.pow(1.48, level));
 }
 
 export function spellDamage(spell: Spell, damageUp: number, crafted?: CraftedSpell | null) {
@@ -150,6 +150,7 @@ export type HudState = {
   bodySize: number;
   bodySpeed: number;
   tunes: Record<Spell, SpellTune>;
+  omen: NightOmen;
 };
 
 type Dir = "down" | "left" | "right" | "up";
@@ -282,7 +283,7 @@ const ARENA = 2200;
 const VIEW_ZOOM = 1.45;
 const FIXED = 1 / 60;
 const PLAYER_R = 16;
-const PLAYER_SPEED = 268;
+const PLAYER_SPEED = 246;
 const PLAYER_ACCEL = 16;
 const PLAYER_STOP = 18;
 const BULLET_SPEED = 560;
@@ -292,7 +293,7 @@ const VOID_CD = 2.5;
 const BOOM_CD = 0.2;
 const BOLT_SPEED = 1280;
 const MAX_BULLETS = 140;
-const MAX_ENEMIES = 48;
+const MAX_ENEMIES = 64;
 const MAX_PICKUPS = 16;
 const MAX_SPARKS = 72;
 const MAX_ARCS = 18;
@@ -346,6 +347,33 @@ function coinCountFor(kind: EnemyKind) {
   if (kind === "brute") return 5;
   if (kind === "runner") return 3;
   return 2;
+}
+
+export type NightOmen = "calm" | "swarm" | "iron" | "gale" | "fangs" | "horde";
+
+const OMEN_CYCLE: NightOmen[] = ["swarm", "iron", "gale", "fangs", "horde"];
+
+export const OMEN_LABEL: Record<NightOmen, string> = {
+  calm: "Still dusk",
+  swarm: "Swarm",
+  iron: "Ironhide",
+  gale: "Gale",
+  fangs: "Fangs",
+  horde: "Horde",
+};
+
+export const OMEN_BLURB: Record<NightOmen, string> = {
+  calm: "Learn the clearing",
+  swarm: "More of them",
+  iron: "They take more hits",
+  gale: "They close fast",
+  fangs: "Contact hurts more",
+  horde: "Heavies in the pack",
+};
+
+function omenForNight(wave: number): NightOmen {
+  if (wave <= 1) return "calm";
+  return OMEN_CYCLE[(wave - 2) % OMEN_CYCLE.length]!;
 }
 
 function circleHit(ax: number, ay: number, ar: number, bx: number, by: number, br: number) {
@@ -483,6 +511,7 @@ export class GameEngine {
   private toSpawn = 0;
   private spawnT = 0;
   private waveGap = 0;
+  private omen: NightOmen = "calm";
   private animT = 0;
   private burnAcc = 0;
 
@@ -583,6 +612,7 @@ export class GameEngine {
       })),
       bodySize: this.bodySize,
       bodySpeed: this.bodySpeed,
+      omen: this.omen,
       tunes: {
         ember: { ...this.tunes.ember },
         frost: { ...this.tunes.frost },
@@ -1861,6 +1891,7 @@ export class GameEngine {
     this.fused = null;
     this.spell = "ember";
     this.wave = 0;
+    this.omen = "calm";
     this.toSpawn = 0;
     this.spawnT = 0;
     this.waveGap = 0.4;
@@ -1999,9 +2030,10 @@ export class GameEngine {
       this.bestNight = this.wave;
       this.persist();
     }
-    this.spawnT = 0.2;
+    this.spawnT = 0.35;
     this.waveGap = 0;
     this.audio.wave();
+    this.omen = this.richRun ? "calm" : omenForNight(this.wave);
     if (this.richRun) {
       if (!this.sandboxPlaying) {
         this.toSpawn = 0;
@@ -2023,16 +2055,22 @@ export class GameEngine {
       this.emit();
       return;
     }
-    this.toSpawn = 5 + this.wave * 3;
+    this.toSpawn = 6 + this.wave * 4;
+    if (this.omen === "swarm") this.toSpawn = Math.round(this.toSpawn * 1.45);
+    if (this.omen === "horde") this.toSpawn = Math.round(this.toSpawn * 1.18);
     this.floatAt(this.player.x, this.player.y - 40, `Night ${this.wave}`);
+    if (!this.richRun) this.floatAt(this.player.x, this.player.y - 58, OMEN_LABEL[this.omen], "#c8a4ff");
     if (this.wave > 0 && this.wave % 10 === 0) {
       const id = (Math.floor(this.wave / 10) - 1) % BOSSES.length;
       this.placeBoss(id);
-      this.toSpawn = 8;
-      this.floatAt(this.player.x, this.player.y - 72, `BOSS ${BOSSES[id]!.name}`, BOSSES[id]!.color2);
+      this.toSpawn = this.omen === "swarm" ? 12 : 10;
+      this.floatAt(this.player.x, this.player.y - 76, `BOSS ${BOSSES[id]!.name}`, BOSSES[id]!.color2);
     } else if (this.wave % 10 === 5) {
       this.spawnEnemy("buffwisp");
-      this.floatAt(this.player.x, this.player.y - 72, "BUFF WISP", "#e8c070");
+      this.floatAt(this.player.x, this.player.y - 76, "BUFF WISP", "#e8c070");
+    } else {
+      if (this.wave >= 3) this.spawnEnemy("brute");
+      if (this.wave >= 7) this.spawnEnemy("elite");
     }
     this.emit();
   }
@@ -3551,7 +3589,7 @@ export class GameEngine {
     if (e.kind === "buffwisp") this.grantForgeDrop(e.x, e.y);
     this.spawnCoins(e.x, e.y, coins);
     this.burstSparks(e.x, e.y, sparkN, sparkColor);
-    if (Math.random() < 0.28) this.spawnPickup(e.x, e.y);
+    if (Math.random() < 0.16) this.spawnPickup(e.x, e.y);
     this.emit();
   }
 
@@ -3575,7 +3613,7 @@ export class GameEngine {
       const live = this.enemies.some((e) => e.alive);
       if (!live) {
         this.waveGap += dt;
-        if (this.waveGap > 1.6) {
+        if (this.waveGap > 1.15) {
           this.score += this.wave * 40;
           this.beginWave();
         }
@@ -3587,7 +3625,7 @@ export class GameEngine {
       if (this.sandboxPlaying) this.spawnSandboxUnit();
       else this.spawnEnemy();
       this.toSpawn -= 1;
-      this.spawnT = Math.max(0.18, 0.62 - this.wave * 0.04);
+      this.spawnT = Math.max(0.16, 0.55 - this.wave * 0.032) * (this.omen === "swarm" ? 0.78 : this.omen === "gale" ? 0.88 : 1);
     }
   }
 
@@ -3638,24 +3676,30 @@ export class GameEngine {
     e.bossId = -1;
     if (e.kind === "buffwisp") {
       e.r = 38;
-      e.speed = 70 + this.wave * 3;
-      e.maxHp = 140 + this.wave * 18;
+      e.speed = 74 + this.wave * 4;
+      e.maxHp = 220 + this.wave * 28;
     } else if (e.kind === "elite") {
       e.r = 26;
-      e.speed = 90 + this.wave * 3;
-      e.maxHp = 72 + this.wave * 14;
+      e.speed = 92 + this.wave * 4;
+      e.maxHp = 110 + this.wave * 20;
     } else if (e.kind === "brute") {
       e.r = 24;
-      e.speed = 54 + this.wave * 2;
-      e.maxHp = 46 + this.wave * 9;
+      e.speed = 56 + this.wave * 2.4;
+      e.maxHp = 72 + this.wave * 14;
     } else if (e.kind === "runner") {
       e.r = 14;
-      e.speed = 136 + this.wave * 7;
-      e.maxHp = 10 + this.wave * 2;
+      e.speed = 142 + this.wave * 8;
+      e.maxHp = 16 + this.wave * 4;
     } else {
       e.r = 18;
-      e.speed = 82 + this.wave * 5;
-      e.maxHp = 18 + this.wave * 5;
+      e.speed = 86 + this.wave * 6;
+      e.maxHp = 28 + this.wave * 8;
+    }
+    if (this.omen === "iron") e.maxHp = Math.round(e.maxHp * 1.42);
+    if (this.omen === "gale") e.speed *= 1.28;
+    if (this.omen === "horde") {
+      e.maxHp = Math.round(e.maxHp * 1.12);
+      e.speed *= 1.08;
     }
     e.hp = e.maxHp;
     if (e.kind === "elite") this.floatAt(e.x, e.y - 28, "Nightbound");
@@ -3674,8 +3718,8 @@ export class GameEngine {
     e.x = clamp(this.player.x + Math.cos(ang) * spread, 90, ARENA - 90);
     e.y = clamp(this.player.y + Math.sin(ang) * spread, 90, ARENA - 90);
     e.r = def.r;
-    e.speed = def.speed;
-    e.maxHp = def.hp + Math.max(0, this.wave - 10) * 40;
+    e.speed = def.speed * (this.omen === "gale" ? 1.18 : 1);
+    e.maxHp = Math.round((def.hp + this.wave * 55) * (this.omen === "iron" ? 1.25 : 1));
     e.hp = e.maxHp;
     e.flash = 0;
     e.frame = 0;
@@ -3702,9 +3746,21 @@ export class GameEngine {
   private pickEnemyKind(): EnemyKind {
     const w = this.wave;
     const roll = Math.random();
-    if (w >= 4 && roll < 0.12 + Math.min(0.12, (w - 4) * 0.02)) return "elite";
-    if (w >= 2 && roll < 0.28 + Math.min(0.12, w * 0.015)) return "brute";
-    if (w >= 2 && roll < 0.52) return "runner";
+    if (this.omen === "horde") {
+      if (w >= 4 && roll < 0.22) return "elite";
+      if (roll < 0.52) return "brute";
+      if (roll < 0.78) return "runner";
+      return "wisp";
+    }
+    if (this.omen === "swarm") {
+      if (w >= 4 && roll < 0.1) return "elite";
+      if (w >= 2 && roll < 0.22) return "brute";
+      if (roll < 0.7) return "runner";
+      return "wisp";
+    }
+    if (w >= 3 && roll < 0.16 + Math.min(0.16, (w - 3) * 0.025)) return "elite";
+    if (w >= 2 && roll < 0.34 + Math.min(0.16, w * 0.02)) return "brute";
+    if (w >= 2 && roll < 0.62) return "runner";
     return "wisp";
   }
 
@@ -3826,7 +3882,8 @@ export class GameEngine {
         e.y = r.y;
       }
       if (e.stun <= 0 && this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, this.bodyR())) {
-        const hit = e.kind === "buffwisp" ? 16 : e.kind === "elite" ? 22 : e.kind === "brute" ? 18 : e.kind === "runner" ? 10 : 8;
+        let hit = e.kind === "buffwisp" ? 22 : e.kind === "elite" ? 30 : e.kind === "brute" ? 26 : e.kind === "runner" ? 14 : 12;
+        if (this.omen === "fangs") hit = Math.round(hit * 1.45);
         this.hurtLantern(hit, px - e.x, py - e.y, 220);
       }
     }
@@ -4048,7 +4105,7 @@ export class GameEngine {
       return;
     }
     this.player.hp -= dmg;
-    this.player.invuln = 0.7;
+    this.player.invuln = 0.48;
     this.player.vx += (kx / m) * knock;
     this.player.vy += (ky / m) * knock;
     this.markPlayerKnock(kx / m, ky / m, 0.3);
