@@ -3,6 +3,7 @@ import { GameAudio } from "./audio";
 import { loadAssets, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
+import { drawBuffWisp } from "./buff-wisp";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 import { FUSIONS, drawFusionSigil } from "./fusions";
 import { rollForgePiece, parseForgeBag, makeWeapon, weaponKey, pieceById, FORGE_PIECES, type ForgedWeapon } from "./forge";
@@ -4064,10 +4065,13 @@ export class GameEngine {
       this.drawBoss(e);
       return;
     }
+    if (e.kind === "buffwisp") {
+      this.drawBuffWispEnemy(e);
+      return;
+    }
     const img = this.assets!.wisp[Math.floor(e.frame) % 4]!;
-    const s = e.kind === "buffwisp" ? 118 : e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
+    const s = e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
     if (e.flash > 0) this.ctx.filter = "brightness(2.4)";
-    else if (e.kind === "buffwisp") this.ctx.filter = "saturate(1.8) brightness(1.25) hue-rotate(-8deg)";
     else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
     else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
     else if (e.freeze > 0) this.ctx.filter = "hue-rotate(160deg) saturate(0.85) brightness(1.15)";
@@ -4080,6 +4084,23 @@ export class GameEngine {
     this.ctx.fillRect(e.x - barW / 2, e.y - s * 0.78, barW, 3);
     this.ctx.fillStyle = "#ecece8";
     this.ctx.fillRect(e.x - barW / 2, e.y - s * 0.78, barW * clamp(e.hp / e.maxHp, 0, 1), 3);
+  }
+
+  private drawBuffWispEnemy(e: Enemy) {
+    if (e.flash > 0) this.ctx.filter = "brightness(2.4)";
+    else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
+    else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
+    else if (e.freeze > 0) this.ctx.filter = "hue-rotate(160deg) saturate(0.85) brightness(1.15)";
+    else if (e.burn > 0) this.ctx.filter = "sepia(0.6) saturate(2.2) hue-rotate(-10deg)";
+    const knock = e.knockT > 0.02 ? 1 + Math.min(0.18, e.knockT * 0.4) : 1;
+    drawBuffWisp(this.ctx, e.x + e.knockX * e.knockT * 8, e.y + e.knockY * e.knockT * 8, e.r * knock, e.flash > 0, e.frame);
+    this.ctx.filter = "none";
+    if (e.wrapped > 0) this.drawVineWrap(e.x, e.y, e.r * 0.9);
+    const barW = e.r * 1.6;
+    this.ctx.fillStyle = "rgba(12,13,12,0.55)";
+    this.ctx.fillRect(e.x - barW / 2, e.y - e.r * 1.35, barW, 3);
+    this.ctx.fillStyle = "#f0d24a";
+    this.ctx.fillRect(e.x - barW / 2, e.y - e.r * 1.35, barW * clamp(e.hp / e.maxHp, 0, 1), 3);
   }
 
   private drawBoss(e: Enemy) {
