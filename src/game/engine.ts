@@ -2033,6 +2033,7 @@ export class GameEngine {
     this.spawnT = 0.35;
     this.waveGap = 0;
     this.audio.wave();
+    this.buzz(18);
     this.omen = this.richRun ? "calm" : omenForNight(this.wave);
     if (this.richRun) {
       if (!this.sandboxPlaying) {
@@ -3590,6 +3591,7 @@ export class GameEngine {
     this.spawnCoins(e.x, e.y, coins);
     this.burstSparks(e.x, e.y, sparkN, sparkColor);
     if (Math.random() < 0.16) this.spawnPickup(e.x, e.y);
+    this.buzz(e.kind === "boss" ? 30 : 8);
     this.emit();
   }
 
@@ -3613,7 +3615,7 @@ export class GameEngine {
       const live = this.enemies.some((e) => e.alive);
       if (!live) {
         this.waveGap += dt;
-        if (this.waveGap > 1.15) {
+        if (this.waveGap > 0.42) {
           this.score += this.wave * 40;
           this.beginWave();
         }
@@ -4111,7 +4113,16 @@ export class GameEngine {
     this.markPlayerKnock(kx / m, ky / m, 0.3);
     this.trauma = Math.min(1, this.trauma + 0.4);
     this.audio.hurt();
+    this.buzz(22);
     this.emit();
+  }
+
+  private buzz(ms = 12) {
+    try {
+      navigator.vibrate?.(ms);
+    } catch {
+      /* ignore */
+    }
   }
 
   private radialHurt(x: number, y: number, r: number, dmg: number) {
@@ -4249,20 +4260,20 @@ export class GameEngine {
       if (!p.alive) continue;
       p.ttl -= dt;
       p.frame += dt * 6;
+      const dx = this.player.x - p.x;
+      const dy = this.player.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const pull = this.hasRelic("moonmoth") ? 280 : 170;
+      if (d < pull) {
+        const spd = this.hasRelic("moonmoth") ? 220 : 160;
+        p.x += (dx / d) * spd * dt;
+        p.y += (dy / d) * spd * dt;
+      }
       if (p.ttl <= 0) {
         p.alive = false;
         continue;
       }
-      if (this.hasRelic("moonmoth")) {
-        const dx = this.player.x - p.x;
-        const dy = this.player.y - p.y;
-        const d = Math.hypot(dx, dy) || 1;
-        if (d < 220) {
-          p.x += (dx / d) * 90 * dt;
-          p.y += (dy / d) * 90 * dt;
-        }
-      }
-      const grab = this.hasRelic("moonmoth") ? 36 : 16;
+      const grab = this.hasRelic("moonmoth") ? 40 : 28;
       if (circleHit(p.x, p.y, grab, this.player.x, this.player.y, this.bodyR() + 8)) {
         p.alive = false;
         this.player.hp = Math.min(this.player.maxHp, this.player.hp + 18);
@@ -4276,6 +4287,7 @@ export class GameEngine {
   private die() {
     this.phase = "dead";
     this.audio.death();
+    this.buzz(40);
     if (this.score > this.best) {
       this.best = this.score;
       this.persist();
@@ -4447,7 +4459,16 @@ export class GameEngine {
       if (!s.alive) continue;
       s.x += s.vx * dt;
       s.y += s.vy * dt;
-      if (s.kind !== "shard") s.vy += 40 * dt;
+      if (s.kind === "coin") {
+        const age = 1 - s.ttl / s.max;
+        if (age > 0.2) {
+          const dx = this.player.x - s.x;
+          const dy = this.player.y - s.y;
+          const d = Math.hypot(dx, dy) || 1;
+          s.vx += (dx / d) * 420 * dt;
+          s.vy += (dy / d) * 420 * dt;
+        }
+      } else if (s.kind !== "shard") s.vy += 40 * dt;
       s.ttl -= dt;
       if (s.ttl <= 0) s.alive = false;
     }

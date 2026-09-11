@@ -1,6 +1,6 @@
 import type { CraftedSpell, GameEngine, Spell, SpellStat } from "@/game/engine";
 import type { HudState } from "@/game/engine";
-import { FUSE_COST, fusionKey, isCoreSpell, MAX_SPELL_UP, OMEN_BLURB, OMEN_LABEL, spellDamage, upgradeCost, type SpellTuneStat } from "@/game/engine";
+import { FUSE_COST, fusionKey, isCoreSpell, MAX_SPELL_UP, OMEN_LABEL, spellDamage, upgradeCost, type SpellTuneStat } from "@/game/engine";
 import { fusionGlyph, FUSIONS } from "@/game/fusions";
 import { loadPlayerName, trySavePlayerName, cleanPlayerName, nameCooldownMs, formatWait } from "@/game/player-name";
 import { loadGuestCreds, loginWithPassword } from "@/game/guest-account";
@@ -111,7 +111,7 @@ export function GameOverlay({ engine, hud }: Props) {
           }}
         />
       ) : null}
-      {hud.phase === "paused" ? <Pause engine={engine} hud={hud} /> : null}
+      {hud.phase === "paused" ? <Pause engine={engine} hud={hud} onSpawn={() => setSpawnOpen(true)} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
       {hud.phase === "wheel" ? <FortuneWheel engine={engine} hud={hud} /> : null}
       {hud.phase === "forge" ? <Forge engine={engine} hud={hud} /> : null}
@@ -121,7 +121,7 @@ export function GameOverlay({ engine, hud }: Props) {
       ) : null}
 
       {showSticks ? <TouchSticks engine={engine} /> : null}
-      {hud.phase === "playing" && !spawnOpen ? <WeaponDock engine={engine} hud={hud} /> : null}
+      {hud.phase === "playing" && !spawnOpen ? <ActionDock engine={engine} hud={hud} coarse={coarse} /> : null}
     </div>
   );
 }
@@ -130,7 +130,6 @@ function Hud({
   engine,
   hud,
   peers,
-  onSpawn,
 }: {
   engine: GameEngine | null;
   hud: HudState;
@@ -138,124 +137,39 @@ function Hud({
   onSpawn?: () => void;
 }) {
   const pct = Math.max(0, hud.hp / hud.maxHp);
-
   return (
     <div
       className="pointer-events-none px-3"
-      style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
+      style={{ paddingTop: "max(0.6rem, env(safe-area-inset-top, 0px))" }}
     >
-      <div className="mx-auto flex max-w-sm items-stretch gap-1.5">
-        <div className="border-2 border-fg bg-bg/95 px-2 py-1 text-center">
-          <p className="font-pixel text-[7px] text-muted">NIGHT</p>
-          <p className="font-pixel text-xl tabular-nums leading-none text-fg">{hud.wave}</p>
-        </div>
-        <div className="min-w-0 flex-1 border-2 border-border bg-bg/95 px-2 py-1">
-          <p className="font-pixel text-[7px] text-muted">LANTERN</p>
-          <div className="mt-1 h-2 overflow-hidden border border-border bg-elevated">
+      <div className="mx-auto flex max-w-sm items-center gap-2">
+        <div className="min-w-0 flex-1 border-2 border-fg bg-bg/90 px-2 py-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-pixel text-[8px] text-muted">N{hud.wave}</p>
+            <p className="font-pixel text-[8px] tabular-nums text-gold">{hud.gold}g</p>
+          </div>
+          <div className="mt-1 h-2.5 overflow-hidden border border-border bg-elevated">
             <div className="h-full bg-accent" style={{ width: `${pct * 100}%` }} />
           </div>
         </div>
-        <div className="border-2 border-gold bg-bg/95 px-2 py-1 text-center">
-          <p className="font-pixel text-[7px] text-gold">MAX</p>
-          <p className="font-pixel text-xl tabular-nums leading-none text-gold">{hud.bestNight}</p>
-        </div>
-      </div>
-      {hud.sandbox ? null : (
-        <p className="mx-auto mt-1 max-w-sm text-center font-pixel text-[8px] text-[#c8a4ff]">
-          {OMEN_LABEL[hud.omen]} · {OMEN_BLURB[hud.omen]}
-        </p>
-      )}
-      <p className="mx-auto mt-1 max-w-sm text-right font-pixel text-[8px] tabular-nums text-gold">
-        {hud.gold} gold · {hud.score} pts
-      </p>
-      <div className="mx-auto mt-1 flex max-w-sm items-center justify-end gap-1">
-        {hud.equipped.map((id, i) => (
-          <span
-            key={i}
-            className="inline-block border border-muted px-1 font-pixel text-[7px] leading-4"
-            style={{ color: id ? relicById(id).color : "#5a5a5a" }}
-          >
-            {id ? relicById(id).glyph : "--"}
-          </span>
-        ))}
-        <span className="font-pixel text-[8px] text-[#c8a4ff]">{hud.trinkoo} trinkoo</span>
-      </div>
-      <p className="mx-auto mt-1 max-w-sm truncate text-right font-pixel text-[8px] text-fg">
-        {hud.hands === "weapon" && hud.weapon
-          ? `${hud.weapon.name} · drag to swing`
-          : spellName(hud.spell, hud.crafted, hud.fused)}
-      </p>
-      {peers.length > 0 ? (
-        <p className="mx-auto mt-1 max-w-sm text-right font-pixel text-[8px] text-muted">
-          With {peers.map((p) => p.name || "Ranger").join(" · ")}
-        </p>
-      ) : null}
-
-      {hud.phase === "playing" ? (
-      <div className="pointer-events-auto mx-auto mt-2 grid max-w-sm grid-cols-3 gap-1" data-ui>
         <button
           type="button"
           data-ui
           onClick={() => engine?.togglePause()}
-          className="flex h-9 items-center justify-center border-2 border-muted bg-bg font-pixel text-[8px] text-fg shadow-[2px_2px_0_0_var(--color-border)]"
+          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center border-2 border-fg bg-bg font-pixel text-[9px] text-fg"
         >
-          Pause
+          II
         </button>
-        <button
-          type="button"
-          data-ui
-          onClick={() => engine?.toggleBook()}
-          className="flex h-9 items-center justify-center border-2 border-fg bg-bg font-pixel text-[8px] text-fg shadow-[2px_2px_0_0_var(--color-border)]"
-        >
-          Book
-        </button>
-        <button
-          type="button"
-          data-ui
-          onClick={() => engine?.openWheel()}
-          className="flex h-9 items-center justify-center border-2 border-gold bg-bg font-pixel text-[8px] text-gold shadow-[2px_2px_0_0_var(--color-border)]"
-        >
-          Wheel
-        </button>
-        <button
-          type="button"
-          data-ui
-          onClick={() => engine?.toggleForge()}
-          className="flex h-9 items-center justify-center border-2 border-[#c45a48] bg-bg font-pixel text-[8px] text-[#e08a3c] shadow-[2px_2px_0_0_var(--color-border)]"
-        >
-          Forge
-        </button>
-        <button
-          type="button"
-          data-ui
-          disabled={hud.weapons.length === 0}
-          onClick={() => engine?.toggleHands()}
-          className="flex h-9 items-center justify-center border-2 bg-bg font-pixel text-[8px] text-fg shadow-[2px_2px_0_0_var(--color-border)] disabled:opacity-40"
-          style={{ borderColor: hud.hands === "weapon" ? "#c45a48" : "#5a5a5a" }}
-        >
-          {hud.hands === "weapon" ? "Spell" : "Arms"}
-        </button>
-        {hud.sandbox ? (
-          <button
-            type="button"
-            data-ui
-            onClick={() => onSpawn?.()}
-            className="flex h-9 items-center justify-center border-2 border-accent bg-bg font-pixel text-[8px] text-fg shadow-[2px_2px_0_0_var(--color-border)]"
-          >
-            Spawn
-          </button>
-        ) : (
-          <button
-            type="button"
-            data-ui
-            onClick={() => engine?.toggleMute()}
-            className="flex h-9 items-center justify-center border-2 border-muted bg-bg font-pixel text-[8px] text-fg shadow-[2px_2px_0_0_var(--color-border)]"
-          >
-            {hud.muted ? "Muted" : "Sound"}
-          </button>
-        )}
       </div>
-      ) : null}
+      {hud.sandbox ? null : (
+        <p className="mx-auto mt-1 max-w-sm text-center font-pixel text-[8px] text-[#c8a4ff]">
+          {OMEN_LABEL[hud.omen]}
+        </p>
+      )}
+      <p className="mx-auto mt-0.5 max-w-sm truncate text-center font-pixel text-[8px] text-fg">
+        {hud.hands === "weapon" && hud.weapon ? hud.weapon.name : spellName(hud.spell, hud.crafted, hud.fused)}
+        {peers.length > 0 ? ` · ${peers.map((p) => p.name || "Ranger").join(" · ")}` : ""}
+      </p>
     </div>
   );
 }
@@ -298,7 +212,7 @@ function Title({
   p2p: P2PRoomHandle;
   onStartNight: () => void;
 }) {
-  const [menu, setMenu] = useState<"home" | "multiplayer" | "join" | "room" | "name" | "account" | "shop" | "guide" | "admin">(
+  const [menu, setMenu] = useState<"home" | "multiplayer" | "join" | "room" | "name" | "account" | "shop" | "guide" | "admin" | "more">(
     roomCode ? "room" : "home",
   );
   const [joinCode, setJoinCode] = useState("");
@@ -421,6 +335,8 @@ function Title({
           ? "FIELD BOOK"
           : menu === "admin"
             ? "ADMIN"
+            : menu === "more"
+              ? "MORE"
             : "WISPWOOD";
 
   return (
@@ -542,6 +458,26 @@ function Title({
               {nameWait > 0 ? "On cooldown" : "Save name"}
             </PixelButton>
           </div>
+        ) : menu === "more" ? (
+          <div className="pointer-events-auto flex w-full max-w-xs flex-col gap-1.5 border-2 border-fg bg-bg/80 p-2">
+            <div className="grid grid-cols-2 gap-1.5">
+              <PixelButton compact onClick={() => setMenu("guide")}>Field book</PixelButton>
+              <PixelButton compact onClick={() => setMenu("shop")}>Shop</PixelButton>
+              <PixelButton compact onClick={() => setMenu("name")}>Name</PixelButton>
+              <PixelButton compact onClick={() => setMenu("account")}>Account</PixelButton>
+            </div>
+            <PixelButton compact onClick={() => void shareGame()}>Share</PixelButton>
+            <PixelButton
+              compact
+              onClick={() => {
+                setAdminCode("");
+                setAdminNote("");
+                setMenu("admin");
+              }}
+            >
+              Admin codes
+            </PixelButton>
+          </div>
         ) : menu === "join" ? (
           <div className="pointer-events-auto flex w-full max-w-xs flex-col items-center gap-4">
             <p className="text-center font-pixel text-pixel-sm leading-relaxed text-muted">
@@ -582,44 +518,20 @@ function Title({
               </div>
             ) : (
               <>
-                <PixelButton primary onClick={() => engine?.play()}>
-                  Clearing
-                </PixelButton>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <PixelButton compact onClick={() => engine?.play(true)}>
-                    Sandbox
-                  </PixelButton>
-                  <PixelButton compact onClick={() => setMenu("multiplayer")}>
-                    Co-op
-                  </PixelButton>
-                  <PixelButton compact onClick={() => setMenu("guide")}>
-                    Field book
-                  </PixelButton>
-                  <PixelButton compact onClick={() => setMenu("shop")}>
-                    Shop
-                  </PixelButton>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <PixelButton compact onClick={() => setMenu("name")}>
-                    Name
-                  </PixelButton>
-                  <PixelButton compact onClick={() => setMenu("account")}>
-                    Account
-                  </PixelButton>
-                  <PixelButton compact onClick={() => void shareGame()}>
-                    Share
-                  </PixelButton>
-                </div>
-                <PixelButton
-                  compact
-                  onClick={() => {
-                    setAdminCode("");
-                    setAdminNote("");
-                    setMenu("admin");
-                  }}
-                >
-                  Admin codes
-                </PixelButton>
+          <PixelButton primary large onClick={() => engine?.play()}>
+            Play
+          </PixelButton>
+          <div className="grid grid-cols-2 gap-1.5">
+            <PixelButton compact onClick={() => engine?.play(true)}>
+              Sandbox
+            </PixelButton>
+            <PixelButton compact onClick={() => setMenu("multiplayer")}>
+              Co-op
+            </PixelButton>
+          </div>
+          <PixelButton compact onClick={() => setMenu("more")}>
+            More
+          </PixelButton>
               </>
             )}
           </div>
@@ -642,7 +554,7 @@ function Title({
         )}
         {menu === "home" ? (
           <p className="text-center font-pixel text-[8px] leading-relaxed text-subtle">
-            WASD move · aim to shoot · B book · R arms · F art · nights change
+            WASD or sticks · tap to shoot
           </p>
         ) : null}
       </div>
@@ -1279,12 +1191,14 @@ function PixelButton({
   onClick,
   primary = false,
   compact = false,
+  large = false,
   disabled = false,
 }: {
   children: ReactNode;
   onClick: () => void;
   primary?: boolean;
   compact?: boolean;
+  large?: boolean;
   disabled?: boolean;
 }) {
   return (
@@ -1295,7 +1209,7 @@ function PixelButton({
       onClick={onClick}
       className={
         "w-full rounded-none border-2 px-2 font-pixel leading-tight shadow-[3px_3px_0_0_var(--color-border)] transition-transform duration-150 enabled:active:translate-x-px enabled:active:translate-y-px disabled:opacity-40 " +
-        (compact ? "h-11 text-[9px] " : "h-12 text-pixel ") +
+        (large ? "h-16 text-base " : compact ? "h-11 text-[9px] " : "h-12 text-pixel ") +
         (primary
           ? "border-fg bg-accent text-accent-fg"
           : "border-muted bg-surface text-fg")
@@ -1515,38 +1429,52 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   );
 }
 
-function WeaponDock({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
-  if (hud.hands !== "weapon" || !hud.weapon) return null;
+function ActionDock({
+  engine,
+  hud,
+  coarse,
+}: {
+  engine: GameEngine | null;
+  hud: HudState;
+  coarse: boolean;
+}) {
   const wait = Math.max(0, hud.abilityWait);
   return (
     <div
-      className="pointer-events-auto absolute left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-1"
-      style={{ bottom: "max(8.5rem, calc(env(safe-area-inset-bottom, 0px) + 8rem))" }}
+      className="pointer-events-auto absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5"
+      style={{ bottom: coarse ? "max(8.25rem, calc(env(safe-area-inset-bottom, 0px) + 7.75rem))" : "max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))" }}
       data-ui
     >
-      <p className="max-w-[10rem] truncate font-pixel text-[8px] text-fg">{hud.weapon.name}</p>
-      <div className="flex gap-1">
-        {hud.weapons.length > 1 ? (
-          <button
-            type="button"
-            data-ui
-            onClick={() => engine?.cycleWeapon()}
-            className="flex h-11 items-center justify-center border-2 border-muted bg-bg px-2 font-pixel text-[8px] text-fg"
-          >
-            Next
-          </button>
-        ) : null}
+      <button
+        type="button"
+        data-ui
+        onClick={() => engine?.openBook()}
+        className="flex h-12 w-12 items-center justify-center border-2 border-fg bg-bg font-pixel text-[8px] text-fg"
+      >
+        Book
+      </button>
+      {hud.weapons.length > 0 ? (
+        <button
+          type="button"
+          data-ui
+          onClick={() => engine?.toggleHands()}
+          className="flex h-12 min-w-12 items-center justify-center border-2 bg-bg px-2 font-pixel text-[8px] text-fg"
+          style={{ borderColor: hud.hands === "weapon" ? "#c45a48" : "#8b8e86" }}
+        >
+          {hud.hands === "weapon" ? "Spell" : "Arms"}
+        </button>
+      ) : null}
+      {hud.hands === "weapon" && hud.weapon ? (
         <button
           type="button"
           data-ui
           disabled={!hud.abilityReady}
           onClick={() => engine?.useWeaponAbility()}
-          className="flex h-11 min-w-[5.5rem] items-center justify-center border-2 border-[#e08a3c] bg-bg px-3 font-pixel text-[9px] text-fg disabled:opacity-40"
+          className="flex h-12 min-w-[4.5rem] items-center justify-center border-2 border-[#e08a3c] bg-bg px-2 font-pixel text-[8px] text-fg disabled:opacity-40"
         >
-          {ABILITY_LABEL[hud.weapon.ability]}
-          <span className="ml-1 text-[8px] text-muted">{hud.abilityReady ? "ready" : `${wait.toFixed(1)}s`}</span>
+          {hud.abilityReady ? ABILITY_LABEL[hud.weapon.ability] : `${wait.toFixed(1)}s`}
         </button>
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -1571,18 +1499,44 @@ function WeaponMini({ id, ore, crystal, px = 2 }: { id: string; ore: string; cry
   return <PixelSprite rows={weaponGlyph(id)} palette={piecePalette(id, ore, crystal)} px={px} />;
 }
 
-function Pause({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
+function Pause({
+  engine,
+  hud,
+  onSpawn,
+}: {
+  engine: GameEngine | null;
+  hud: HudState;
+  onSpawn?: () => void;
+}) {
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg/70 pointer-events-auto">
+    <div className="absolute inset-0 z-40 grid place-items-center bg-bg/80 px-4 pointer-events-auto">
       <div className="pointer-events-auto flex w-[min(92vw,20rem)] flex-col gap-2 border-2 border-fg bg-surface p-4">
         <p className="text-center font-pixel text-pixel text-fg">Paused</p>
+        <p className="text-center font-pixel text-[8px] text-muted">
+          Night {hud.wave} · {hud.gold}g · {hud.sandbox ? "Sandbox" : OMEN_LABEL[hud.omen]}
+        </p>
         <PixelButton primary onClick={() => engine?.togglePause()}>
           Resume
         </PixelButton>
-        <PixelButton onClick={() => engine?.openBook()}>Spellbook</PixelButton>
-        <PixelButton onClick={() => engine?.toggleMute()}>
-          {hud.muted ? "Sound off" : "Sound on"}
-        </PixelButton>
+        <div className="grid grid-cols-2 gap-2">
+          <PixelButton compact onClick={() => engine?.openBook()}>
+            Book
+          </PixelButton>
+          <PixelButton compact onClick={() => engine?.openWheel()}>
+            Wheel
+          </PixelButton>
+          <PixelButton compact onClick={() => engine?.openForge()}>
+            Forge
+          </PixelButton>
+          <PixelButton compact onClick={() => engine?.toggleMute()}>
+            {hud.muted ? "Muted" : "Sound"}
+          </PixelButton>
+        </div>
+        {hud.sandbox ? (
+          <PixelButton compact onClick={() => onSpawn?.()}>
+            Spawn
+          </PixelButton>
+        ) : null}
         <PixelButton onClick={() => engine?.leaveRun()}>Leave</PixelButton>
       </div>
     </div>
@@ -2137,8 +2091,8 @@ function Dead({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
           <p className="mt-1 font-pixel text-pixel-sm text-[#c8a4ff]">+{hud.runTrinkoo} trinkoo</p>
         ) : null}
         <div className="mt-5 flex flex-col gap-2">
-          <PixelButton primary onClick={() => engine?.replay()}>
-            Light it again
+          <PixelButton primary large onClick={() => engine?.replay()}>
+            Again
           </PixelButton>
           <PixelButton onClick={() => engine?.leaveRun()}>Leave</PixelButton>
         </div>
@@ -2147,25 +2101,11 @@ function Dead({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   );
 }
 
-function TouchSticks({ engine, compact = false }: { engine: GameEngine | null; compact?: boolean }) {
+function TouchSticks({ engine }: { engine: GameEngine | null }) {
   return (
-    <div
-      className={
-        compact
-          ? "pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-6 pb-2"
-          : "pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
-      }
-    >
-      <Stick
-        compact={compact}
-        onVec={(x, y) => engine?.setTouchMove(x, y)}
-        onEnd={() => engine?.setTouchMove(0, 0)}
-      />
-      <Stick
-        compact={compact}
-        onVec={(x, y) => engine?.setTouchAim(x, y, true)}
-        onEnd={() => engine?.setTouchAim(0, 0, false)}
-      />
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-3 pb-[max(0.85rem,env(safe-area-inset-bottom,0px))]">
+      <Stick label="MOVE" onVec={(x, y) => engine?.setTouchMove(x, y)} onEnd={() => engine?.setTouchMove(0, 0)} />
+      <Stick label="AIM" onVec={(x, y) => engine?.setTouchAim(x, y, true)} onEnd={() => engine?.setTouchAim(0, 0, false)} />
     </div>
   );
 }
@@ -2173,11 +2113,11 @@ function TouchSticks({ engine, compact = false }: { engine: GameEngine | null; c
 function Stick({
   onVec,
   onEnd,
-  compact = false,
+  label,
 }: {
   onVec: (x: number, y: number) => void;
   onEnd: () => void;
-  compact?: boolean;
+  label: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const active = useRef(false);
@@ -2214,11 +2154,11 @@ function Stick({
         active.current = false;
         onEnd();
       }}
-      className={
-        compact
-          ? "pointer-events-auto size-16 rounded-full border-2 border-fg/70 bg-bg/50 touch-none"
-          : "pointer-events-auto size-28 rounded-full border-2 border-fg/70 bg-bg/50 touch-none"
-      }
-    />
+      className="pointer-events-auto relative size-[6.5rem] rounded-full border-2 border-fg/80 bg-bg/55 touch-none"
+    >
+      <span className="pointer-events-none absolute inset-0 grid place-items-center font-pixel text-[8px] text-muted">
+        {label}
+      </span>
+    </div>
   );
 }
