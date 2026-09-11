@@ -8,7 +8,7 @@ import { rarityTint, wheelChoices, pickLegendary, spellFlavor, WHEEL_RUNES } fro
 import { glyphFor, coreGlyph, CORE_COLOR } from "@/game/craft-sprites";
 import { BOSSES } from "@/game/bosses";
 import { RELICS, RELIC_COST, relicById, type RelicId } from "@/game/relics";
-import { FORGE_CATALOG, type ForgeKind, type ForgePiece } from "@/game/forge";
+import { FORGE_CATALOG, FORGE_PIECES, type ForgeKind, type ForgePiece } from "@/game/forge";
 import { asset } from "@/game/paths";
 import { useP2PRoom, type P2PRoomHandle } from "@/lib/multiplayer/use-p2p-room";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -1301,6 +1301,7 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
   const crystal = picked.crystal;
   const hammer = picked.hammer;
   const ownedCount = Object.values(hud.forgeBag).reduce((a, n) => a + n, 0);
+  const bag = FORGE_PIECES.filter((p) => (hud.forgeBag[p.id] ?? 0) > 0);
 
   return (
     <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-bg/80 px-3 py-4 pointer-events-auto">
@@ -1317,7 +1318,41 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
         <div className="flex justify-center">
           <PixelSprite rows={ANVIL_ROWS} palette={ANVIL_PALETTE} px={4} />
         </div>
-        <p className="text-center font-pixel text-[8px] text-[#8a6a4a]">{ownedCount} in the bag. Buff wisps drop more.</p>
+        <div className="border-2 border-[#5a4030] bg-[#1c1612] px-2 py-1.5">
+          <p className="font-pixel text-[7px] text-[#8a6a4a]">BAG {ownedCount}</p>
+          <div className="mt-1 flex gap-1 overflow-x-auto pb-0.5">
+            {bag.length === 0 ? (
+              <p className="font-pixel text-[8px] text-muted">Empty. Hunt buff wisps.</p>
+            ) : (
+              bag.map((p) => {
+                const n = hud.forgeBag[p.id] ?? 0;
+                const on = picked[p.kind]?.id === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    data-ui
+                    title={p.name}
+                    onClick={() => {
+                      setTab(p.kind);
+                      setPicked((cur) => ({ ...cur, [p.kind]: p }));
+                    }}
+                    className="relative h-7 w-7 shrink-0 border"
+                    style={{
+                      background: p.color,
+                      borderColor: on ? "#fff4c8" : "#5a4030",
+                      outline: on ? `2px solid ${p.color}` : undefined,
+                    }}
+                  >
+                    <span className="absolute -bottom-0.5 -right-0.5 bg-[#16110d] px-0.5 font-pixel text-[7px] leading-none text-[#e8c070]">
+                      {n}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
         <div className="grid grid-cols-3 gap-2">
           {(
             [
