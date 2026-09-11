@@ -99,21 +99,21 @@ export function rollForgePiece(): ForgePiece {
 
 export type WeaponExtra = "burn" | "slow" | "stun" | "knock" | "wrap" | "leech" | "none";
 export type WeaponAbility =
-  | "nova"
-  | "dash"
-  | "pull"
-  | "wrap"
-  | "burst"
-  | "heal"
-  | "veil"
-  | "leech"
-  | "stunring"
-  | "wave"
-  | "chain"
-  | "bloom"
-  | "mist"
-  | "spark"
-  | "freeze";
+  | "meteor"
+  | "glacier"
+  | "skewer"
+  | "rift"
+  | "lash"
+  | "mine"
+  | "beacon"
+  | "echo"
+  | "pact"
+  | "tomb"
+  | "undertow"
+  | "orbs"
+  | "garden"
+  | "eclipse"
+  | "ward";
 export type WeaponStance = "blade" | "spear" | "hammer" | "maul" | "whip";
 
 export type ForgedWeapon = {
@@ -152,21 +152,21 @@ const ORE_EXTRA: Record<string, WeaponExtra> = {
 };
 
 const CRYSTAL_ABILITY: Record<string, { ability: WeaponAbility; cd: number }> = {
-  "cinder-crystal": { ability: "nova", cd: 3.2 },
-  "frost-crystal": { ability: "freeze", cd: 3.4 },
-  "bolt-crystal": { ability: "spark", cd: 2.6 },
-  "void-crystal": { ability: "pull", cd: 3.6 },
-  "vine-crystal": { ability: "wrap", cd: 3.1 },
-  "boom-crystal": { ability: "burst", cd: 3.8 },
-  "dawn-crystal": { ability: "heal", cd: 4.2 },
-  "dusk-crystal": { ability: "veil", cd: 4.5 },
-  "heart-crystal": { ability: "leech", cd: 3.3 },
-  "grave-crystal": { ability: "stunring", cd: 3.7 },
-  "tide-crystal": { ability: "wave", cd: 3.2 },
-  "spark-crystal": { ability: "chain", cd: 2.8 },
-  "bloom-crystal": { ability: "bloom", cd: 3.5 },
-  "shade-crystal": { ability: "mist", cd: 3.4 },
-  "lantern-crystal": { ability: "nova", cd: 3 },
+  "cinder-crystal": { ability: "meteor", cd: 3.4 },
+  "frost-crystal": { ability: "glacier", cd: 3.6 },
+  "bolt-crystal": { ability: "skewer", cd: 2.8 },
+  "void-crystal": { ability: "rift", cd: 3.8 },
+  "vine-crystal": { ability: "lash", cd: 3.0 },
+  "boom-crystal": { ability: "mine", cd: 3.4 },
+  "dawn-crystal": { ability: "beacon", cd: 4.0 },
+  "dusk-crystal": { ability: "echo", cd: 3.2 },
+  "heart-crystal": { ability: "pact", cd: 3.5 },
+  "grave-crystal": { ability: "tomb", cd: 3.8 },
+  "tide-crystal": { ability: "undertow", cd: 3.1 },
+  "spark-crystal": { ability: "orbs", cd: 2.6 },
+  "bloom-crystal": { ability: "garden", cd: 3.4 },
+  "shade-crystal": { ability: "eclipse", cd: 3.6 },
+  "lantern-crystal": { ability: "ward", cd: 3.8 },
 };
 
 const HAMMER_STANCE: Record<string, { stance: WeaponStance; reach: number; arc: number; cooldown: number; dmg: number }> = {
@@ -197,7 +197,7 @@ export function makeWeapon(oreId: string, crystalId: string, hammerId: string): 
   const hammer = pieceById(hammerId);
   if (!ore || ore.kind !== "ore" || !crystal || crystal.kind !== "crystal" || !hammer || hammer.kind !== "hammer") return null;
   const ham = HAMMER_STANCE[hammerId] ?? { stance: "hammer" as const, reach: 60, arc: 1.2, cooldown: 0.4, dmg: 22 };
-  const cry = CRYSTAL_ABILITY[crystalId] ?? { ability: "nova" as const, cd: 3.2 };
+  const cry = CRYSTAL_ABILITY[crystalId] ?? { ability: "meteor" as const, cd: 3.2 };
   const oreWord = ore.name.split(" ")[0]!;
   const cryWord = crystal.name.split(" ")[0]!;
   const hamWord = hammer.name.split(" ").slice(-1)[0]!;
@@ -237,20 +237,20 @@ export function parseWeapons(raw: unknown): ForgedWeapon[] {
 }
 
 export const ABILITY_LABEL: Record<WeaponAbility, string> = {
-  nova: "Nova",
-  dash: "Dash",
-  pull: "Pull",
-  wrap: "Bind",
-  burst: "Burst",
-  heal: "Mend",
-  veil: "Veil",
-  leech: "Sip",
-  stunring: "Howl",
-  wave: "Tide",
-  chain: "Arc",
-  bloom: "Bloom",
-  mist: "Mist",
-  spark: "Spark",
-  freeze: "Rime",
+  meteor: "Meteor",
+  glacier: "Glacier",
+  skewer: "Skewer",
+  rift: "Rift",
+  lash: "Lash",
+  mine: "Mine",
+  beacon: "Beacon",
+  echo: "Echo",
+  pact: "Pact",
+  tomb: "Tomb",
+  undertow: "Undertow",
+  orbs: "Orbs",
+  garden: "Garden",
+  eclipse: "Eclipse",
+  ward: "Ward",
 };
 

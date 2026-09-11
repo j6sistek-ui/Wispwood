@@ -7,7 +7,7 @@ import { drawBuffWisp } from "./buff-wisp";
 import { drawWeaponGlyph } from "./weapon-sprites";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 import { FUSIONS, drawFusionSigil } from "./fusions";
-import { rollForgePiece, parseForgeBag, makeWeapon, weaponKey, pieceById, FORGE_PIECES, type ForgedWeapon } from "./forge";
+import { rollForgePiece, parseForgeBag, makeWeapon, weaponKey, pieceById, FORGE_PIECES, ABILITY_LABEL, type ForgedWeapon, type WeaponAbility } from "./forge";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "forge" | "dead";
@@ -244,6 +244,24 @@ type Hazard = {
   kind: "goo" | "acid" | "web" | "dust" | "spore";
   color: string;
 };
+type WeaponArt = {
+  alive: boolean;
+  kind: WeaponAbility;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  ox: number;
+  oy: number;
+  r: number;
+  ttl: number;
+  max: number;
+  dmg: number;
+  color: string;
+  color2: string;
+  phase: number;
+  hits: Set<Enemy>;
+};
 type BossShot = {
   alive: boolean;
   x: number;
@@ -474,6 +492,7 @@ export class GameEngine {
   private arcs: Arc[] = [];
   private hazards: Hazard[] = [];
   private bossShots: BossShot[] = [];
+  private weaponArts: WeaponArt[] = [];
   private playerSlow = 0;
   private playerStun = 0;
   private props: Prop[] = [];
