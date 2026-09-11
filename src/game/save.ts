@@ -1,5 +1,5 @@
 import { parseLoadout, parseOwned, type RelicId } from "./relics";
-import { parseForgeBag } from "./forge";
+import { parseForgeBag, parseWeapons, type ForgedWeapon } from "./forge";
 
 const KEY = "wispwood-v1";
 
@@ -12,6 +12,7 @@ export type SaveData = {
   ownedRelics: RelicId[];
   equipped: Array<RelicId | null>;
   forgeBag: Record<string, number>;
+  weapons: ForgedWeapon[];
 };
 
 const defaults: SaveData = {
@@ -23,13 +24,14 @@ const defaults: SaveData = {
   ownedRelics: [],
   equipped: [null, null, null],
   forgeBag: {},
+  weapons: [],
 };
 
 export function loadSave(): SaveData {
-  if (typeof window === "undefined") return { ...defaults, ownedRelics: [], equipped: [null, null, null], forgeBag: {} };
+  if (typeof window === "undefined") return { ...defaults, ownedRelics: [], equipped: [null, null, null], forgeBag: {}, weapons: [] };
   try {
     const raw = window.localStorage.getItem(KEY);
-    if (!raw) return { ...defaults, ownedRelics: [], equipped: [null, null, null], forgeBag: {} };
+    if (!raw) return { ...defaults, ownedRelics: [], equipped: [null, null, null], forgeBag: {}, weapons: [] };
     const parsed = JSON.parse(raw) as Partial<SaveData>;
     return {
       version: 2,
@@ -40,9 +42,10 @@ export function loadSave(): SaveData {
       ownedRelics: parseOwned(parsed.ownedRelics),
       equipped: parseLoadout(parsed.equipped),
       forgeBag: parseForgeBag(parsed.forgeBag),
+      weapons: parseWeapons(parsed.weapons),
     };
   } catch {
-    return { ...defaults, ownedRelics: [], equipped: [null, null, null], forgeBag: {} };
+    return { ...defaults, ownedRelics: [], equipped: [null, null, null], forgeBag: {}, weapons: [] };
   }
 }
 

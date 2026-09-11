@@ -22,6 +22,8 @@ const GAME_CODES = new Set([
   "KeyM",
   "KeyQ",
   "KeyB",
+  "KeyR",
+  "KeyF",
   "Tab",
   "Digit1",
   "Digit2",

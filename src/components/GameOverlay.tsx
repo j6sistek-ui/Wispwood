@@ -8,7 +8,7 @@ import { rarityTint, wheelChoices, pickLegendary, spellFlavor, WHEEL_RUNES } fro
 import { glyphFor, coreGlyph, CORE_COLOR } from "@/game/craft-sprites";
 import { BOSSES } from "@/game/bosses";
 import { RELICS, RELIC_COST, relicById, type RelicId } from "@/game/relics";
-import { FORGE_CATALOG, FORGE_PIECES, type ForgeKind, type ForgePiece } from "@/game/forge";
+import { FORGE_CATALOG, FORGE_PIECES, ABILITY_LABEL, type ForgeKind, type ForgePiece } from "@/game/forge";
 import { asset } from "@/game/paths";
 import { useP2PRoom, type P2PRoomHandle } from "@/lib/multiplayer/use-p2p-room";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -120,6 +120,7 @@ export function GameOverlay({ engine, hud }: Props) {
       ) : null}
 
       {showSticks ? <TouchSticks engine={engine} /> : null}
+      {hud.phase === "playing" || hud.phase === "paused" ? <WeaponDock engine={engine} hud={hud} /> : null}
     </div>
   );
 }
@@ -1409,13 +1410,55 @@ function Forge({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
         <button
           type="button"
           data-ui
-          className="h-11 border-2 border-[#5a4030] bg-[#2a1c14] font-pixel text-[10px] text-[#8a6a4a]"
+          disabled={!ore || !crystal || !hammer}
+          onClick={() => {
+            if (!ore || !crystal || !hammer) return;
+            const res = engine?.craftForge(ore.id, crystal.id, hammer.id);
+            if (res === "ok") setPicked({});
+          }}
+          className="h-11 border-2 border-[#c45a48] bg-[#2a1c14] font-pixel text-[10px] text-[#e08a3c] disabled:border-[#5a4030] disabled:text-[#8a6a4a]"
         >
           Forge
         </button>
-        <p className="text-center font-pixel text-[8px] text-muted">The coals wait</p>
+        <p className="text-center font-pixel text-[8px] text-muted">
+          {ore && crystal && hammer ? `${ore.name} + ${crystal.name.split(" ")[0]} + ${hammer.name.split(" ").slice(-1)[0]}` : "Pick one of each. Buff wisps drop stock."}
+        </p>
         <PixelButton onClick={() => engine?.closeForge()}>Back</PixelButton>
       </div>
+    </div>
+  );
+}
+
+function WeaponDock({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
+  return (
+    <div
+      className="pointer-events-auto absolute left-3 flex flex-col gap-2"
+      style={{ bottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
+      data-ui
+    >
+      <button
+        type="button"
+        data-ui
+        onClick={() => engine?.toggleHands()}
+        className="flex h-11 min-w-[5.5rem] items-center justify-center border-2 bg-bg px-3 font-pixel text-[9px] text-fg"
+        style={{ borderColor: hud.hands === "weapon" ? "#c45a48" : "#5a5a5a" }}
+      >
+        Weapon
+        <span className="ml-1 text-[8px]" style={{ color: hud.weapon?.color ?? "#8a8a8a" }}>
+          {hud.hands === "weapon" ? hud.weapon?.name ?? "—" : "Spells"}
+        </span>
+      </button>
+      {hud.hands === "weapon" && hud.weapon ? (
+        <button
+          type="button"
+          data-ui
+          onClick={() => engine?.useWeaponAbility()}
+          className="flex h-11 min-w-[5.5rem] items-center justify-center border-2 border-[#e08a3c] bg-bg px-3 font-pixel text-[9px] text-fg"
+        >
+          {ABILITY_LABEL[hud.weapon.ability]}
+          <span className="ml-1 text-[8px] text-muted">{hud.abilityReady ? "ready" : "..."}</span>
+        </button>
+      ) : null}
     </div>
   );
 }
