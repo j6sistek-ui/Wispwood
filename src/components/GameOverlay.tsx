@@ -705,10 +705,10 @@ function SpawnMenu({
   hud: HudState;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<"foes" | "waves" | "relics" | "runes" | "you">("foes");
+  const [tab, setTab] = useState<"foes" | "waves" | "relics" | "runes" | "you" | "bag">("foes");
   const foes = [
-    { kind: "wisp" as const, label: "Wisp" },
     { kind: "buffwisp" as const, label: "Buff wisp" },
+    { kind: "wisp" as const, label: "Wisp" },
     { kind: "runner" as const, label: "Runner" },
     { kind: "brute" as const, label: "Brute" },
     { kind: "elite" as const, label: "Elite" },
@@ -717,8 +717,8 @@ function SpawnMenu({
     <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-bg/75 px-3 py-6 pointer-events-auto">
       <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-3 border-2 border-fg bg-surface px-3 py-4">
         <p className="font-pixel text-pixel text-fg">Menu</p>
-        <div className="grid w-full grid-cols-5 gap-1">
-          {(["foes", "waves", "relics", "runes", "you"] as const).map((t) => (
+        <div className="grid w-full grid-cols-3 gap-1">
+          {(["foes", "waves", "relics", "runes", "you", "bag"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -729,7 +729,7 @@ function SpawnMenu({
                 (tab === t ? "border-gold bg-accent text-accent-fg" : "border-muted bg-bg text-fg")
               }
             >
-              {t === "foes" ? "Drop" : t === "waves" ? "Waves" : t === "relics" ? "Relics" : t === "runes" ? "Runes" : "You"}
+              {t === "foes" ? "Drop" : t === "waves" ? "Waves" : t === "relics" ? "Relics" : t === "runes" ? "Runes" : t === "bag" ? "Bag" : "You"}
             </button>
           ))}
         </div>
@@ -743,7 +743,10 @@ function SpawnMenu({
                   type="button"
                   data-ui
                   onClick={() => engine?.spawnFoe(f.kind)}
-                  className="h-11 border-2 border-fg bg-bg font-pixel text-[10px] text-fg"
+                  className={
+                    "h-11 border-2 bg-bg font-pixel text-[10px] " +
+                    (f.kind === "buffwisp" ? "border-gold text-gold" : "border-fg text-fg")
+                  }
                 >
                   {f.label}
                 </button>
@@ -846,7 +849,7 @@ function SpawnMenu({
               </button>
             ))}
           </div>
-        ) : (
+        ) : tab === "you" ? (
           <div className="flex w-full flex-col gap-3">
             <p className="text-center font-pixel text-pixel-sm text-muted">This run only</p>
             <div className="border-2 border-muted bg-bg px-2 py-3">
@@ -878,6 +881,33 @@ function SpawnMenu({
               </div>
             </div>
           </div>
+        ) : (
+          <>
+            <p className="font-pixel text-pixel-sm text-muted">Grant forge stock for this save</p>
+            <div className="grid w-full grid-cols-2 gap-2">
+              <PixelButton onClick={() => engine?.sandboxGivePiece()}>Random piece</PixelButton>
+              <PixelButton primary onClick={() => engine?.sandboxGiveForgeKit()}>
+                Give all
+              </PixelButton>
+            </div>
+            <div className="max-h-[40vh] w-full overflow-y-auto overscroll-contain border-2 border-muted bg-bg p-1">
+              {FORGE_PIECES.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  data-ui
+                  onClick={() => engine?.sandboxGivePiece(p.id)}
+                  className="mb-1 flex w-full items-center gap-2 border border-border bg-surface px-2 py-1.5 text-left last:mb-0"
+                >
+                  <span className="h-3 w-3 shrink-0 border border-muted" style={{ background: p.color }} />
+                  <span className="min-w-0 flex-1 font-pixel text-[8px]" style={{ color: p.color }}>
+                    {p.name}
+                  </span>
+                  <span className="font-pixel text-[8px] text-gold">x{hud.forgeBag[p.id] ?? 0}</span>
+                </button>
+              ))}
+            </div>
+          </>
         )}
         <PixelButton primary onClick={onClose}>
           Close

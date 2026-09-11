@@ -5,7 +5,7 @@ import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 import { FUSIONS, drawFusionSigil } from "./fusions";
-import { rollForgePiece, parseForgeBag, makeWeapon, weaponKey, type ForgedWeapon } from "./forge";
+import { rollForgePiece, parseForgeBag, makeWeapon, weaponKey, pieceById, FORGE_PIECES, type ForgedWeapon } from "./forge";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
 
 export type Phase = "boot" | "title" | "playing" | "paused" | "book" | "wheel" | "forge" | "dead";
@@ -1303,6 +1303,26 @@ export class GameEngine {
     this.floatAt(x, y - 48, piece.name, piece.color);
     this.audio.pickup();
     this.persist();
+  }
+
+  sandboxGivePiece(id?: string) {
+    if (!this.richRun) return;
+    const piece = id ? pieceById(id) : rollForgePiece();
+    if (!piece) return;
+    this.forgeBag[piece.id] = (this.forgeBag[piece.id] ?? 0) + 1;
+    this.floatAt(this.player.x, this.player.y - 48, piece.name, piece.color);
+    this.audio.pickup();
+    this.persist();
+    this.emit();
+  }
+
+  sandboxGiveForgeKit() {
+    if (!this.richRun) return;
+    for (const p of FORGE_PIECES) this.forgeBag[p.id] = (this.forgeBag[p.id] ?? 0) + 1;
+    this.floatAt(this.player.x, this.player.y - 48, "Full bag", "#e8c070");
+    this.audio.pickup();
+    this.persist();
+    this.emit();
   }
 
 
