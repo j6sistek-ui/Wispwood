@@ -8,6 +8,7 @@ import { rarityTint, wheelChoices, pickLegendary, spellFlavor, WHEEL_RUNES } fro
 import { glyphFor, coreGlyph, CORE_COLOR } from "@/game/craft-sprites";
 import { BOSSES } from "@/game/bosses";
 import { RELICS, RELIC_COST, relicById, type RelicId } from "@/game/relics";
+import { FORGE_CATALOG, type ForgeKind, type ForgePiece } from "@/game/forge";
 import { asset } from "@/game/paths";
 import { useP2PRoom, type P2PRoomHandle } from "@/lib/multiplayer/use-p2p-room";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -1292,40 +1293,85 @@ const ANVIL_PALETTE: Record<string, string> = {
 };
 
 function Forge({ engine }: { engine: GameEngine | null }) {
+  const [tab, setTab] = useState<ForgeKind>("ore");
+  const [picked, setPicked] = useState<Partial<Record<ForgeKind, ForgePiece>>>({});
+  const pieces = FORGE_CATALOG[tab];
+  const ore = picked.ore;
+  const crystal = picked.crystal;
+  const hammer = picked.hammer;
+
   return (
     <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-bg/80 px-3 py-4 pointer-events-auto">
-      <div className="pointer-events-auto w-full max-w-sm border-4 border-[#8a5a32] bg-[#16110d] p-4">
+      <div className="pointer-events-auto flex w-full max-w-sm flex-col gap-3 border-4 border-[#8a5a32] bg-[#16110d] p-4">
         <div className="h-2 bg-[#c45a48]" />
-        <p className="mt-2 text-center font-pixel text-pixel text-[#e08a3c]">THE FORGE</p>
-        <div className="mt-3 flex items-end gap-3">
+        <p className="text-center font-pixel text-pixel text-[#e08a3c]">THE FORGE</p>
+        <div className="flex items-end gap-3">
           <PixelSprite rows={SMITH_ROWS} palette={SMITH_PALETTE} px={3} />
           <div className="min-w-0 flex-1 border-2 border-[#c45a48] bg-[#2a1c14] px-2 py-2">
             <p className="font-pixel text-[8px] text-[#e8c070]">BRANN</p>
             <p className="mt-2 font-pixel text-[10px] leading-relaxed text-fg">I'm ready to forge.</p>
           </div>
         </div>
-        <div className="mt-4 flex justify-center">
+        <div className="flex justify-center">
           <PixelSprite rows={ANVIL_ROWS} palette={ANVIL_PALETTE} px={4} />
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {["Ore", "Magic crystal", "Hammer"].map((slot) => (
-            <div key={slot} className="border-2 border-[#5a4030] bg-[#1c1612] py-3 text-center">
-              <p className="font-pixel text-[8px] text-[#8a6a4a]">{slot}</p>
-              <p className="mt-2 font-pixel text-[10px] text-muted">—</p>
-            </div>
+        <div className="grid grid-cols-3 gap-2">
+          {(
+            [
+              ["ore", "Ore", ore],
+              ["crystal", "Magic crystal", crystal],
+              ["hammer", "Hammer", hammer],
+            ] as const
+          ).map(([kind, label, piece]) => (
+            <button
+              key={kind}
+              type="button"
+              data-ui
+              onClick={() => setTab(kind)}
+              className={
+                "border-2 py-2 text-center " +
+                (tab === kind ? "border-[#e08a3c] bg-[#2a1c14]" : "border-[#5a4030] bg-[#1c1612]")
+              }
+            >
+              <p className="font-pixel text-[7px] text-[#8a6a4a]">{label}</p>
+              <p className="mt-1 font-pixel text-[8px] leading-tight" style={{ color: piece?.color ?? "#5a5a5a" }}>
+                {piece?.name ?? "—"}
+              </p>
+            </button>
           ))}
         </div>
-        <div className="mt-4 flex flex-col gap-2">
-          <button
-            type="button"
-            data-ui
-            className="h-11 border-2 border-[#5a4030] bg-[#2a1c14] font-pixel text-[10px] text-[#8a6a4a]"
-          >
-            Forge
-          </button>
-          <p className="text-center font-pixel text-[8px] text-muted">The coals wait</p>
-          <PixelButton onClick={() => engine?.closeForge()}>Back</PixelButton>
+        <div className="max-h-[32vh] overflow-y-auto overscroll-contain border-2 border-[#5a4030] bg-[#1c1612] p-1">
+          {pieces.map((p) => {
+            const on = picked[tab]?.id === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                data-ui
+                onClick={() => setPicked((cur) => ({ ...cur, [tab]: p }))}
+                className="mb-1 flex w-full items-center gap-2 border border-[#3a2a22] bg-[#16110d] px-2 py-1.5 text-left last:mb-0"
+                style={{ outline: on ? `2px solid ${p.color}` : undefined }}
+              >
+                <span className="h-3 w-3 shrink-0 border border-[#5a4030]" style={{ background: p.color }} />
+                <span className="min-w-0">
+                  <span className="block font-pixel text-[9px]" style={{ color: p.color }}>
+                    {p.name}
+                  </span>
+                  <span className="mt-0.5 block font-pixel text-[7px] leading-relaxed text-muted">{p.blurb}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
+        <button
+          type="button"
+          data-ui
+          className="h-11 border-2 border-[#5a4030] bg-[#2a1c14] font-pixel text-[10px] text-[#8a6a4a]"
+        >
+          Forge
+        </button>
+        <p className="text-center font-pixel text-[8px] text-muted">The coals wait</p>
+        <PixelButton onClick={() => engine?.closeForge()}>Back</PixelButton>
       </div>
     </div>
   );
