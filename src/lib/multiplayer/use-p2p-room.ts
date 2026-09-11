@@ -27,27 +27,23 @@ type AnyRoom = {
   startRoom: () => void;
   broadcast: (data: unknown) => void;
   send: (data: unknown, peerId?: string) => void;
+  setName?: (name: string) => void;
 };
 
-let rtcOk: boolean | null = null;
-
-async function probeRtc() {
-  if (rtcOk != null) return rtcOk;
+async function rtcAvailable() {
   try {
     const ctrl = new AbortController();
-    const t = window.setTimeout(() => ctrl.abort(), 1200);
+    const t = window.setTimeout(() => ctrl.abort(), 700);
     const res = await fetch("/api/rtc?room=probe&peer=probe&name=&since=0", { signal: ctrl.signal });
     window.clearTimeout(t);
-    rtcOk = res.ok;
+    return res.ok;
   } catch {
-    rtcOk = false;
+    return false;
   }
-  return rtcOk;
 }
 
 export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
   const [selfId] = useState(() => `p-${Math.random().toString(36).slice(2, 10)}`);
-  const [name] = useState(() => options.name ?? selfId);
   const [peers, setPeers] = useState<PeerInfo[]>([]);
   const [joined, setJoined] = useState(false);
   const roomRef = useRef<AnyRoom | null>(null);
@@ -56,19 +52,29 @@ export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
   );
   const onStartRef = useRef(options.onStart);
   onStartRef.current = options.onStart;
+  const nameRef = useRef(options.name ?? "Ranger");
+  nameRef.current = options.name ?? "Ranger";
+  const wantStart = useRef(false);
+  const started = useRef(false);
   const room = options.room;
-  const liveName = options.name ?? name;
 
   useEffect(() => {
     setPeers([]);
     setJoined(false);
+    wantStart.current = false;
+    started.current = false;
     if (!room) return;
     let closed = false;
     let inst: AnyRoom | null = null;
+    const fireStart = () => {
+      if (started.current) return;
+      started.current = true;
+      onStartRef.current?.();
+    };
     const opts = {
       room,
       selfId,
-      name: liveName,
+      name: nameRef.current,
       onPeersChanged: setPeers,
       onMessage: (from: string, data: unknown, channel: "state" | "reliable") => {
         for (const fn of listeners.current) fn(from, data, channel);
@@ -76,28 +82,49 @@ export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
       onConnected: () => {
         if (!closed) setJoined(true);
       },
-      onRoomStarted: () => onStartRef.current?.(),
+      onRoomStarted: fireStart,
     };
     void (async () => {
-      const useRtc = await probeRtc();
-      if (closed) return;
-      inst = useRtc ? new P2PRoom(opts) : new MeshRoom(opts);
-      roomRef.current = inst;
-      await inst.join();
+      const mesh = new MeshRoom(opts);
+      inst = mesh;
+      roomRef.current = mesh;
+      try {
+        await mesh.join();
+      } catch {
+        if (closed) return;
+        if (!(await rtcAvailable())) return;
+        mesh.close();
+        const rtc = new P2PRoom(opts);
+        inst = rtc;
+        roomRef.current = rtc;
+        await rtc.join();
+      }
+      if (closed) {
+        inst?.close();
+        return;
+      }
+      if (wantStart.current) inst.startRoom();
     })();
     return () => {
       closed = true;
       roomRef.current = null;
       inst?.close();
     };
-  }, [room, selfId, liveName]);
+  }, [room, selfId]);
+
+  useEffect(() => {
+    roomRef.current?.setName?.(nameRef.current);
+  }, [options.name]);
 
   const broadcast = useCallback((data: unknown) => roomRef.current?.broadcast(data), []);
   const send = useCallback(
     (data: unknown, peerId?: string) => roomRef.current?.send(data, peerId),
     [],
   );
-  const startRoom = useCallback(() => roomRef.current?.startRoom(), []);
+  const startRoom = useCallback(() => {
+    wantStart.current = true;
+    if (roomRef.current) roomRef.current.startRoom();
+  }, []);
   const onMessage = useCallback(
     (fn: (from: string, data: unknown, channel: "state" | "reliable") => void) => {
       listeners.current.add(fn);

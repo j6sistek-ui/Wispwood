@@ -135,6 +135,10 @@ export class P2PRoom {
     }, PING_INTERVAL_MS);
   }
 
+  setName(name: string) {
+    this.opts.name = name;
+  }
+
   close(): void {
     this.closed = true;
     if (this.pollTimer) clearTimeout(this.pollTimer);

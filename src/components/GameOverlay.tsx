@@ -31,7 +31,8 @@ export function GameOverlay({ engine, hud }: Props) {
     if (entered.current) return;
     entered.current = true;
     engine?.play();
-  }, [engine]);
+    engine?.nudgePlayer(isHost ? -48 : 48, 0);
+  }, [engine, isHost]);
 
   const p2p = useP2PRoom({
     room: roomCode ? `ww${roomCode}` : null,
@@ -79,9 +80,9 @@ export function GameOverlay({ engine, hud }: Props) {
   useEffect(() => {
     if (!roomCode || !engine) return;
     const id = window.setInterval(() => {
-      if (engine.phase !== "playing" && engine.phase !== "paused") return;
+      if (engine.phase === "title" || engine.phase === "boot" || engine.phase === "dead") return;
       p2p.broadcast({ name: playerName, ...engine.netSnapshot() });
-    }, 100);
+    }, 80);
     return () => window.clearInterval(id);
   }, [roomCode, engine, p2p.broadcast, playerName]);
 
@@ -686,19 +687,41 @@ function Lobby({
 }) {
   const others = p2p.peers;
   const linked = others.filter((p) => p.connectionState === "connected").length;
-  const status = !p2p.joined
-    ? "Opening path"
+  const ready = p2p.joined;
+  const status = !ready
+    ? "Opening path…"
     : others.length === 0
       ? isHost
         ? "Give this code to a friend"
         : "Waiting for host"
-      : `${linked + 1} lanterns ready`;
+      : linked > 0
+        ? `${linked + 1} lanterns linked`
+        : `${others.length + 1} found · linking`;
+  const [copied, setCopied] = useState(false);
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   return (
     <div className="pointer-events-auto flex w-full max-w-xs flex-col items-center gap-4">
       <div className="w-full border-2 border-muted bg-surface px-4 py-4 text-center shadow-[4px_4px_0_0_var(--color-bg)]">
         <p className="font-pixel text-pixel-sm text-muted">Room</p>
-        <p className="mt-3 font-pixel text-xl tracking-[0.35em] text-fg">{code}</p>
+        <button
+          type="button"
+          data-ui
+          onClick={() => void copyCode()}
+          className="mt-3 w-full font-pixel text-xl tracking-[0.35em] text-fg"
+        >
+          {code}
+        </button>
+        <p className="mt-2 font-pixel text-[8px] text-subtle">{copied ? "Copied" : "Tap code to copy"}</p>
         <p className="mt-3 font-pixel text-pixel-sm leading-relaxed text-subtle">{status}</p>
         <div className="mt-3 flex flex-col gap-1">
           <p className="font-pixel text-pixel-sm text-fg">
@@ -711,19 +734,19 @@ function Lobby({
             others.map((peer) => (
               <p key={peer.id} className="font-pixel text-pixel-sm text-muted">
                 {peer.name || "Ranger"}
-                {peer.connectionState === "connected" ? " · linked" : " · joining"}
+                {peer.connectionState === "connected" ? " · here" : " · joining"}
               </p>
             ))
           )}
         </div>
       </div>
       {isHost ? (
-        <PixelButton primary onClick={onStart}>
-          Start night
+        <PixelButton primary disabled={!ready} onClick={onStart}>
+          {!ready ? "Linking…" : others.length === 0 ? "Start anyway" : "Start night"}
         </PixelButton>
       ) : (
         <p className="text-center font-pixel text-pixel-sm leading-relaxed text-subtle">
-          Stay here. You enter when they start.
+          {ready ? "Stay here. You enter when they start." : "Finding the host…"}
         </p>
       )}
       <PixelButton onClick={onLeave}>Leave</PixelButton>

@@ -477,7 +477,7 @@ export class GameEngine {
   private menuHold = false;
 
   player = { x: ARENA / 2, y: ARENA / 2, hp: 100, maxHp: 100, invuln: 0, face: "down" as Dir, frame: 0, moving: false, vx: 0, vy: 0, knockT: 0, knockX: 0, knockY: 1 };
-  private ghosts = new Map<string, { name: string; x: number; y: number; face: Dir; hp: number; frame: number; ttl: number }>();
+  private ghosts = new Map<string, { name: string; x: number; y: number; tx: number; ty: number; face: Dir; hp: number; frame: number; ttl: number }>();
   aim = { x: 1, y: 0 };
   cam = { x: 0, y: 0 };
   fireCd = 0;
@@ -687,6 +687,7 @@ export class GameEngine {
       this.acc += raw;
       while (this.acc >= FIXED) {
         this.acc -= FIXED;
+        this.chaseGhosts(FIXED);
         this.fixed();
       }
       this.draw();
@@ -1847,14 +1848,17 @@ export class GameEngine {
     id: string,
     data: { name?: string; x: number; y: number; face?: Dir; hp?: number; frame?: number },
   ) {
+    const prev = this.ghosts.get(id);
     this.ghosts.set(id, {
-      name: data.name || "Ranger",
-      x: data.x,
-      y: data.y,
-      face: data.face ?? "down",
-      hp: data.hp ?? 100,
-      frame: data.frame ?? 0,
-      ttl: 2.5,
+      name: data.name || prev?.name || "Ranger",
+      x: prev?.x ?? data.x,
+      y: prev?.y ?? data.y,
+      tx: data.x,
+      ty: data.y,
+      face: data.face ?? prev?.face ?? "down",
+      hp: data.hp ?? prev?.hp ?? 100,
+      frame: data.frame ?? prev?.frame ?? 0,
+      ttl: 4,
     });
   }
 
@@ -2099,6 +2103,19 @@ export class GameEngine {
     this.emit();
   }
 
+  private chaseGhosts(dt: number) {
+    const k = 1 - Math.exp(-14 * dt);
+    for (const [id, g] of this.ghosts) {
+      g.ttl -= dt;
+      if (g.ttl <= 0) {
+        this.ghosts.delete(id);
+        continue;
+      }
+      g.x += (g.tx - g.x) * k;
+      g.y += (g.ty - g.y) * k;
+    }
+  }
+
   private buildProps() {
     this.props = PROP_LAYOUT.map((p) => ({
       ...p,
@@ -2120,10 +2137,6 @@ export class GameEngine {
     this.swingCd = Math.max(0, this.swingCd - dt);
     this.abilityT = Math.max(0, this.abilityT - dt);
     this.swingT = Math.max(0, this.swingT - dt);
-    for (const [id, g] of this.ghosts) {
-      g.ttl -= dt;
-      if (g.ttl <= 0) this.ghosts.delete(id);
-    }
     this.player.invuln = Math.max(0, this.player.invuln - dt);
     this.player.knockT = Math.max(0, this.player.knockT - dt);
     this.playerSlow = Math.max(0, this.playerSlow - dt);
