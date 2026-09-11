@@ -43,8 +43,11 @@ export function GameOverlay({ engine, hud }: Props) {
     setCoarse(window.matchMedia("(pointer: coarse)").matches);
   }, []);
   useEffect(() => {
-    if (hud.phase !== "playing" && hud.phase !== "paused") setSpawnOpen(false);
-  }, [hud.phase]);
+    if (hud.phase !== "playing" && hud.phase !== "paused") {
+      setSpawnOpen(false);
+      engine?.holdSim(false);
+    }
+  }, [hud.phase, engine]);
   useEffect(() => {
     if (hud.phase === "title") entered.current = false;
     if (hud.phase !== "playing" && hud.phase !== "paused") engine?.clearGhosts();
@@ -82,7 +85,7 @@ export function GameOverlay({ engine, hud }: Props) {
     return () => window.clearInterval(id);
   }, [roomCode, engine, p2p.broadcast, playerName]);
 
-  const showSticks = coarse && hud.phase === "playing";
+  const showSticks = coarse && hud.phase === "playing" && !spawnOpen;
 
   return (
     <div
@@ -90,7 +93,15 @@ export function GameOverlay({ engine, hud }: Props) {
       style={{ position: "absolute", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
     >
       {hud.phase === "playing" || hud.phase === "paused" ? (
-        <Hud engine={engine} hud={hud} peers={p2p.peers} onSpawn={() => setSpawnOpen(true)} />
+        <Hud
+          engine={engine}
+          hud={hud}
+          peers={p2p.peers}
+          onSpawn={() => {
+            setSpawnOpen(true);
+            engine?.holdSim(true);
+          }}
+        />
       ) : null}
 
       {hud.phase === "boot" || hud.loading ? <Boot /> : null}
@@ -111,13 +122,20 @@ export function GameOverlay({ engine, hud }: Props) {
           }}
         />
       ) : null}
-      {hud.phase === "paused" ? <Pause engine={engine} hud={hud} /> : null}
+      {hud.phase === "paused" && !spawnOpen ? <Pause engine={engine} hud={hud} /> : null}
       {hud.phase === "book" ? <Spellbook engine={engine} hud={hud} /> : null}
       {hud.phase === "wheel" ? <FortuneWheel engine={engine} hud={hud} /> : null}
       {hud.phase === "forge" ? <Forge engine={engine} hud={hud} /> : null}
       {hud.phase === "dead" ? <Dead engine={engine} hud={hud} /> : null}
       {spawnOpen && hud.sandbox && (hud.phase === "playing" || hud.phase === "paused") ? (
-        <SpawnMenu engine={engine} hud={hud} onClose={() => setSpawnOpen(false)} />
+        <SpawnMenu
+          engine={engine}
+          hud={hud}
+          onClose={() => {
+            setSpawnOpen(false);
+            engine?.holdSim(false);
+          }}
+        />
       ) : null}
 
       {showSticks ? <TouchSticks engine={engine} /> : null}
@@ -731,7 +749,7 @@ function SpawnMenu({
     { kind: "elite" as const, label: "Elite" },
   ];
   return (
-    <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-bg/75 px-3 py-6 pointer-events-auto">
+    <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-bg/75 px-3 py-6 pointer-events-auto" data-ui>
       <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-3 border-2 border-fg bg-surface px-3 py-4">
         <p className="font-pixel text-pixel text-fg">Sandbox</p>
         <div className="grid w-full grid-cols-3 gap-1">

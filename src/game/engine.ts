@@ -474,6 +474,7 @@ export class GameEngine {
   private cycleLatch = false;
   private muteLatch = false;
   private heldPause = false;
+  private menuHold = false;
 
   player = { x: ARENA / 2, y: ARENA / 2, hp: 100, maxHp: 100, invuln: 0, face: "down" as Dir, frame: 0, moving: false, vx: 0, vy: 0, knockT: 0, knockX: 0, knockY: 1 };
   private ghosts = new Map<string, { name: string; x: number; y: number; face: Dir; hp: number; frame: number; ttl: number }>();
@@ -1660,6 +1661,14 @@ export class GameEngine {
     this.emit();
   }
 
+  holdSim(on: boolean) {
+    this.menuHold = on;
+    if (on) {
+      this.input.pointer.down = false;
+      this.fireHeld = false;
+    }
+  }
+
   redeemCode(code: string) {
     const key = code.trim().toUpperCase();
     if (!key) return "Need a code";
@@ -1941,6 +1950,7 @@ export class GameEngine {
     this.weaponArts = [];
     this.playerSlow = 0;
     this.playerStun = 0;
+    this.menuHold = false;
     this.cam.x = this.player.x - this.view.w / 2;
     this.cam.y = this.player.y - this.view.h / 2;
   }
@@ -2099,7 +2109,7 @@ export class GameEngine {
 
   private fixed() {
     this.pollChrome();
-    if (this.phase !== "playing") return;
+    if (this.phase !== "playing" || this.menuHold) return;
     if (this.hitstop > 0) {
       this.hitstop -= FIXED;
       return;
