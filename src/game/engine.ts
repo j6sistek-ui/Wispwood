@@ -200,6 +200,7 @@ type Enemy = {
   lunging: number;
   voidIcd: number;
   vineIcd: number;
+  bladeCd: number;
   wrapped: number;
   knockT: number;
   knockX: number;
@@ -462,11 +463,11 @@ export class GameEngine {
   hands: "spell" | "weapon" = "spell";
   private weaponIndex = 0;
   private swingT = 0;
-  private swingDur = 0.34;
-  private swingAng = 0;
   private swingCd = 0;
+  private prevBladeAng = 0;
+  private fireHeld = false;
+  private bladeSmear = 0;
   private abilityT = 0;
-  private swingHit = new Set<Enemy>();
   private metaSave = { trinkoo: 0, ownedRelics: [] as RelicId[], equipped: emptyLoadout(), forgeBag: {} as Record<string, number>, weapons: [] as ForgedWeapon[] };
   private secondWindUsed = false;
   private sandboxDeck: SandboxUnit[][] = [[]];
@@ -910,62 +911,92 @@ export class GameEngine {
     this.emit();
   }
 
-  private swingWeapon() {
+  private steerBlade(actions: Actions, dt: number) {
     const w = this.currentWeapon();
-    if (!w) return;
-    this.swingCd = w.cooldown;
-    this.swingDur = w.stance === "maul" ? 0.28 : w.stance === "spear" ? 0.2 : 0.22;
-    this.swingT = this.swingDur;
-    this.swingAng = Math.atan2(this.aim.y, this.aim.x);
-    this.swingHit.clear();
-    this.audio.fire();
-    const lunge = w.stance === "spear" ? 210 : w.stance === "maul" ? 90 : 140;
-    this.player.vx = this.aim.x * lunge;
-    this.player.vy = this.aim.y * lunge;
-    this.trauma = Math.min(1, this.trauma + 0.05);
+    const ang = Math.atan2(this.aim.y, this.aim.x);
+    const da = this.wrapDelta(ang - this.prevBladeAng);
+    const speed = dt > 0 ? Math.abs(da) / dt : 0;
+    const pressed = actions.fire && !this.fireHeld;
+    this.fireHeld = actions.fire;
+    this.bladeSmear = da;
+    if (!w) {
+      this.prevBladeAng = ang;
+      return;
+    }
+    for (const e of this.enemies) e.bladeCd = Math.max(0, e.bladeCd - dt);
+    if (actions.fire && speed > 2) {
+      this.swingT = Math.min(0.14, 0.05 + speed * 0.012);
+      this.sweepBlade(w, this.prevBladeAng, ang, speed);
+    }
+    if (pressed && this.swingCd <= 0) {
+      this.swingCd = w.cooldown * 0.7;
+      this.pokeBlade(w);
+    }
+    this.prevBladeAng = ang;
   }
 
-  private swingProgress() {
-    if (this.swingT <= 0 || this.swingDur <= 0) return 1;
-    const u = 1 - this.swingT / this.swingDur;
-    return u * u * (3 - 2 * u);
+  private wrapDelta(a: number) {
+    let d = a;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return d;
   }
 
-  private swingFacing(w: ForgedWeapon, p = this.swingProgress()) {
-    const wind = -w.arc * 0.42;
-    const follow = w.arc * 0.48;
-    return this.swingAng + wind + (follow - wind) * p;
+  private onBladeArc(from: number, to: number, a: number) {
+    const span = this.wrapDelta(to - from);
+    const off = this.wrapDelta(a - from);
+    if (span >= 0) return off >= -0.14 && off <= span + 0.14;
+    return off <= 0.14 && off >= span - 0.14;
   }
 
-  private tickSwing() {
-    const w = this.currentWeapon();
-    if (!w) return;
-    const p = this.swingProgress();
-    if (p < 0.28 || p > 0.78) return;
-    const dir = this.swingFacing(w);
+  private sweepBlade(w: ForgedWeapon, from: number, to: number, speed: number) {
     const reach = w.reach;
+    const power = 1 + Math.min(0.85, speed / 14);
     let hit = false;
     for (const e of this.enemies) {
-      if (!e.alive || this.swingHit.has(e)) continue;
+      if (!e.alive || e.bladeCd > 0) continue;
       const dx = e.x - this.player.x;
       const dy = e.y - this.player.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > reach + e.r || dist < 8) continue;
-      const rel = Math.atan2(dy, dx) - dir;
-      const a = ((rel + Math.PI) % (Math.PI * 2)) - Math.PI;
-      if (Math.abs(a) > 0.36) continue;
-      this.swingHit.add(e);
-      this.hitWithWeapon(e, w);
+      if (dist > reach + e.r || dist < 10) continue;
+      if (!this.onBladeArc(from, to, Math.atan2(dy, dx))) continue;
+      e.bladeCd = w.stance === "maul" ? 0.38 : 0.26;
+      this.hitWithWeapon(e, w, power);
       hit = true;
     }
-    if (hit) this.hitstop = Math.max(this.hitstop, w.stance === "maul" ? 0.09 : 0.055);
+    if (hit) {
+      this.hitstop = Math.max(this.hitstop, w.stance === "maul" ? 0.08 : 0.045);
+      this.audio.hit();
+    }
   }
 
-  private hitWithWeapon(e: Enemy, w: ForgedWeapon) {
+  private pokeBlade(w: ForgedWeapon) {
+    const reach = w.reach * (w.stance === "spear" ? 1 : 0.72);
+    const ang = Math.atan2(this.aim.y, this.aim.x);
+    this.player.vx += this.aim.x * (w.stance === "spear" ? 160 : 70);
+    this.player.vy += this.aim.y * (w.stance === "spear" ? 160 : 70);
+    this.swingT = 0.08;
+    let hit = false;
+    for (const e of this.enemies) {
+      if (!e.alive || e.bladeCd > 0) continue;
+      const dx = e.x - this.player.x;
+      const dy = e.y - this.player.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > reach + e.r) continue;
+      const rel = this.wrapDelta(Math.atan2(dy, dx) - ang);
+      if (Math.abs(rel) > (w.stance === "spear" ? 0.22 : 0.32)) continue;
+      e.bladeCd = 0.3;
+      this.hitWithWeapon(e, w, 0.85);
+      hit = true;
+    }
+    if (hit) this.hitstop = Math.max(this.hitstop, 0.04);
+  }
+
+  private hitWithWeapon(e: Enemy, w: ForgedWeapon, power = 1) {
     const scale = e.kind === "boss" ? 1.5 : e.kind === "buffwisp" ? 1.3 : e.kind === "elite" ? 1.15 : 1;
-    const dmg = Math.round(w.damage * scale);
+    const dmg = Math.round(w.damage * scale * power);
     this.hurtEnemy(e, dmg, this.aim.x, this.aim.y, "ember");
-    const shove = w.extra === "knock" ? 160 : w.stance === "maul" ? 90 : 50;
+    const shove = (w.extra === "knock" ? 160 : w.stance === "maul" ? 90 : 50) * Math.min(1.2, power);
     const m = Math.hypot(this.aim.x, this.aim.y) || 1;
     e.kvx = (this.aim.x / m) * shove;
     e.kvy = (this.aim.y / m) * shove;
@@ -1417,21 +1448,21 @@ export class GameEngine {
   private drawHeldWeapon() {
     const w = this.currentWeapon();
     if (!w) return;
+    const ang = Math.atan2(this.aim.y, this.aim.x);
     const swinging = this.swingT > 0;
-    const ang = swinging ? this.swingFacing(w) : Math.atan2(this.aim.y, this.aim.x);
-    const px = swinging ? 4 : w.stance === "maul" ? 4 : 3;
+    const px = w.stance === "maul" ? 4 : 3;
     const ox = this.player.x + Math.cos(ang) * 10;
     const oy = this.player.y + Math.sin(ang) * 8;
     if (swinging) {
       const ctx = this.ctx;
-      for (let g = 3; g >= 1; g--) {
-        const p = Math.max(0, this.swingProgress() - g * 0.09);
-        ctx.globalAlpha = 0.16 * (4 - g);
-        drawWeaponGlyph(ctx, w.hammer, ox, oy, this.swingFacing(w, p), px, w.color, w.color2, false);
+      const smear = this.bladeSmear;
+      for (let g = 2; g >= 1; g--) {
+        ctx.globalAlpha = 0.2 * (3 - g);
+        drawWeaponGlyph(ctx, w.hammer, ox, oy, ang - smear * g * 0.45, px, w.color, w.color2, false);
       }
       ctx.globalAlpha = 1;
     }
-    drawWeaponGlyph(this.ctx, w.hammer, ox, oy, ang, px, w.color, w.color2, swinging && this.swingProgress() > 0.35 && this.swingProgress() < 0.8);
+    drawWeaponGlyph(this.ctx, w.hammer, ox, oy, ang, px, w.color, w.color2, swinging);
   }
 
   spinWheel(): "poor" | "miss" | "craft" | "jackpot" {
@@ -1999,10 +2030,7 @@ export class GameEngine {
     this.fireCd = Math.max(0, this.fireCd - dt);
     this.swingCd = Math.max(0, this.swingCd - dt);
     this.abilityT = Math.max(0, this.abilityT - dt);
-    if (this.swingT > 0) {
-      this.swingT = Math.max(0, this.swingT - dt);
-      this.tickSwing();
-    }
+    this.swingT = Math.max(0, this.swingT - dt);
     for (const [id, g] of this.ghosts) {
       g.ttl -= dt;
       if (g.ttl <= 0) this.ghosts.delete(id);
@@ -2015,9 +2043,8 @@ export class GameEngine {
     const actions = this.input.poll();
     this.aimFrom(actions);
     this.movePlayer(actions, dt);
-    if (this.hands === "weapon") {
-      if (actions.fire && this.swingCd <= 0) this.swingWeapon();
-    } else if (actions.fire && this.fireCd <= 0) this.shoot();
+    if (this.hands === "weapon") this.steerBlade(actions, dt);
+    else if (actions.fire && this.fireCd <= 0) this.shoot();
     this.updateBullets(dt);
     this.updateEnemies(dt);
     this.updateBossShots(dt);
@@ -3661,6 +3688,7 @@ export class GameEngine {
       lunging: 0,
       voidIcd: 0,
       vineIcd: 0,
+      bladeCd: 0,
       wrapped: 0,
       knockT: 0,
       knockX: 0,
