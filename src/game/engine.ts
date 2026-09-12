@@ -1,6 +1,6 @@
 import { Input, type Actions } from "./input";
 import { GameAudio } from "./audio";
-import { loadCore, loadProps, loadTitle, type GameAssets } from "./assets";
+import { loadCore, loadExtras, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawBuffWisp } from "./buff-wisp";
@@ -673,51 +673,40 @@ export class GameEngine {
   }
 
   async boot() {
-    this.loading = true;
-    this.loadPct = 0.04;
-    this.loadNote = "Cover";
-    this.emit();
-    let cover: HTMLImageElement | undefined;
-    try {
-      cover = await loadTitle();
-      this.assets = { title: cover } as GameAssets;
-      this.loadPct = 0.12;
-    } catch {
-      this.assets = null;
-    }
     this.loading = false;
     this.phase = "title";
+    this.loadPct = 0.08;
+    this.loadNote = "Art";
     this.emit();
     try {
-      this.assets = await loadCore(cover, (done, total, label) => {
-        this.loadPct = 0.12 + (done / Math.max(1, total)) * 0.7;
+      this.assets = await loadCore(undefined, (done, total, label) => {
+        this.loadPct = 0.08 + (done / Math.max(1, total)) * 0.55;
         this.loadNote = label;
-        if (done === total || done % 4 === 0) this.emit();
+        this.emit();
       });
       this.buildProps();
       this.worldReady = true;
-      this.loadPct = 0.86;
-      this.loadNote = "Woods";
+      this.loadPct = 0.7;
+      this.loadNote = "Ready";
       this.emit();
       if (this.pendingPlay != null) {
         const mode = this.pendingPlay;
         this.pendingPlay = null;
-        this.loading = false;
         this.play(mode);
       }
-      void loadProps((done, total) => {
-        this.loadPct = 0.86 + (done / Math.max(1, total)) * 0.14;
-        this.loadNote = "Woods";
-        if (done === total) this.emit();
-      }).then((props) => {
-        if (this.assets) this.assets.props = props;
-        this.loadPct = 1;
-        this.loadNote = "Ready";
-        this.emit();
-      });
+      if (this.assets) {
+        void loadExtras(this.assets, (done, total) => {
+          this.loadPct = 0.7 + (done / Math.max(1, total)) * 0.3;
+          if (done === total) {
+            this.loadPct = 1;
+            this.loadNote = "Ready";
+            this.emit();
+          }
+        });
+      }
     } catch {
       this.worldReady = Boolean(this.assets?.player);
-      this.loadNote = this.worldReady ? "Ready" : "Cover only";
+      this.loadNote = this.worldReady ? "Ready" : "Need a refresh";
       this.emit();
       if (this.pendingPlay != null && this.worldReady) {
         const mode = this.pendingPlay;
@@ -4805,7 +4794,7 @@ export class GameEngine {
   }
 
   private drawKnockSprite(
-    img: HTMLImageElement,
+    img: CanvasImageSource,
     x: number,
     y: number,
     s: number,
@@ -4966,7 +4955,7 @@ export class GameEngine {
     return out;
   }
 
-  private drawTinted(img: HTMLImageElement, x: number, y: number, w: number, h: number, ang = 0, color?: string) {
+  private drawTinted(img: CanvasImageSource, x: number, y: number, w: number, h: number, ang = 0, color?: string) {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(x, y);

@@ -94,7 +94,16 @@ export function GameApp() {
   const [crash, setCrash] = useState<string | null>(null);
 
   useEffect(() => {
-    void ensureGuestAccount();
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(() => {
+        void ensureGuestAccount();
+      });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(() => {
+      void ensureGuestAccount();
+    }, 400);
+    return () => window.clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -160,18 +169,10 @@ export function GameApp() {
       window.addEventListener("pointerup", onUp);
       window.addEventListener("pointercancel", onUp);
 
-      void game
-        .boot()
-        .then(() => {
-          lockViewport();
-          game.resize();
-          game.startLoop();
-        })
-        .catch(() => {
-          lockViewport();
-          game.resize();
-          game.startLoop();
-        });
+      void game.boot().catch(() => {});
+      lockViewport();
+      game.resize();
+      game.startLoop();
 
       cleanup = () => {
         unsub();
