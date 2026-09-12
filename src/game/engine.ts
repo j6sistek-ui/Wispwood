@@ -1,6 +1,6 @@
 import { Input, type Actions } from "./input";
 import { GameAudio } from "./audio";
-import { loadAssets, loadTitle, type GameAssets } from "./assets";
+import { loadCore, loadProps, loadTitle, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawBuffWisp } from "./buff-wisp";
@@ -123,6 +123,9 @@ export type HudState = {
   bestNight: number;
   muted: boolean;
   loading: boolean;
+  loadPct: number;
+  loadNote: string;
+  worldReady: boolean;
   spell: Spell;
   gold: number;
   upgrades: Record<Spell, SpellUpgrades>;
@@ -477,6 +480,8 @@ export class GameEngine {
   private menuHold = false;
   private worldReady = false;
   private pendingPlay: boolean | "sandbox" | "max" | null = null;
+  private loadPct = 0;
+  private loadNote = "Gathering dusk";
 
   player = { x: ARENA / 2, y: ARENA / 2, hp: 100, maxHp: 100, invuln: 0, face: "down" as Dir, frame: 0, moving: false, vx: 0, vy: 0, knockT: 0, knockX: 0, knockY: 1 };
   private ghosts = new Map<string, { name: string; x: number; y: number; tx: number; ty: number; face: Dir; hp: number; frame: number; ttl: number }>();
@@ -588,6 +593,9 @@ export class GameEngine {
       bestNight: this.bestNight,
       muted: this.muted,
       loading: this.loading,
+      loadPct: this.loadPct,
+      loadNote: this.loadNote,
+      worldReady: this.worldReady,
       spell: this.spell,
       gold: this.gold,
       upgrades: {
@@ -666,11 +674,14 @@ export class GameEngine {
 
   async boot() {
     this.loading = true;
+    this.loadPct = 0.04;
+    this.loadNote = "Cover";
     this.emit();
     let cover: HTMLImageElement | undefined;
     try {
       cover = await loadTitle();
       this.assets = { title: cover } as GameAssets;
+      this.loadPct = 0.12;
     } catch {
       this.assets = null;
     }
@@ -678,17 +689,41 @@ export class GameEngine {
     this.phase = "title";
     this.emit();
     try {
-      this.assets = await loadAssets(cover);
+      this.assets = await loadCore(cover, (done, total, label) => {
+        this.loadPct = 0.12 + (done / Math.max(1, total)) * 0.7;
+        this.loadNote = label;
+        if (done === total || done % 4 === 0) this.emit();
+      });
       this.buildProps();
       this.worldReady = true;
+      this.loadPct = 0.86;
+      this.loadNote = "Woods";
+      this.emit();
+      if (this.pendingPlay != null) {
+        const mode = this.pendingPlay;
+        this.pendingPlay = null;
+        this.loading = false;
+        this.play(mode);
+      }
+      void loadProps((done, total) => {
+        this.loadPct = 0.86 + (done / Math.max(1, total)) * 0.14;
+        this.loadNote = "Woods";
+        if (done === total) this.emit();
+      }).then((props) => {
+        if (this.assets) this.assets.props = props;
+        this.loadPct = 1;
+        this.loadNote = "Ready";
+        this.emit();
+      });
     } catch {
       this.worldReady = Boolean(this.assets?.player);
-    }
-    this.emit();
-    if (this.pendingPlay != null) {
-      const mode = this.pendingPlay;
-      this.pendingPlay = null;
-      this.play(mode);
+      this.loadNote = this.worldReady ? "Ready" : "Cover only";
+      this.emit();
+      if (this.pendingPlay != null && this.worldReady) {
+        const mode = this.pendingPlay;
+        this.pendingPlay = null;
+        this.play(mode);
+      }
     }
   }
 

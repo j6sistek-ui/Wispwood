@@ -19,6 +19,14 @@ function loadImage(src: string, timeoutMs = 8000): Promise<HTMLImageElement> {
   });
 }
 
+async function loadQuiet(src: string): Promise<HTMLImageElement | null> {
+  try {
+    return await loadImage(src);
+  } catch {
+    return null;
+  }
+}
+
 export type GameAssets = {
   player: Record<"down" | "left" | "right" | "up", HTMLImageElement[]>;
   wisp: HTMLImageElement[];
@@ -29,6 +37,8 @@ export type GameAssets = {
   ground: HTMLImageElement;
   title: HTMLImageElement;
 };
+
+export type LoadProgress = (done: number, total: number, label: string) => void;
 
 const PROP_KEYS = [
   "moss-stone",
@@ -42,50 +52,101 @@ const PROP_KEYS = [
   "root",
 ] as const;
 
+const CORE_TOTAL = 16 + 4 + 4 + 4 + 4 + 1;
+const PROP_TOTAL = PROP_KEYS.length;
+
+function frames(kind: string, n: number) {
+  return Array.from({ length: n }, (_, i) => asset(`game/${kind}-${i + 1}.png`));
+}
+
 export async function loadTitle(): Promise<HTMLImageElement> {
   return loadImage(asset("game/title.jpg"), 6000);
 }
 
-export async function loadAssets(title?: HTMLImageElement): Promise<GameAssets> {
-  const [
-    down,
-    left,
-    right,
-    up,
-    wisp,
-    projectile,
-    impact,
-    pickup,
-    ground,
-    cover,
-    propImgs,
-  ] = await Promise.all([
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/player/down-${i}.png`)))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/player/left-${i}.png`)))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/player/right-${i}.png`)))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/player/up-${i}.png`)))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/wisp/hover-${i}.png`)))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/projectile/projectile-${i}.png`)))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/impact/impact-${i}.png`)))),
-    Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/pickup/idle-${i}.png`)))),
-    loadImage(asset("game/ground.jpg")),
-    title ? Promise.resolve(title) : loadImage(asset("game/title.jpg")),
-    Promise.all(PROP_KEYS.map((k) => loadImage(asset(`game/props/${k}.png`)))),
+export async function loadCore(title: HTMLImageElement | undefined, onProgress?: LoadProgress): Promise<GameAssets> {
+  let done = 0;
+  const total = CORE_TOTAL + (title ? 0 : 1);
+  const tick = (label: string) => {
+    done += 1;
+    onProgress?.(done, total, label);
+  };
+
+  const pack = async (urls: string[], label: string) => {
+    const imgs = await Promise.all(
+      urls.map(async (src) => {
+        const img = await loadQuiet(src);
+        tick(label);
+        return img;
+      }),
+    );
+    return imgs.filter((img): img is HTMLImageElement => Boolean(img));
+  };
+
+  const [down, left, right, up, wisp, projectile, impact, pickup, ground, cover] = await Promise.all([
+    pack(frames("player/down", 4), "Keeper"),
+    pack(frames("player/left", 4), "Keeper"),
+    pack(frames("player/right", 4), "Keeper"),
+    pack(frames("player/up", 4), "Keeper"),
+    pack(frames("wisp/hover", 4), "Wisps"),
+    pack(frames("projectile/projectile", 4), "Sparks"),
+    pack(frames("impact/impact", 4), "Hits"),
+    pack(frames("pickup/idle", 4), "Hearts"),
+    loadQuiet(asset("game/ground.jpg")).then((img) => {
+      tick("Clearing");
+      return img;
+    }),
+    title
+      ? Promise.resolve(title)
+      : loadQuiet(asset("game/title.jpg")).then((img) => {
+          tick("Cover");
+          return img;
+        }),
   ]);
 
-  const props: Record<string, HTMLImageElement> = {};
-  PROP_KEYS.forEach((k, i) => {
-    props[k] = propImgs[i]!;
-  });
+  if (!down[0] || !wisp[0] || !projectile[0] || !ground || !cover) {
+    throw new Error("Core art missing");
+  }
+
+  const four = (imgs: HTMLImageElement[], fallback: HTMLImageElement[]) => {
+    const src = imgs.length ? imgs : fallback;
+    const out = src.slice(0, 4);
+    while (out.length < 4) out.push(out[out.length - 1]!);
+    return out;
+  };
 
   return {
-    player: { down, left, right, up },
-    wisp,
-    projectile,
-    impact,
-    pickup,
-    props,
+    player: {
+      down: four(down, [cover]),
+      left: four(left, down),
+      right: four(right, down),
+      up: four(up, down),
+    },
+    wisp: four(wisp, down),
+    projectile: four(projectile, down),
+    impact: four(impact, projectile.length ? projectile : down),
+    pickup: four(pickup, projectile.length ? projectile : down),
+    props: {},
     ground,
     title: cover,
   };
+}
+
+export async function loadProps(onProgress?: LoadProgress): Promise<Record<string, HTMLImageElement>> {
+  const props: Record<string, HTMLImageElement> = {};
+  let done = 0;
+  await Promise.all(
+    PROP_KEYS.map(async (k) => {
+      const img = await loadQuiet(asset(`game/props/${k}.png`));
+      done += 1;
+      onProgress?.(done, PROP_TOTAL, "Woods");
+      if (img) props[k] = img;
+    }),
+  );
+  return props;
+}
+
+export async function loadAssets(title?: HTMLImageElement): Promise<GameAssets> {
+  const core = await loadCore(title);
+  core.props = await loadProps();
+  return core;
 }

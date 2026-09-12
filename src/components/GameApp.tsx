@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { GameEngine, type HudState } from "@/game/engine";
-import { GameOverlay } from "@/components/GameOverlay";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import type { GameEngine, HudState } from "@/game/engine";
 import { ensureGuestAccount } from "@/game/guest-account";
+
+const GameOverlay = lazy(() =>
+  import("./GameOverlay").then((m) => ({ default: m.GameOverlay })),
+);
 
 const idleHud: HudState = {
   phase: "boot",
@@ -13,6 +16,9 @@ const idleHud: HudState = {
   bestNight: 0,
   muted: false,
   loading: true,
+  loadPct: 0,
+  loadNote: "Gathering dusk",
+  worldReady: false,
   spell: "ember",
   gold: 0,
   upgrades: {
@@ -95,88 +101,99 @@ export function GameApp() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     lockViewport();
-    let game: GameEngine;
-    try {
-      game = new GameEngine(canvas);
-    } catch (err) {
-      setCrash(err instanceof Error ? err.message : "Could not start");
-      return;
-    }
-    engineRef.current = game;
-    setEngine(game);
-    const unsub = game.subscribe(setHud);
-    const onResize = () => {
-      lockViewport();
-      game.resize();
-    };
-    window.addEventListener("resize", onResize);
-    window.addEventListener("orientationchange", onResize);
-    window.visualViewport?.addEventListener("resize", onResize);
-    window.visualViewport?.addEventListener("scroll", onResize);
-    const ro = new ResizeObserver(() => {
-      lockViewport();
-      game.resize();
-    });
-    ro.observe(canvas.parentElement ?? canvas);
-    const onVis = () => {
-      if (document.visibilityState === "visible") game.audio.resume();
-    };
-    document.addEventListener("visibilitychange", onVis);
+    let cancelled = false;
+    let cleanup = () => {};
 
-    const unlockAudio = () => game.audio.unlock();
-    window.addEventListener("pointerdown", unlockAudio);
-    window.addEventListener("keydown", unlockAudio);
-
-    const playing = () => game.phase === "playing";
-
-    const onDown = (e: PointerEvent) => {
-      if (!playing() || isChromeTarget(e.target)) return;
-      e.preventDefault();
-      game.pointAt(e.clientX, e.clientY, true, true);
-    };
-    const onMove = (e: PointerEvent) => {
-      if (!playing() || isChromeTarget(e.target)) return;
-      const held = e.buttons > 0;
-      game.pointAt(e.clientX, e.clientY, held, false);
-    };
-    const onUp = (e: PointerEvent) => {
-      if (!playing()) return;
-      game.pointAt(e.clientX, e.clientY, false, false);
-    };
-
-    window.addEventListener("pointerdown", onDown, { passive: false });
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-
-    void game
-      .boot()
-      .then(() => {
+    void import("@/game/engine").then(({ GameEngine }) => {
+      if (cancelled || !canvasRef.current) return;
+      let game: GameEngine;
+      try {
+        game = new GameEngine(canvasRef.current);
+      } catch (err) {
+        setCrash(err instanceof Error ? err.message : "Could not start");
+        return;
+      }
+      engineRef.current = game;
+      setEngine(game);
+      const unsub = game.subscribe(setHud);
+      const onResize = () => {
         lockViewport();
         game.resize();
-        game.startLoop();
-      })
-      .catch(() => {
+      };
+      window.addEventListener("resize", onResize);
+      window.addEventListener("orientationchange", onResize);
+      window.visualViewport?.addEventListener("resize", onResize);
+      window.visualViewport?.addEventListener("scroll", onResize);
+      const ro = new ResizeObserver(() => {
         lockViewport();
         game.resize();
-        game.startLoop();
       });
+      ro.observe(canvas.parentElement ?? canvas);
+      const onVis = () => {
+        if (document.visibilityState === "visible") game.audio.resume();
+      };
+      document.addEventListener("visibilitychange", onVis);
+
+      const unlockAudio = () => game.audio.unlock();
+      window.addEventListener("pointerdown", unlockAudio);
+      window.addEventListener("keydown", unlockAudio);
+
+      const playing = () => game.phase === "playing";
+
+      const onDown = (e: PointerEvent) => {
+        if (!playing() || isChromeTarget(e.target)) return;
+        e.preventDefault();
+        game.pointAt(e.clientX, e.clientY, true, true);
+      };
+      const onMove = (e: PointerEvent) => {
+        if (!playing() || isChromeTarget(e.target)) return;
+        const held = e.buttons > 0;
+        game.pointAt(e.clientX, e.clientY, held, false);
+      };
+      const onUp = (e: PointerEvent) => {
+        if (!playing()) return;
+        game.pointAt(e.clientX, e.clientY, false, false);
+      };
+
+      window.addEventListener("pointerdown", onDown, { passive: false });
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+
+      void game
+        .boot()
+        .then(() => {
+          lockViewport();
+          game.resize();
+          game.startLoop();
+        })
+        .catch(() => {
+          lockViewport();
+          game.resize();
+          game.startLoop();
+        });
+
+      cleanup = () => {
+        unsub();
+        window.removeEventListener("resize", onResize);
+        window.removeEventListener("orientationchange", onResize);
+        window.visualViewport?.removeEventListener("resize", onResize);
+        window.visualViewport?.removeEventListener("scroll", onResize);
+        ro.disconnect();
+        document.removeEventListener("visibilitychange", onVis);
+        window.removeEventListener("pointerdown", unlockAudio);
+        window.removeEventListener("keydown", unlockAudio);
+        window.removeEventListener("pointerdown", onDown);
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        game.stop();
+      };
+    });
 
     return () => {
-      unsub();
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onResize);
-      window.visualViewport?.removeEventListener("resize", onResize);
-      window.visualViewport?.removeEventListener("scroll", onResize);
-      ro.disconnect();
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      game.stop();
+      cancelled = true;
+      cleanup();
     };
   }, []);
 
@@ -204,7 +221,15 @@ export function GameApp() {
           imageRendering: "pixelated",
         }}
       />
-      <GameOverlay engine={engine} hud={hud} />
+      <Suspense
+        fallback={
+          <div className="absolute inset-0 z-20 grid place-items-center bg-bg">
+            <p className="font-pixel text-pixel-sm text-muted">Gathering dusk</p>
+          </div>
+        }
+      >
+        <GameOverlay engine={engine} hud={hud} />
+      </Suspense>
       {crash ? (
         <div className="absolute inset-0 z-50 grid place-items-center bg-bg px-6 text-center">
           <p className="font-pixel text-pixel text-fg">Could not load</p>

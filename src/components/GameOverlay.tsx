@@ -105,7 +105,7 @@ export function GameOverlay({ engine, hud }: Props) {
         />
       ) : null}
 
-      {hud.phase === "boot" || hud.loading ? <Boot /> : null}
+      {hud.phase === "boot" || hud.loading ? <Boot pct={hud.loadPct} note={hud.loadNote} /> : null}
       {hud.phase === "title" && !hud.loading ? (
         <Title
           engine={engine}
@@ -279,10 +279,16 @@ function Hud({
   );
 }
 
-function Boot() {
+function Boot({ pct = 0, note = "Gathering dusk" }: { pct?: number; note?: string }) {
+  const w = Math.max(4, Math.min(100, Math.round(pct * 100)));
   return (
-    <div className="absolute inset-0 grid place-items-center bg-bg">
-      <p className="font-pixel text-pixel-sm text-muted">Gathering dusk</p>
+    <div className="absolute inset-0 z-30 grid place-items-center bg-bg">
+      <div className="flex w-48 flex-col items-center gap-3">
+        <p className="font-pixel text-pixel-sm text-muted">{note}</p>
+        <div className="h-2 w-full overflow-hidden border-2 border-muted bg-elevated">
+          <div className="h-full bg-gold" style={{ width: `${w}%` }} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -601,11 +607,11 @@ function Title({
               </div>
             ) : (
               <>
-                <PixelButton primary onClick={() => engine?.play()}>
-                  Clearing
+                <PixelButton primary disabled={!hud.worldReady} onClick={() => engine?.play()}>
+                  {hud.worldReady ? "Clearing" : "Loading…"}
                 </PixelButton>
                 <div className="grid grid-cols-2 gap-1.5">
-                  <PixelButton compact onClick={() => engine?.play(true)}>
+                  <PixelButton compact disabled={!hud.worldReady} onClick={() => engine?.play(true)}>
                     Sandbox
                   </PixelButton>
                   <PixelButton compact onClick={() => setMenu("multiplayer")}>
@@ -1118,6 +1124,8 @@ function FieldManual() {
           alt="Field book"
           className="pixelated h-auto max-h-[min(62vh,20rem)] w-full select-none object-contain"
           draggable={false}
+          loading="lazy"
+          decoding="async"
         />
         <div className="absolute inset-x-[12%] inset-y-[18%] grid grid-cols-2 gap-[8%]">
           <div className="flex flex-col items-center justify-center px-1 text-center font-pixel text-bg">
@@ -1916,6 +1924,8 @@ function Spellbook({ engine, hud }: { engine: GameEngine | null; hud: HudState }
             alt="Spellbook"
             className="pixelated h-auto max-h-[min(70vh,22rem)] w-full select-none object-contain"
             draggable={false}
+            loading="lazy"
+            decoding="async"
           />
 
           {tuning ? (
