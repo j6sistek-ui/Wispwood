@@ -1,10 +1,20 @@
 import { asset } from "./paths";
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+function loadImage(src: string, timeoutMs = 8000): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Failed to load ${src}`));
+    const t = window.setTimeout(() => {
+      img.src = "";
+      reject(new Error(`Timed out ${src}`));
+    }, timeoutMs);
+    img.onload = () => {
+      window.clearTimeout(t);
+      resolve(img);
+    };
+    img.onerror = () => {
+      window.clearTimeout(t);
+      reject(new Error(`Failed to load ${src}`));
+    };
     img.src = src;
   });
 }
@@ -20,7 +30,6 @@ export type GameAssets = {
   title: HTMLImageElement;
 };
 
-const DIRS = ["down", "left", "right", "up"] as const;
 const PROP_KEYS = [
   "moss-stone",
   "pebbles",
@@ -33,7 +42,11 @@ const PROP_KEYS = [
   "root",
 ] as const;
 
-export async function loadAssets(): Promise<GameAssets> {
+export async function loadTitle(): Promise<HTMLImageElement> {
+  return loadImage(asset("game/title.jpg"), 6000);
+}
+
+export async function loadAssets(title?: HTMLImageElement): Promise<GameAssets> {
   const [
     down,
     left,
@@ -44,7 +57,7 @@ export async function loadAssets(): Promise<GameAssets> {
     impact,
     pickup,
     ground,
-    title,
+    cover,
     propImgs,
   ] = await Promise.all([
     Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/player/down-${i}.png`)))),
@@ -55,8 +68,8 @@ export async function loadAssets(): Promise<GameAssets> {
     Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/projectile/projectile-${i}.png`)))),
     Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/impact/impact-${i}.png`)))),
     Promise.all([1, 2, 3, 4].map((i) => loadImage(asset(`game/pickup/idle-${i}.png`)))),
-    loadImage(asset("game/ground.png")),
-    loadImage(asset("game/title.jpg")),
+    loadImage(asset("game/ground.jpg")),
+    title ? Promise.resolve(title) : loadImage(asset("game/title.jpg")),
     Promise.all(PROP_KEYS.map((k) => loadImage(asset(`game/props/${k}.png`)))),
   ]);
 
@@ -73,6 +86,6 @@ export async function loadAssets(): Promise<GameAssets> {
     pickup,
     props,
     ground,
-    title,
+    title: cover,
   };
 }

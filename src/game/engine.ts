@@ -1,6 +1,6 @@
 import { Input, type Actions } from "./input";
 import { GameAudio } from "./audio";
-import { loadAssets, type GameAssets } from "./assets";
+import { loadAssets, loadTitle, type GameAssets } from "./assets";
 import { loadSave, writeSave } from "./save";
 import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawBuffWisp } from "./buff-wisp";
@@ -475,6 +475,8 @@ export class GameEngine {
   private muteLatch = false;
   private heldPause = false;
   private menuHold = false;
+  private worldReady = false;
+  private pendingPlay: boolean | "sandbox" | "max" | null = null;
 
   player = { x: ARENA / 2, y: ARENA / 2, hp: 100, maxHp: 100, invuln: 0, face: "down" as Dir, frame: 0, moving: false, vx: 0, vy: 0, knockT: 0, knockX: 0, knockY: 1 };
   private ghosts = new Map<string, { name: string; x: number; y: number; tx: number; ty: number; face: Dir; hp: number; frame: number; ttl: number }>();
@@ -665,15 +667,29 @@ export class GameEngine {
   async boot() {
     this.loading = true;
     this.emit();
+    let cover: HTMLImageElement | undefined;
     try {
-      this.assets = await loadAssets();
-      this.buildProps();
+      cover = await loadTitle();
+      this.assets = { title: cover } as GameAssets;
     } catch {
       this.assets = null;
     }
     this.loading = false;
     this.phase = "title";
     this.emit();
+    try {
+      this.assets = await loadAssets(cover);
+      this.buildProps();
+      this.worldReady = true;
+    } catch {
+      this.worldReady = Boolean(this.assets?.player);
+    }
+    this.emit();
+    if (this.pendingPlay != null) {
+      const mode = this.pendingPlay;
+      this.pendingPlay = null;
+      this.play(mode);
+    }
   }
 
   startLoop() {
@@ -725,6 +741,12 @@ export class GameEngine {
   }
 
   play(mode: boolean | "sandbox" | "max" = false) {
+    if (!this.worldReady) {
+      this.pendingPlay = mode;
+      this.loading = true;
+      this.emit();
+      return;
+    }
     this.audio.unlock();
     this.captureMeta();
     this.maxRun = mode === "max";

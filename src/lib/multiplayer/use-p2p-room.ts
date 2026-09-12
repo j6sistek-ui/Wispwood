@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { P2PRoom, type PeerInfo } from "./p2p";
-import { MeshRoom } from "./mesh-room";
+import type { PeerInfo } from "./p2p";
 
 export interface UseP2PRoomOptions {
   room: string | null;
@@ -85,6 +84,7 @@ export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
       onRoomStarted: fireStart,
     };
     void (async () => {
+      const { MeshRoom } = await import("./mesh-room");
       const mesh = new MeshRoom(opts);
       inst = mesh;
       roomRef.current = mesh;
@@ -94,6 +94,7 @@ export function useP2PRoom(options: UseP2PRoomOptions): P2PRoomHandle {
         if (closed) return;
         if (!(await rtcAvailable())) return;
         mesh.close();
+        const { P2PRoom } = await import("./p2p");
         const rtc = new P2PRoom(opts);
         inst = rtc;
         roomRef.current = rtc;
