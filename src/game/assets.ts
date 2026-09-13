@@ -102,7 +102,7 @@ export async function loadCore(_title: HTMLImageElement | undefined, onProgress?
     onProgress?.(done, total, label);
   };
 
-  const [playerSheet, wispSheet, projSheet, downR, leftR, rightR, upR, wispR] = await Promise.all([
+  const [playerSheet, wispSheet, projSheet, wispR] = await Promise.all([
     loadQuiet(asset("game/player/sheet.png")).then((img) => {
       tick("Keeper");
       return img;
@@ -115,10 +115,6 @@ export async function loadCore(_title: HTMLImageElement | undefined, onProgress?
       tick("Sparks");
       return img;
     }),
-    loadQuiet(asset("game/player/down-real.png")),
-    loadQuiet(asset("game/player/left-real.png")),
-    loadQuiet(asset("game/player/right-real.png")),
-    loadQuiet(asset("game/player/up-real.png")),
     loadQuiet(asset("game/wisp/real.png")),
   ]);
 
