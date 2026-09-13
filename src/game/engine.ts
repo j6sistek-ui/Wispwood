@@ -2052,6 +2052,8 @@ export class GameEngine {
     if (this.phase !== "playing" && this.phase !== "paused") return;
     const ready = this.sandboxDeck.filter((w) => w.length > 0);
     if (!ready.length) return;
+    this.menuHold = false;
+    this.phase = "playing";
     this.sandboxDeck = ready;
     this.sandboxEdit = 0;
     this.sandboxPlaying = true;
@@ -2207,6 +2209,8 @@ export class GameEngine {
   }
 
   private pollChrome() {
+    if (this.menuHold) return;
+    if (this.phase === "title" || this.phase === "boot" || this.phase === "dead") return;
     const bookNow = this.input.has("KeyB") || this.input.has("KeyQ");
     if (bookNow && !this.bookLatch) {
       if (this.phase === "book") this.closeBook();
@@ -4649,7 +4653,8 @@ export class GameEngine {
   }
 
   private drawTitleCover() {
-    const img = this.assets!.title;
+    const img = this.assets?.title;
+    if (!img || img.width < 64 || img.height < 64) return;
     const vw = this.view.w;
     const vh = this.view.h;
     const scale = Math.max(vw / img.width, vh / img.height);
@@ -4659,7 +4664,8 @@ export class GameEngine {
   }
 
   private drawGround() {
-    const img = this.assets!.ground;
+    const img = this.assets?.ground;
+    if (!img) return;
     const tile = 704;
     const ctx = this.ctx;
     for (let y = 0; y < ARENA; y += tile) {
@@ -4676,9 +4682,10 @@ export class GameEngine {
   }
 
   private drawPlayer() {
-    const frames = this.assets!.player[this.player.face];
+    const frames = this.assets?.player[this.player.face];
     const i = this.player.moving ? Math.floor(this.player.frame) % 4 : 0;
-    const img = frames[i]!;
+    const img = frames?.[i] ?? frames?.[0];
+    if (!img) return;
     const s = 64 * this.bodySize;
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
@@ -4689,8 +4696,9 @@ export class GameEngine {
   }
 
   private drawGhost(g: { name: string; x: number; y: number; face: Dir; hp: number; frame: number }) {
-    const frames = this.assets!.player[g.face];
-    const img = frames[Math.floor(g.frame) % 4]!;
+    const frames = this.assets?.player[g.face];
+    const img = frames?.[Math.floor(g.frame) % 4] ?? frames?.[0];
+    if (!img) return;
     this.ctx.globalAlpha = 0.92;
     this.drawKnockSprite(img, g.x, g.y, 64, 0.78, 0, 1, 0, 0.28);
     this.ctx.globalAlpha = 1;
@@ -4712,7 +4720,8 @@ export class GameEngine {
       this.drawBuffWispEnemy(e);
       return;
     }
-    const img = this.assets!.wisp[Math.floor(e.frame) % 4]!;
+    const img = this.assets?.wisp[Math.floor(e.frame) % 4] ?? this.assets?.wisp[0];
+    if (!img) return;
     const s = e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
     if (e.flash > 0) this.ctx.filter = "brightness(3.4) saturate(1.6)";
     else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
@@ -4794,7 +4803,7 @@ export class GameEngine {
   }
 
   private drawKnockSprite(
-    img: CanvasImageSource,
+    img: CanvasImageSource | null | undefined,
     x: number,
     y: number,
     s: number,
@@ -4804,6 +4813,7 @@ export class GameEngine {
     knockT: number,
     maxT: number,
   ) {
+    if (!img) return;
     const ctx = this.ctx;
     const k = this.reduced ? 0 : clamp(knockT / maxT, 0, 1);
     const ang = Math.atan2(ky, kx);
@@ -4847,7 +4857,8 @@ export class GameEngine {
   }
 
   private drawPickup(p: Pickup) {
-    const img = this.assets!.pickup[Math.floor(p.frame) % 4]!;
+    const img = this.assets?.pickup[Math.floor(p.frame) % 4] ?? this.assets?.pickup[0];
+    if (!img) return;
     const bob = Math.sin(this.animT * 6 + p.x) * 4;
     const pulse = 1 + Math.sin(this.animT * 8) * 0.12;
     this.drawGlow(p.x, p.y - 8 + bob, 22, "#ffe14a");
@@ -4914,15 +4925,15 @@ export class GameEngine {
   }
 
   private projFrame() {
-    return this.assets!.projectile[Math.floor(this.animT * 14) % 4]!;
+    return this.assets?.projectile[Math.floor(this.animT * 14) % 4] ?? this.assets?.projectile[0];
   }
 
   private impactFrame(t: number) {
-    return this.assets!.impact[Math.min(3, Math.max(0, Math.floor(t * 4)))]!;
+    return this.assets?.impact[Math.min(3, Math.max(0, Math.floor(t * 4)))] ?? this.assets?.impact[0];
   }
 
   private coinFrame() {
-    return this.assets!.pickup[Math.floor(this.animT * 8) % 4]!;
+    return this.assets?.pickup[Math.floor(this.animT * 8) % 4] ?? this.assets?.pickup[0];
   }
 
   private tintCache = new Map<string, string>();
@@ -4955,7 +4966,8 @@ export class GameEngine {
     return out;
   }
 
-  private drawTinted(img: CanvasImageSource, x: number, y: number, w: number, h: number, ang = 0, color?: string) {
+  private drawTinted(img: CanvasImageSource | null | undefined, x: number, y: number, w: number, h: number, ang = 0, color?: string) {
+    if (!img) return;
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(x, y);
@@ -5048,11 +5060,12 @@ export class GameEngine {
     ctx.translate(x, y);
     ctx.rotate(ang);
     ctx.globalAlpha = fade;
-    const boom = this.assets!.impact[Math.min(3, Math.floor(k * 4))]!;
+    const boom = this.assets?.impact[Math.min(3, Math.floor(k * 4))] ?? this.assets?.impact[0];
     const s = radius * 1.15;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(boom, -s / 2, -s / 2, s, s);
-    ctx.drawImage(this.projFrame(), -s * 0.2, -10, s * 0.7, 20);
+    if (boom) ctx.drawImage(boom, -s / 2, -s / 2, s, s);
+    const shot = this.projFrame();
+    if (shot) ctx.drawImage(shot, -s * 0.2, -10, s * 0.7, 20);
     ctx.restore();
     drawCoreSigil(this.ctx, "boom", x, y, ang, this.animT + k);
     ctx.globalAlpha = 1;

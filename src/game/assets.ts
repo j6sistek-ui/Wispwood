@@ -117,15 +117,14 @@ export async function loadCore(_title: HTMLImageElement | undefined, onProgress?
     }),
   ]);
 
-  if (!playerSheet || !wispSheet || !projSheet) throw new Error("Core art missing");
-
-  const playerFrames = sliceGrid(playerSheet, 96, 96);
-  const down = four(playerFrames.slice(0, 4), playerFrames);
+  const fallback = swatch("#e08a3c", 96, 96);
+  const playerFrames = playerSheet ? sliceGrid(playerSheet, 96, 96) : [fallback, fallback, fallback, fallback];
+  const down = four(playerFrames.slice(0, 4), [fallback]);
   const left = four(playerFrames.slice(4, 8), down);
   const right = four(playerFrames.slice(8, 12), down);
   const up = four(playerFrames.slice(12, 16), down);
-  const wisp = four(sliceGrid(wispSheet, 128, 128), down);
-  const projectile = four(sliceGrid(projSheet, 128, 128), wisp);
+  const wisp = four(wispSheet ? sliceGrid(wispSheet, 128, 128) : down, down);
+  const projectile = four(projSheet ? sliceGrid(projSheet, 128, 128) : wisp, wisp);
 
   return {
     player: { down, left, right, up },

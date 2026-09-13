@@ -53,7 +53,7 @@ export function isRelicId(v: unknown): v is RelicId {
 }
 
 export function relicById(id: RelicId): RelicDef {
-  return RELICS.find((r) => r.id === id)!;
+  return RELICS.find((r) => r.id === id) ?? RELICS[0]!;
 }
 
 export function emptyLoadout(): Array<RelicId | null> {
