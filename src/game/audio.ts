@@ -564,7 +564,16 @@ export class GameAudio {
   }
 
   hit() {
-    this.tone(180 + Math.random() * 30, 0.09, "square", 0.06, -80);
+    this.tone(90 + Math.random() * 20, 0.09, "square", 0.12, -50);
+    this.tone(210 + Math.random() * 50, 0.06, "sawtooth", 0.08, -140);
+    this.noise(0.03, 0.06);
+  }
+
+  kill() {
+    this.tone(120, 0.12, "square", 0.12, -40);
+    this.tone(360 + Math.random() * 40, 0.1, "triangle", 0.09, 90);
+    this.tone(720, 0.08, "sine", 0.05, 40);
+    this.noise(0.05, 0.08);
   }
 
   hurt() {

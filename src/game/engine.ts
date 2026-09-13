@@ -476,6 +476,10 @@ export class GameEngine {
   private last = 0;
   private hitstop = 0;
   private trauma = 0;
+  private streak = 0;
+  private streakT = 0;
+  private killFlash = 0;
+  private muzzleT = 0;
   private reduced = false;
   private listeners: Array<(h: HudState) => void> = [];
   private bookLatch = false;
@@ -1987,6 +1991,10 @@ export class GameEngine {
     this.weaponIndex = 0;
     this.hitstop = 0;
     this.trauma = 0;
+    this.streak = 0;
+    this.streakT = 0;
+    this.killFlash = 0;
+    this.muzzleT = 0;
     this.animT = 0;
     this.burnAcc = 0;
     this.secondWindUsed = false;
@@ -2107,6 +2115,22 @@ export class GameEngine {
     this.emit();
   }
 
+  private holdNight() {
+    const n = Math.max(1, this.wave);
+    const bonus = 10 + n * 12;
+    this.gold += bonus;
+    this.score += n * 40;
+    this.player.hp = Math.min(this.player.maxHp, this.player.hp + 12);
+    this.killFlash = 0.16;
+    this.trauma = Math.min(1, this.trauma + 0.4);
+    this.burstSparks(this.player.x, this.player.y, 22, "#fff4c8");
+    this.burstSparks(this.player.x, this.player.y, 10, "#f0d24a");
+    this.floatAt(this.player.x, this.player.y - 52, `NIGHT ${n} HELD`, "#fff4c8");
+    this.floatAt(this.player.x, this.player.y - 34, `+${bonus}`, "#f0d24a");
+    this.audio.pickup();
+    this.buzz(22);
+  }
+
   private beginWave() {
     this.wave += 1;
     if (this.wave > 1) this.grantTrinkoo(1, this.player.x, this.player.y);
@@ -2212,7 +2236,11 @@ export class GameEngine {
     this.player.knockT = Math.max(0, this.player.knockT - dt);
     this.playerSlow = Math.max(0, this.playerSlow - dt);
     this.playerStun = Math.max(0, this.playerStun - dt);
-    this.trauma = Math.max(0, this.trauma - dt * 1.8);
+    this.trauma = Math.max(0, this.trauma - dt * 1.5);
+    this.killFlash = Math.max(0, this.killFlash - dt);
+    this.muzzleT = Math.max(0, this.muzzleT - dt);
+    this.streakT = Math.max(0, this.streakT - dt);
+    if (this.streakT <= 0) this.streak = 0;
     const actions = this.input.poll();
     this.aimFrom(actions);
     this.movePlayer(actions, dt);
@@ -2369,7 +2397,8 @@ export class GameEngine {
     if (boomish) this.markPlayerKnock(-this.aim.x, -this.aim.y, 0.28);
     this.trauma = Math.min(1, this.trauma + (boomish ? 0.48 : 0.12));
     const tint = this.spell === "fuse" && this.fused ? this.fused.color : this.spell === "craft" && this.crafted ? this.crafted.color : spellTint(this.spell);
-    this.burstSparks(this.player.x + this.aim.x * 22, this.player.y + this.aim.y * 18, boomish ? 14 : 7, tint);
+    this.burstSparks(this.player.x + this.aim.x * 22, this.player.y + this.aim.y * 18, boomish ? 18 : 10, tint);
+    this.muzzleT = boomish ? 0.14 : 0.08;
   }
 
   private castSpell(spell: Spell) {
@@ -3503,14 +3532,15 @@ export class GameEngine {
     e.knockX = nx;
     e.knockY = ny;
     e.knockT = spell === "void" ? 0.4 : spell === "boom" ? 0.12 : 0.18;
-    this.spawnKnockDust(e.x, e.y, nx, ny, spell === "boom" ? 4 : 6);
+    this.spawnKnockDust(e.x, e.y, nx, ny, spell === "boom" ? 6 : 8);
     if (spell === "void") e.stun = Math.max(e.stun, 0.35);
-    this.hitstop = 0.05;
-    this.trauma = Math.min(1, this.trauma + 0.26);
+    const heavy = e.kind === "boss" ? 0.12 : e.kind === "elite" ? 0.08 : e.kind === "brute" ? 0.06 : spell === "boom" ? 0.07 : 0.04;
+    this.hitstop = Math.max(this.hitstop, heavy);
+    this.trauma = Math.min(1, this.trauma + (spell === "boom" ? 0.38 : e.kind === "boss" ? 0.32 : 0.2));
     this.audio.hit();
     this.spawnBurst(e.x, e.y, spell);
-    this.burstSparks(e.x, e.y, spell === "boom" ? 16 : 10, spellTint(spell));
-    this.floatAt(e.x, e.y - 14, `${dmg}`, spellTint(spell));
+    this.burstSparks(e.x, e.y, spell === "boom" ? 22 : e.kind === "boss" ? 18 : 12, spellTint(spell));
+    this.floatAt(e.x, e.y - 14, `${Math.round(dmg)}`, spellTint(spell));
     if (e.hp <= 0) this.killEnemy(e);
   }
 
@@ -3698,8 +3728,28 @@ export class GameEngine {
       if (Math.random() < 0.4) this.spawnPickup(e.x + 18, e.y);
     }
     if (this.hasRelic("goldbeetle")) gold = Math.floor(gold * 1.5);
+    this.streak += 1;
+    this.streakT = 2.6;
+    if (this.streak >= 2) gold += Math.floor(gold * Math.min(1.1, (this.streak - 1) * 0.07));
+    if (this.player.hp / this.player.maxHp < 0.3) {
+      gold += 8;
+      this.floatAt(e.x, e.y - 44, "CLUTCH", "#c45a4a");
+    }
+    if (this.streak === 5) {
+      gold += 14;
+      this.floatAt(e.x, e.y - 52, "HOT", "#ff9a3c");
+    } else if (this.streak === 10) {
+      gold += 36;
+      this.floatAt(e.x, e.y - 52, "ON FIRE", "#fff4c8");
+      this.audio.bolt();
+    } else if (this.streak === 20) {
+      gold += 90;
+      this.floatAt(e.x, e.y - 52, "UNSTOPPABLE", "#f0d24a");
+      this.audio.bolt();
+    }
     this.gold += gold;
     this.floatAt(e.x, e.y - 18, `+${gold}`, "#f0d24a");
+    if (this.streak >= 2) this.floatAt(e.x + 18, e.y - 8, `x${this.streak}`, "#fff4c8");
     if (this.hasRelic("bloodsap")) {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 3);
       this.floatAt(e.x, e.y - 30, "+hp", "#c45a4a");
@@ -3707,9 +3757,15 @@ export class GameEngine {
     if (e.kind === "boss") this.grantTrinkoo(5, e.x, e.y);
     if (e.kind === "buffwisp") this.grantForgeDrop(e.x, e.y);
     this.spawnCoins(e.x, e.y, coins);
-    this.burstSparks(e.x, e.y, sparkN, sparkColor);
+    this.burstSparks(e.x, e.y, sparkN + 8 + Math.min(12, this.streak), sparkColor);
+    this.burstSparks(e.x, e.y, 8, "#fff4c8");
+    this.spawnBurst(e.x, e.y, "ember");
+    this.killFlash = Math.max(this.killFlash, e.kind === "boss" ? 0.2 : this.streak >= 10 ? 0.12 : 0.07);
+    this.trauma = Math.min(1, this.trauma + (e.kind === "boss" ? 0.55 : 0.18));
+    this.hitstop = Math.max(this.hitstop, e.kind === "boss" ? 0.14 : 0.05);
     if (Math.random() < 0.16) this.spawnPickup(e.x, e.y);
     this.buzz(e.kind === "boss" ? 30 : 8);
+    this.audio.kill();
     this.emit();
   }
 
@@ -3734,7 +3790,7 @@ export class GameEngine {
       if (!live) {
         this.waveGap += dt;
         if (this.waveGap > 0.42) {
-          this.score += this.wave * 40;
+          this.holdNight();
           this.beginWave();
         }
       }
@@ -4673,6 +4729,10 @@ export class GameEngine {
       this.drawFx();
     }
     ctx.restore();
+    if (this.killFlash > 0) {
+      ctx.fillStyle = `rgba(255, 236, 180, ${this.killFlash * 0.9})`;
+      ctx.fillRect(0, 0, this.view.w, this.view.h);
+    }
   }
 
   private drawTitleCover() {
@@ -4714,6 +4774,12 @@ export class GameEngine {
     if (blink) this.ctx.globalAlpha = 0.45;
     this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
     this.ctx.globalAlpha = 1;
+    if (this.muzzleT > 0) {
+      const mx = this.player.x + this.aim.x * 26;
+      const my = this.player.y + this.aim.y * 18;
+      const tint = this.spell === "fuse" && this.fused ? this.fused.color : this.spell === "craft" && this.crafted ? this.crafted.color : spellTint(this.spell);
+      this.drawGlow(mx, my, 16 + this.muzzleT * 90, tint);
+    }
     if (this.hands === "weapon") this.drawHeldWeapon();
     if (this.hands === "spell" && this.spell === "vine") this.drawVineAura(this.player.x, this.player.y);
   }
@@ -5165,13 +5231,14 @@ export class GameEngine {
       if (b.spell === "boom") this.drawBoomBurst(b.x, b.y, 28 + b.t * 140);
       ctx.globalAlpha = 1;
     }
-    ctx.font = "10px \"Press Start 2P\", monospace";
-    ctx.textAlign = "center";
     for (const f of this.floaters) {
       if (!f.alive) continue;
+      const big = f.text.startsWith("x") || f.text.includes("HELD") || f.text === "HOT" || f.text === "ON FIRE" || f.text === "UNSTOPPABLE" || f.text === "CLUTCH";
+      ctx.font = `${big ? 14 : 10}px "Press Start 2P", monospace`;
+      ctx.textAlign = "center";
       ctx.globalAlpha = clamp(f.ttl / 0.85, 0, 1);
       ctx.fillStyle = f.color;
-      ctx.fillText(f.text, f.x, f.y - (0.85 - f.ttl) * 22);
+      ctx.fillText(f.text, f.x, f.y - (0.85 - f.ttl) * (big ? 30 : 22));
       ctx.globalAlpha = 1;
     }
     ctx.textAlign = "left";
