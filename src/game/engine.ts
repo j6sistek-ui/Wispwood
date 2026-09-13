@@ -286,6 +286,8 @@ type Prop = { kind: string; x: number; y: number; r: number; drawW: number; draw
 
 const ARENA = 2200;
 const VIEW_ZOOM = 1.45;
+const VIEW_PITCH = 0.8;
+const UPRIGHT = 1 / VIEW_PITCH;
 const FIXED = 1 / 60;
 const PLAYER_R = 16;
 const PLAYER_SPEED = 246;
@@ -2351,7 +2353,7 @@ export class GameEngine {
       this.aim.y = actions.aimY;
     } else if (this.input.pointer.hasPoint) {
       const wx = this.cam.x + this.input.pointer.x * VIEW_ZOOM;
-      const wy = this.cam.y + this.input.pointer.y * VIEW_ZOOM;
+      const wy = this.cam.y + this.input.pointer.y * VIEW_ZOOM / VIEW_PITCH;
       this.aim.x = wx - this.player.x;
       this.aim.y = wy - this.player.y;
     }
@@ -4753,7 +4755,7 @@ export class GameEngine {
   private followCam(dt: number) {
     const look = 58;
     const vw = this.view.w * VIEW_ZOOM;
-    const vh = this.view.h * VIEW_ZOOM;
+    const vh = this.view.h * VIEW_ZOOM / VIEW_PITCH;
     const tx = this.player.x + this.aim.x * look + this.player.vx * 0.14 - vw / 2;
     const ty = this.player.y + this.aim.y * look + this.player.vy * 0.14 - vh / 2 - 70;
     const k = 1 - Math.exp(-5.2 * dt);
@@ -4778,7 +4780,7 @@ export class GameEngine {
     ctx.imageSmoothingEnabled = false;
     ctx.save();
     ctx.translate(ox, oy);
-    ctx.scale(1 / VIEW_ZOOM, 1 / VIEW_ZOOM);
+    ctx.scale(1 / VIEW_ZOOM, VIEW_PITCH / VIEW_ZOOM);
     ctx.translate(-this.cam.x, -this.cam.y);
 
     if (this.assets) {
@@ -4862,8 +4864,14 @@ export class GameEngine {
     const img = this.assets!.props[p.kind];
     if (!img) return;
     this.ctx.fillStyle = "rgba(8,10,6,0.35)";
-    this.ctx.fillRect(p.x - p.drawW / 2 + 6, p.y - 8, p.drawW * 0.72, 10);
-    this.ctx.drawImage(img, p.x - p.drawW / 2, p.y - p.drawH * 0.82, p.drawW, p.drawH);
+    this.ctx.beginPath();
+    this.ctx.ellipse(p.x, p.y + 2, p.drawW * 0.34, p.drawW * 0.12, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.save();
+    this.ctx.translate(p.x, p.y);
+    this.ctx.scale(1, UPRIGHT);
+    this.ctx.drawImage(img, -p.drawW / 2, -p.drawH * 0.82, p.drawW, p.drawH);
+    this.ctx.restore();
   }
 
   private drawPlayer() {
@@ -4872,6 +4880,7 @@ export class GameEngine {
     const img = frames?.[i] ?? frames?.[0];
     if (!img) return;
     const s = 64 * this.bodySize;
+    this.drawShadow(this.player.x, this.player.y + 6, 16 * this.bodySize, 7 * this.bodySize);
     this.drawGlow(this.player.x, this.player.y - 8, 34, "#ffd86a");
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
@@ -4904,6 +4913,7 @@ export class GameEngine {
     const img = frames?.[Math.floor(g.frame) % 4] ?? frames?.[0];
     if (!img) return;
     this.ctx.globalAlpha = 0.92;
+    this.drawShadow(g.x, g.y + 6, 16, 7);
     this.drawKnockSprite(img, g.x, g.y, 64, 0.78, 0, 1, 0, 0.28);
     this.ctx.globalAlpha = 1;
     const ctx = this.ctx;
@@ -4927,6 +4937,7 @@ export class GameEngine {
     const img = this.assets?.wisp[Math.floor(e.frame) % 4] ?? this.assets?.wisp[0];
     if (!img) return;
     const s = e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
+    this.drawShadow(e.x, e.y + 8, s * 0.28, s * 0.12);
     if (e.flash > 0) this.ctx.filter = "brightness(3.4) saturate(1.6)";
     else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
     else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
@@ -4953,7 +4964,12 @@ export class GameEngine {
     else if (e.freeze > 0) this.ctx.filter = "hue-rotate(160deg) saturate(0.85) brightness(1.15)";
     else if (e.burn > 0) this.ctx.filter = "sepia(0.6) saturate(2.2) hue-rotate(-10deg)";
     const knock = e.knockT > 0.02 ? 1 + Math.min(0.18, e.knockT * 0.4) : 1;
-    drawBuffWisp(this.ctx, e.x + e.knockX * e.knockT * 8, e.y + e.knockY * e.knockT * 8, e.r * knock, e.flash > 0, e.frame);
+    this.drawShadow(e.x, e.y + 8, e.r * 0.7, e.r * 0.28);
+    this.ctx.save();
+    this.ctx.translate(e.x + e.knockX * e.knockT * 8, e.y + e.knockY * e.knockT * 8);
+    this.ctx.scale(1, UPRIGHT);
+    drawBuffWisp(this.ctx, 0, 0, e.r * knock, e.flash > 0, e.frame);
+    this.ctx.restore();
     this.ctx.filter = "none";
     if (e.wrapped > 0) this.drawVineWrap(e.x, e.y, e.r * 0.9);
     const barW = e.r * 1.6;
@@ -4968,7 +4984,12 @@ export class GameEngine {
     const ctx = this.ctx;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    drawBossPixels(ctx, def, e.x, e.y, e.r, e.flash > 0, e.frame, e.lunging);
+    this.drawShadow(e.x, e.y + 6, e.r * 0.72, e.r * 0.28);
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.scale(1, UPRIGHT);
+    drawBossPixels(ctx, def, 0, 0, e.r, e.flash > 0, e.frame, e.lunging);
+    ctx.restore();
     if (BOSS_ATTACK[def.name] === "tongue" && e.lunging > 0) {
       const ang = Math.atan2(this.player.y - e.y, this.player.x - e.x);
       ctx.strokeStyle = "#8ed48a";
@@ -5010,6 +5031,16 @@ export class GameEngine {
     ctx.fillText(def.name, Math.round(e.x), Math.round(e.y - e.r - 24));
   }
 
+  private drawShadow(x: number, y: number, rx: number, ry: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = "rgba(6, 8, 4, 0.42)";
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   private drawKnockSprite(
     img: CanvasImageSource | null | undefined,
     x: number,
@@ -5046,6 +5077,7 @@ export class GameEngine {
         ctx.save();
         ctx.globalAlpha = 0.12 * k * gt;
         ctx.translate(x - kx * g * 16, y - ky * g * 16);
+        ctx.scale(1, UPRIGHT);
         ctx.rotate(ang);
         ctx.scale(1 + 0.45 * k, 1 - 0.28 * k);
         ctx.rotate(-ang);
@@ -5055,6 +5087,7 @@ export class GameEngine {
     }
     ctx.save();
     ctx.translate(x, y);
+    ctx.scale(1, UPRIGHT);
     if (k > 0.04) {
       ctx.rotate(ang);
       ctx.scale(1 + 0.55 * k, 1 - 0.32 * k);
@@ -5069,8 +5102,13 @@ export class GameEngine {
     if (!img) return;
     const bob = Math.sin(this.animT * 6 + p.x) * 4;
     const pulse = 1 + Math.sin(this.animT * 8) * 0.12;
+    this.drawShadow(p.x, p.y + 6, 10, 4);
     this.drawGlow(p.x, p.y - 8 + bob, 22, "#ffe14a");
-    this.ctx.drawImage(img, p.x - 16 * pulse, p.y - 20 + bob, 32 * pulse, 32 * pulse);
+    this.ctx.save();
+    this.ctx.translate(p.x, p.y + bob);
+    this.ctx.scale(1, UPRIGHT);
+    this.ctx.drawImage(img, -16 * pulse, -20, 32 * pulse, 32 * pulse);
+    this.ctx.restore();
   }
 
   private shotLook(b: Bullet) {
@@ -5430,7 +5468,7 @@ export class GameEngine {
     g.addColorStop(0.5, fever ? "rgba(40,18,4,0.04)" : "rgba(8,10,9,0.08)");
     g.addColorStop(1, fever ? "rgba(18,8,4,0.42)" : "rgba(8,10,9,0.52)");
     ctx.fillStyle = g;
-    ctx.fillRect(this.cam.x - 40, this.cam.y - 40, this.view.w * VIEW_ZOOM + 80, this.view.h * VIEW_ZOOM + 80);
+    ctx.fillRect(this.cam.x - 40, this.cam.y - 40, this.view.w * VIEW_ZOOM + 80, this.view.h * VIEW_ZOOM / VIEW_PITCH + 80);
     const glow = ctx.createRadialGradient(px, py - 6, 4, px, py - 6, fever ? 190 : 150);
     glow.addColorStop(0, fever ? "rgba(255, 244, 200, 0.62)" : "rgba(255, 226, 122, 0.42)");
     glow.addColorStop(0.4, fever ? "rgba(255, 154, 60, 0.28)" : "rgba(255, 154, 60, 0.16)");
