@@ -290,9 +290,9 @@ const VIEW_PITCH = 0.8;
 const UPRIGHT = 1 / VIEW_PITCH;
 const FIXED = 1 / 60;
 const PLAYER_R = 16;
-const PLAYER_SPEED = 246;
-const PLAYER_ACCEL = 16;
-const PLAYER_STOP = 18;
+const PLAYER_SPEED = 232;
+const PLAYER_ACCEL = 11;
+const PLAYER_STOP = 9;
 const BULLET_SPEED = 560;
 const FIRE_CD = 0.5;
 const BOLT_CD = 1.5;
@@ -347,6 +347,15 @@ function sandboxWaveLabel(units: SandboxUnit[], index: number) {
   }
   const bits = [...tally.entries()].map(([k, n]) => (n > 1 ? `${n} ${k}` : k));
   return `W${index + 1} ${bits.join(" · ")}`;
+}
+
+function massOf(kind: EnemyKind) {
+  if (kind === "boss") return 8;
+  if (kind === "buffwisp") return 4.2;
+  if (kind === "elite") return 2.4;
+  if (kind === "brute") return 3.4;
+  if (kind === "runner") return 0.72;
+  return 1;
 }
 
 function goldFor(kind: EnemyKind) {
@@ -2396,6 +2405,9 @@ export class GameEngine {
     }
     this.player.x = nx;
     this.player.y = ny;
+    if (this.player.moving && Math.random() < 0.18) {
+      this.spawnKnockDust(nx, ny, -this.player.vx, -this.player.vy, 1);
+    }
   }
 
   private shoot() {
@@ -3567,12 +3579,13 @@ export class GameEngine {
     const m = Math.hypot(vx, vy) || 1;
     const nx = vx / m;
     const ny = vy / m;
-    const knock = spell === "void" ? (this.hasRelic("voidring") ? 320 : 180) : spell === "boom" ? 36 : e.kind === "boss" ? 18 : 10;
-    e.kvx = nx * (knock / 0.22);
-    e.kvy = ny * (knock / 0.22);
+    const impulse = spell === "void" ? (this.hasRelic("voidring") ? 520 : 280) : spell === "boom" ? 110 : 70;
+    const mass = massOf(e.kind);
+    e.kvx += nx * (impulse / mass);
+    e.kvy += ny * (impulse / mass);
     e.knockX = nx;
     e.knockY = ny;
-    e.knockT = spell === "void" ? 0.4 : spell === "boom" ? 0.12 : 0.18;
+    e.knockT = Math.min(0.55, 0.1 + impulse / mass * 0.0035);
     this.spawnKnockDust(e.x, e.y, nx, ny, spell === "boom" ? 6 : 8);
     if (spell === "void") e.stun = Math.max(e.stun, 0.35);
     const heavy = e.kind === "boss" ? 0.12 : e.kind === "elite" ? 0.08 : e.kind === "brute" ? 0.06 : spell === "boom" ? 0.07 : 0.04;
@@ -4106,40 +4119,105 @@ export class GameEngine {
       const tx = px - e.x;
       const ty = py - e.y;
       const td = Math.hypot(tx, ty) || 1;
+      const nx = tx / td;
+      const ny = ty / td;
+      const pxn = -ny;
+      const pyn = nx;
+      const side = i % 2 === 0 ? 1 : -1;
       if (e.freeze <= 0 && e.stun <= 0 && e.dash <= 0 && (e.kind === "runner" || e.kind === "elite") && td < (e.kind === "elite" ? 250 : 190)) {
         e.lunging = e.kind === "elite" ? 0.38 : 0.28;
         e.dash = e.kind === "elite" ? 2.2 : 1.45;
       }
-      let vx = (tx / td) * 0.85 + sx * 0.35;
-      let vy = (ty / td) * 0.85 + sy * 0.35;
-      const vm = Math.hypot(vx, vy) || 1;
+      let wx = nx;
+      let wy = ny;
+      if (e.kind === "elite") {
+        if (td > 230) {
+          wx = nx * 0.85 + pxn * side * 0.35;
+          wy = ny * 0.85 + pyn * side * 0.35;
+        } else if (td < 120) {
+          wx = -nx * 0.7 + pxn * side * 0.55;
+          wy = -ny * 0.7 + pyn * side * 0.55;
+        } else {
+          wx = pxn * side * 0.9 + nx * 0.15;
+          wy = pyn * side * 0.9 + ny * 0.15;
+        }
+      } else if (e.kind === "buffwisp") {
+        const radial = td > 170 ? 0.65 : td < 110 ? -0.75 : 0.05;
+        wx = pxn * 0.85 + nx * radial;
+        wy = pyn * 0.85 + ny * radial;
+      } else if (e.kind === "brute") {
+        wx = nx * 0.92 + sx * 0.4;
+        wy = ny * 0.92 + sy * 0.4;
+      } else if (e.kind === "runner") {
+        wx = nx * 0.9 + pxn * Math.sin(this.animT * 6 + i) * 0.25;
+        wy = ny * 0.9 + pyn * Math.sin(this.animT * 6 + i) * 0.25;
+      } else {
+        wx = nx * 0.8 + sx * 0.35 + pxn * Math.sin(this.animT * 2.2 + i) * 0.2;
+        wy = ny * 0.8 + sy * 0.35 + pyn * Math.sin(this.animT * 2.2 + i) * 0.2;
+      }
+      const wall = this.coverBetween(e.x, e.y, px, py);
+      if (wall) {
+        const ox = e.x - wall.x;
+        const oy = e.y - wall.y;
+        const om = Math.hypot(ox, oy) || 1;
+        wx += -oy / om * 0.8 + ox / om * 0.35;
+        wy += ox / om * 0.8 + oy / om * 0.35;
+      }
+      const wm = Math.hypot(wx, wy) || 1;
       const lunge = e.lunging > 0 ? (e.kind === "elite" ? 2.6 : 2.2) : 1;
       const frozen = e.freeze > 0 ? (e.kind === "elite" ? 0.55 : 0.28) : 1;
       const stunned = e.stun > 0 ? 0 : 1;
+      const wish = e.speed * lunge * frozen * stunned;
+      const wishX = (wx / wm) * wish;
+      const wishY = (wy / wm) * wish;
+      e.knockT = Math.max(0, e.knockT - dt);
       if (e.knockT > 0) {
-        e.knockT = Math.max(0, e.knockT - dt);
-        e.x = clamp(e.x + e.kvx * dt, 40, ARENA - 40);
-        e.y = clamp(e.y + e.kvy * dt, 40, ARENA - 40);
-        e.kvx *= Math.exp(-7 * dt);
-        e.kvy *= Math.exp(-7 * dt);
+        e.kvx *= Math.exp(-6.5 * dt);
+        e.kvy *= Math.exp(-6.5 * dt);
         if (Math.random() < 0.45) this.spawnKnockDust(e.x, e.y, e.knockX, e.knockY, 1);
+      } else if (e.stun > 0) {
+        e.kvx *= Math.exp(-10 * dt);
+        e.kvy *= Math.exp(-10 * dt);
       } else {
-        vx = (vx / vm) * e.speed * lunge * frozen * stunned;
-        vy = (vy / vm) * e.speed * lunge * frozen * stunned;
-        e.x = clamp(e.x + vx * dt, 40, ARENA - 40);
-        e.y = clamp(e.y + vy * dt, 40, ARENA - 40);
+        const turn = e.kind === "brute" ? 3.4 : e.kind === "runner" ? 12 : e.kind === "elite" ? 7 : 6;
+        const k = 1 - Math.exp(-turn * dt);
+        e.kvx += (wishX - e.kvx) * k;
+        e.kvy += (wishY - e.kvy) * k;
       }
+      e.x = clamp(e.x + e.kvx * dt, 40, ARENA - 40);
+      e.y = clamp(e.y + e.kvy * dt, 40, ARENA - 40);
       for (const p of this.props) {
         const r = resolveCircle(e.x, e.y, e.r, p.x, p.y, p.r);
+        if (r.x !== e.x) e.kvx *= 0.4;
+        if (r.y !== e.y) e.kvy *= 0.4;
         e.x = r.x;
         e.y = r.y;
       }
       if (e.stun <= 0 && this.player.invuln <= 0 && circleHit(e.x, e.y, e.r, px, py, this.bodyR())) {
         let hit = e.kind === "buffwisp" ? 22 : e.kind === "elite" ? 30 : e.kind === "brute" ? 26 : e.kind === "runner" ? 14 : 12;
         if (this.omen === "fangs") hit = Math.round(hit * 1.45);
-        this.hurtLantern(hit, px - e.x, py - e.y, 220);
+        this.hurtLantern(hit, px - e.x, py - e.y, 180 + massOf(e.kind) * 18);
       }
     }
+  }
+
+  private coverBetween(x1: number, y1: number, x2: number, y2: number) {
+    const abx = x2 - x1;
+    const aby = y2 - y1;
+    const ab2 = abx * abx + aby * aby || 1;
+    for (const p of this.props) {
+      const t = clamp(((p.x - x1) * abx + (p.y - y1) * aby) / ab2, 0, 1);
+      const cx = x1 + abx * t;
+      const cy = y1 + aby * t;
+      if (Math.hypot(p.x - cx, p.y - cy) < p.r + 12) return p;
+    }
+    return null;
+  }
+
+  private lanternShade(x: number, y: number) {
+    const flick = 0.9 + 0.08 * Math.sin(this.animT * 19) + 0.04 * Math.sin(this.animT * 47);
+    const d = Math.hypot(x - this.player.x, y - this.player.y);
+    return clamp(1.08 - d / (420 * flick), 0.22, 1);
   }
 
   private updateBoss(e: Enemy, dt: number, px: number, py: number, index: number) {
@@ -4715,15 +4793,18 @@ export class GameEngine {
       s.x += s.vx * dt;
       s.y += s.vy * dt;
       if (s.kind === "coin") {
+        s.vx *= Math.exp(-2.8 * dt);
+        s.vy *= Math.exp(-2.8 * dt);
+        s.vy += 90 * dt;
         const age = 1 - s.ttl / s.max;
-        if (age > 0.2) {
+        if (age > 0.28) {
           const dx = this.player.x - s.x;
           const dy = this.player.y - s.y;
           const d = Math.hypot(dx, dy) || 1;
-          s.vx += (dx / d) * 420 * dt;
-          s.vy += (dy / d) * 420 * dt;
+          s.vx += (dx / d) * 380 * dt;
+          s.vy += (dy / d) * 380 * dt;
         }
-      } else if (s.kind !== "shard") s.vy += 40 * dt;
+      } else if (s.kind !== "shard") s.vy += 90 * dt;
       s.ttl -= dt;
       if (s.ttl <= 0) s.alive = false;
     }
@@ -4868,6 +4949,7 @@ export class GameEngine {
     this.ctx.ellipse(p.x, p.y + 2, p.drawW * 0.34, p.drawW * 0.12, 0, 0, Math.PI * 2);
     this.ctx.fill();
     this.ctx.save();
+    this.ctx.globalAlpha = this.lanternShade(p.x, p.y);
     this.ctx.translate(p.x, p.y);
     this.ctx.scale(1, UPRIGHT);
     this.ctx.drawImage(img, -p.drawW / 2, -p.drawH * 0.82, p.drawW, p.drawH);
@@ -4938,6 +5020,7 @@ export class GameEngine {
     if (!img) return;
     const s = e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
     this.drawShadow(e.x, e.y + 8, s * 0.28, s * 0.12);
+    this.ctx.globalAlpha = this.lanternShade(e.x, e.y);
     if (e.flash > 0) this.ctx.filter = "brightness(3.4) saturate(1.6)";
     else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
     else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
@@ -4949,6 +5032,7 @@ export class GameEngine {
     else this.ctx.filter = "saturate(1.15) brightness(1.05)";
     this.drawKnockSprite(img, e.x, e.y, s, 0.72, e.knockX, e.knockY, e.knockT, 0.4);
     this.ctx.filter = "none";
+    this.ctx.globalAlpha = 1;
     if (e.wrapped > 0) this.drawVineWrap(e.x, e.y, s * 0.42);
     const barW = s * 0.7;
     this.ctx.fillStyle = "rgba(12,13,12,0.55)";
@@ -5463,14 +5547,15 @@ export class GameEngine {
     const px = this.player.x;
     const py = this.player.y;
     const fever = this.streak >= 8;
-    const g = ctx.createRadialGradient(px, py - 8, 24, px, py - 8, fever ? 460 : 420);
+    const flick = 0.9 + 0.08 * Math.sin(this.animT * 19) + 0.04 * Math.sin(this.animT * 47);
+    const g = ctx.createRadialGradient(px, py - 8, 24, px, py - 8, (fever ? 460 : 420) * flick);
     g.addColorStop(0, "rgba(0,0,0,0)");
     g.addColorStop(0.5, fever ? "rgba(40,18,4,0.04)" : "rgba(8,10,9,0.08)");
     g.addColorStop(1, fever ? "rgba(18,8,4,0.42)" : "rgba(8,10,9,0.52)");
     ctx.fillStyle = g;
     ctx.fillRect(this.cam.x - 40, this.cam.y - 40, this.view.w * VIEW_ZOOM + 80, this.view.h * VIEW_ZOOM / VIEW_PITCH + 80);
-    const glow = ctx.createRadialGradient(px, py - 6, 4, px, py - 6, fever ? 190 : 150);
-    glow.addColorStop(0, fever ? "rgba(255, 244, 200, 0.62)" : "rgba(255, 226, 122, 0.42)");
+    const glow = ctx.createRadialGradient(px, py - 6, 4, px, py - 6, (fever ? 190 : 150) * flick);
+    glow.addColorStop(0, fever ? "rgba(255, 244, 200, 0.62)" : `rgba(255, 226, 122, ${0.36 + flick * 0.12})`);
     glow.addColorStop(0.4, fever ? "rgba(255, 154, 60, 0.28)" : "rgba(255, 154, 60, 0.16)");
     glow.addColorStop(1, "rgba(232, 196, 120, 0)");
     ctx.fillStyle = glow;
