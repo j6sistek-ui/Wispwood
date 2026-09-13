@@ -450,7 +450,7 @@ function Title({
 
   return (
     <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-start gap-2 overflow-y-auto px-4 py-[max(1rem,env(safe-area-inset-top))] pointer-events-auto">
-      <div className="pointer-events-none absolute inset-0 bg-bg/50" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(18,22,12,0.15),rgba(8,10,6,0.62))]" />
       <div className="relative z-10 flex w-full max-w-xs flex-col items-center gap-2">
       <PixelBanner text={titleLabel} />
       <div className="pointer-events-none shrink-0 text-center">
@@ -1060,19 +1060,29 @@ function SpellGlyph({ color, name }: { color: string; name: string }) {
 function PixelBanner({ text }: { text: string }) {
   const small = text.length > 10;
   return (
-    <div className="w-[min(90vw,20rem)] shrink-0 border-4 border-fg bg-bg">
-      <div className="h-2 bg-gold" />
-      <div className="px-3 py-4 text-center">
+    <div className="w-[min(90vw,20rem)] shrink-0 border-4 border-[#3d3424] bg-[#10140c] shadow-[5px_5px_0_0_#1a1810]">
+      <div className="flex h-2">
+        <span className="w-3 bg-[#5a4a28]" />
+        <span className="flex-1 bg-gold" />
+        <span className="w-3 bg-[#5a4a28]" />
+      </div>
+      <div className="flex items-center gap-2 px-3 py-4">
+        <span className="h-3 w-3 shrink-0 bg-gold shadow-[0_0_8px_#ffd86a]" />
         <p
           className={
-            "font-pixel leading-none tracking-[0.18em] text-gold " +
+            "flex-1 text-center font-pixel leading-none tracking-[0.16em] text-gold " +
             (small ? "text-[12px]" : "text-[20px]")
           }
         >
           {text}
         </p>
+        <span className="h-3 w-3 shrink-0 bg-gold shadow-[0_0_8px_#ffd86a]" />
       </div>
-      <div className="h-2 bg-gold" />
+      <div className="flex h-2">
+        <span className="w-3 bg-[#5a4a28]" />
+        <span className="flex-1 bg-gold" />
+        <span className="w-3 bg-[#5a4a28]" />
+      </div>
     </div>
   );
 }
@@ -1343,11 +1353,11 @@ function PixelButton({
       disabled={disabled}
       onClick={onClick}
       className={
-        "w-full rounded-none border-2 px-2 font-pixel leading-tight shadow-[3px_3px_0_0_var(--color-border)] transition-transform duration-150 enabled:active:translate-x-px enabled:active:translate-y-px disabled:opacity-40 " +
+        "relative w-full rounded-none border-2 px-2 font-pixel leading-tight shadow-[3px_3px_0_0_#1a1810] transition-transform duration-150 enabled:active:translate-x-px enabled:active:translate-y-px disabled:opacity-40 " +
         (compact ? "h-11 text-[9px] " : "h-12 text-pixel ") +
         (primary
-          ? "border-fg bg-accent text-accent-fg"
-          : "border-muted bg-surface text-fg")
+          ? "border-[#5a4a28] bg-accent text-accent-fg"
+          : "border-[#3d3424] bg-surface text-fg")
       }
     >
       {children}

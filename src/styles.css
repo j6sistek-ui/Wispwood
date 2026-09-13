@@ -3,17 +3,17 @@
 @source "../static-app/**/*.{ts,tsx,html}";
 
 @theme {
-  --color-bg: #0c0d0c;
-  --color-surface: #151714;
-  --color-elevated: #1c1e1b;
-  --color-fg: #ecece8;
-  --color-muted: #8b8e86;
-  --color-subtle: #6a6d66;
-  --color-accent: #ffe27a;
-  --color-accent-fg: #0c0d0c;
-  --color-border: #2a2c28;
+  --color-bg: #0b0e0a;
+  --color-surface: #161910;
+  --color-elevated: #1e2318;
+  --color-fg: #f4f0dc;
+  --color-muted: #8f9178;
+  --color-subtle: #6a6d58;
+  --color-accent: #ffd86a;
+  --color-accent-fg: #141208;
+  --color-border: #2f3324;
   --color-danger: #ff6a48;
-  --color-gold: #ffe14a;
+  --color-gold: #ffd86a;
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", "Iowan Old Style", "Times New Roman", serif;
   --font-pixel: "Press Start 2P", "VT323", ui-monospace, monospace;
