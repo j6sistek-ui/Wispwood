@@ -4858,7 +4858,8 @@ export class GameEngine {
       this.drawTitleCover();
       return;
     }
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     ctx.save();
     ctx.translate(ox, oy);
     ctx.scale(1 / VIEW_ZOOM, VIEW_PITCH / VIEW_ZOOM);
@@ -4898,6 +4899,15 @@ export class GameEngine {
       ctx.fillStyle = `rgba(255, 236, 180, ${this.killFlash * 0.9})`;
       ctx.fillRect(0, 0, this.view.w, this.view.h);
     }
+    if (this.phase !== "title" && this.phase !== "boot") {
+      ctx.fillStyle = "rgba(8, 16, 22, 0.16)";
+      ctx.fillRect(0, 0, this.view.w, this.view.h);
+      const vg = ctx.createRadialGradient(this.view.w * 0.5, this.view.h * 0.48, this.view.h * 0.2, this.view.w * 0.5, this.view.h * 0.5, this.view.w * 0.72);
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,0.38)");
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, this.view.w, this.view.h);
+    }
   }
 
   private drawTitleCover() {
@@ -4930,7 +4940,7 @@ export class GameEngine {
   private drawGround() {
     const img = this.assets?.ground;
     if (!img) return;
-    const tile = 704;
+    const tile = 1024;
     const ctx = this.ctx;
     for (let y = 0; y < ARENA; y += tile) {
       for (let x = 0; x < ARENA; x += tile) {
@@ -4961,12 +4971,13 @@ export class GameEngine {
     const i = this.player.moving ? Math.floor(this.player.frame) % 4 : 0;
     const img = frames?.[i] ?? frames?.[0];
     if (!img) return;
-    const s = 64 * this.bodySize;
-    this.drawShadow(this.player.x, this.player.y + 6, 16 * this.bodySize, 7 * this.bodySize);
+    const s = 96 * this.bodySize;
+    const bob = this.player.moving ? Math.abs(Math.sin(this.player.frame * 1.8)) * 4 : 0;
+    this.drawShadow(this.player.x, this.player.y + 6, 18 * this.bodySize, 7 * this.bodySize);
     this.drawGlow(this.player.x, this.player.y - 8, 34, "#ffd86a");
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
-    this.drawKnockSprite(img, this.player.x, this.player.y, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
+    this.drawKnockSprite(img, this.player.x, this.player.y - bob, s, 0.9, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
     this.ctx.globalAlpha = 1;
     if (this.muzzleT > 0) {
       const mx = this.player.x + this.aim.x * 26;
@@ -4996,7 +5007,7 @@ export class GameEngine {
     if (!img) return;
     this.ctx.globalAlpha = 0.92;
     this.drawShadow(g.x, g.y + 6, 16, 7);
-    this.drawKnockSprite(img, g.x, g.y, 64, 0.78, 0, 1, 0, 0.28);
+    this.drawKnockSprite(img, g.x, g.y, 96, 0.9, 0, 1, 0, 0.28);
     this.ctx.globalAlpha = 1;
     const ctx = this.ctx;
     ctx.font = "8px \"Press Start 2P\", monospace";
