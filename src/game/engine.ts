@@ -4971,7 +4971,7 @@ export class GameEngine {
     const i = this.player.moving ? Math.floor(this.player.frame) % 4 : 0;
     const img = frames?.[i] ?? frames?.[0];
     if (!img) return;
-    const s = 96 * this.bodySize;
+    const s = 124 * this.bodySize;
     const bob = this.player.moving ? Math.abs(Math.sin(this.player.frame * 1.8)) * 4 : 0;
     this.drawShadow(this.player.x, this.player.y + 6, 18 * this.bodySize, 7 * this.bodySize);
     this.drawGlow(this.player.x, this.player.y - 8, 34, "#ffd86a");
@@ -5007,7 +5007,7 @@ export class GameEngine {
     if (!img) return;
     this.ctx.globalAlpha = 0.92;
     this.drawShadow(g.x, g.y + 6, 16, 7);
-    this.drawKnockSprite(img, g.x, g.y, 96, 0.9, 0, 1, 0, 0.28);
+    this.drawKnockSprite(img, g.x, g.y, 124, 0.9, 0, 1, 0, 0.28);
     this.ctx.globalAlpha = 1;
     const ctx = this.ctx;
     ctx.font = "8px \"Press Start 2P\", monospace";
@@ -5151,6 +5151,10 @@ export class GameEngine {
     const ctx = this.ctx;
     const k = this.reduced ? 0 : clamp(knockT / maxT, 0, 1);
     const ang = Math.atan2(ky, kx);
+    const iw = "width" in img ? Number(img.width) || s : s;
+    const ih = "height" in img ? Number(img.height) || s : s;
+    const h = s;
+    const w = s * (iw / Math.max(1, ih));
     if (k > 0.04) {
       ctx.save();
       ctx.strokeStyle = "rgba(236,236,232,0.35)";
@@ -5176,7 +5180,7 @@ export class GameEngine {
         ctx.rotate(ang);
         ctx.scale(1 + 0.45 * k, 1 - 0.28 * k);
         ctx.rotate(-ang);
-        ctx.drawImage(img, -s / 2, -s * anchor, s, s);
+        ctx.drawImage(img, -w / 2, -h * anchor, w, h);
         ctx.restore();
       }
     }
@@ -5188,7 +5192,7 @@ export class GameEngine {
       ctx.scale(1 + 0.55 * k, 1 - 0.32 * k);
       ctx.rotate(-ang);
     }
-    ctx.drawImage(img, -s / 2, -s * anchor, s, s);
+    ctx.drawImage(img, -w / 2, -h * anchor, w, h);
     ctx.restore();
   }
 
