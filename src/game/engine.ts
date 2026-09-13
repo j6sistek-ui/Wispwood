@@ -319,6 +319,15 @@ const PROP_LAYOUT: Array<Omit<Prop, "drawW" | "drawH">> = [
   { kind: "moss-stone", x: 1320, y: 760, r: 28 },
   { kind: "shrub", x: 240, y: 640, r: 24 },
   { kind: "log", x: 980, y: 420, r: 26 },
+  { kind: "fern", x: 340, y: 360, r: 20 },
+  { kind: "shrub", x: 430, y: 780, r: 22 },
+  { kind: "mushrooms", x: 640, y: 460, r: 16 },
+  { kind: "fern", x: 1920, y: 430, r: 20 },
+  { kind: "shrub", x: 1980, y: 1260, r: 24 },
+  { kind: "mushrooms", x: 1460, y: 1880, r: 16 },
+  { kind: "root", x: 280, y: 980, r: 22 },
+  { kind: "fern", x: 1880, y: 1560, r: 20 },
+  { kind: "shrub", x: 860, y: 260, r: 22 },
 ];
 
 function clamp(v: number, a: number, b: number) {
@@ -2167,8 +2176,22 @@ export class GameEngine {
   private buildProps() {
     this.props = PROP_LAYOUT.map((p) => ({
       ...p,
-      drawW: p.kind === "log" ? 96 : p.kind === "lantern-post" ? 36 : 72,
-      drawH: p.kind === "lantern-post" ? 110 : p.kind === "log" ? 42 : 68,
+      drawW:
+        p.kind === "log" ? 96
+        : p.kind === "lantern-post" ? 36
+        : p.kind === "fern" ? 58
+        : p.kind === "mushrooms" ? 50
+        : p.kind === "pebbles" ? 48
+        : p.kind === "shrub" ? 64
+        : 72,
+      drawH:
+        p.kind === "lantern-post" ? 110
+        : p.kind === "log" ? 42
+        : p.kind === "fern" ? 62
+        : p.kind === "mushrooms" ? 44
+        : p.kind === "pebbles" ? 36
+        : p.kind === "shrub" ? 60
+        : 68,
     }));
   }
 
