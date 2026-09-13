@@ -285,8 +285,8 @@ type BossShot = {
 type Prop = { kind: string; x: number; y: number; r: number; drawW: number; drawH: number };
 
 const ARENA = 2200;
-const VIEW_ZOOM = 1.45;
-const VIEW_PITCH = 0.8;
+const VIEW_ZOOM = 1.38;
+const VIEW_PITCH = 0.64;
 const UPRIGHT = 1 / VIEW_PITCH;
 const FIXED = 1 / 60;
 const PLAYER_R = 16;
@@ -504,6 +504,13 @@ export class GameEngine {
     hy: 140 + ((i * 251) % (ARENA - 280)),
     ph: i * 0.81,
     s: 1.4 + (i % 3) * 0.7,
+  }));
+  private grass = Array.from({ length: 96 }, (_, i) => ({
+    x: 70 + ((i * 197) % (ARENA - 140)),
+    y: 70 + ((i * 311) % (ARENA - 140)),
+    h: 11 + (i % 6) * 3,
+    w: 4 + (i % 4),
+    tint: i % 3,
   }));
   private reduced = false;
   private listeners: Array<(h: HudState) => void> = [];
@@ -4854,11 +4861,13 @@ export class GameEngine {
     ctx.fillStyle = "#0b0e0a";
     ctx.fillRect(0, 0, this.view.w, this.view.h);
     if ((this.phase === "title" || this.phase === "boot") && this.assets) {
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       this.drawTitleCover();
       return;
     }
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     ctx.save();
     ctx.translate(ox, oy);
     ctx.scale(1 / VIEW_ZOOM, VIEW_PITCH / VIEW_ZOOM);
@@ -4866,6 +4875,7 @@ export class GameEngine {
 
     if (this.assets) {
       this.drawGround();
+      this.drawGrass();
       this.drawHazards();
       const drawables: Array<{ y: number; draw: () => void }> = [];
       for (const p of this.props) drawables.push({ y: p.y, draw: () => this.drawProp(p) });
@@ -4937,8 +4947,37 @@ export class GameEngine {
         ctx.drawImage(img, x, y, tile, tile);
       }
     }
-    ctx.fillStyle = "rgba(10, 16, 8, 0.22)";
+    ctx.fillStyle = "rgba(18, 36, 22, 0.18)";
     ctx.fillRect(0, 0, ARENA, ARENA);
+  }
+
+  private drawGrass() {
+    const ctx = this.ctx;
+    const cols = ["#2f6a38", "#3d7c42", "#24582c"];
+    for (const g of this.grass) {
+      ctx.save();
+      ctx.translate(g.x, g.y);
+      ctx.scale(1, UPRIGHT);
+      ctx.fillStyle = "rgba(8,14,8,0.28)";
+      ctx.beginPath();
+      ctx.ellipse(0, 2, g.w * 1.4, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = cols[g.tint]!;
+      ctx.beginPath();
+      ctx.moveTo(-g.w, 0);
+      ctx.lineTo(0, -g.h);
+      ctx.lineTo(g.w, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(190, 230, 150, 0.35)";
+      ctx.beginPath();
+      ctx.moveTo(-g.w * 0.2, -2);
+      ctx.lineTo(0, -g.h);
+      ctx.lineTo(g.w * 0.15, -2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   private drawProp(p: Prop) {
@@ -4968,7 +5007,6 @@ export class GameEngine {
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
     this.drawKnockSprite(img, this.player.x, this.player.y - bob, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
-    this.ctx.globalAlpha = 1;
     this.ctx.globalAlpha = 1;
     if (this.muzzleT > 0) {
       const mx = this.player.x + this.aim.x * 26;
@@ -5121,9 +5159,13 @@ export class GameEngine {
   private drawShadow(x: number, y: number, rx: number, ry: number) {
     const ctx = this.ctx;
     ctx.save();
-    ctx.fillStyle = "rgba(6, 8, 4, 0.42)";
+    ctx.fillStyle = "rgba(6, 10, 6, 0.5)";
     ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y, rx * 1.15, ry * 1.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(6, 8, 4, 0.28)";
+    ctx.beginPath();
+    ctx.ellipse(x + 3, y + 2, rx * 1.35, ry * 1.45, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -5185,6 +5227,12 @@ export class GameEngine {
       ctx.rotate(-ang);
     }
     ctx.drawImage(img, -w / 2, -h * anchor, w, h);
+    ctx.globalCompositeOperation = "screen";
+    ctx.fillStyle = "rgba(255, 244, 210, 0.32)";
+    ctx.beginPath();
+    ctx.ellipse(-w * 0.14, -h * anchor * 0.52, w * 0.2, h * 0.11, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
     ctx.restore();
   }
 
@@ -5576,6 +5624,26 @@ export class GameEngine {
     ctx.beginPath();
     ctx.arc(px, py - 10, 22, 0, Math.PI * 2);
     ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = -5; i <= 5; i++) {
+      const a = -Math.PI / 2 + i * 0.11 + Math.sin(this.animT * 0.7) * 0.03;
+      const ray = ctx.createLinearGradient(px, py - 12, px + Math.cos(a) * 260, py + Math.sin(a) * 180);
+      ray.addColorStop(0, `rgba(255, 220, 140, ${0.16 * flick})`);
+      ray.addColorStop(1, "rgba(255, 180, 80, 0)");
+      ctx.strokeStyle = ray;
+      ctx.lineWidth = 14;
+      ctx.beginPath();
+      ctx.moveTo(px, py - 12);
+      ctx.lineTo(px + Math.cos(a) * 260, py + Math.sin(a) * 180);
+      ctx.stroke();
+    }
+    ctx.restore();
+    const moon = ctx.createRadialGradient(this.cam.x + 80, this.cam.y + 40, 10, this.cam.x + 80, this.cam.y + 40, 340);
+    moon.addColorStop(0, "rgba(160, 190, 230, 0.12)");
+    moon.addColorStop(1, "rgba(160, 190, 230, 0)");
+    ctx.fillStyle = moon;
+    ctx.fillRect(this.cam.x - 40, this.cam.y - 40, this.view.w * VIEW_ZOOM + 80, this.view.h * VIEW_ZOOM / VIEW_PITCH + 80);
   }
 
   private drawMoths() {
