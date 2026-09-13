@@ -102,7 +102,7 @@ export async function loadCore(_title: HTMLImageElement | undefined, onProgress?
     onProgress?.(done, total, label);
   };
 
-  const [playerSheet, wispSheet, projSheet, wispR] = await Promise.all([
+  const [playerSheet, wispSheet, projSheet] = await Promise.all([
     loadQuiet(asset("game/player/sheet.png")).then((img) => {
       tick("Keeper");
       return img;
@@ -115,7 +115,6 @@ export async function loadCore(_title: HTMLImageElement | undefined, onProgress?
       tick("Sparks");
       return img;
     }),
-    loadQuiet(asset("game/wisp/real.png")),
   ]);
 
   const fallback = swatch("#e08a3c", 96, 96);
@@ -124,7 +123,7 @@ export async function loadCore(_title: HTMLImageElement | undefined, onProgress?
   const left = four(playerFrames.slice(4, 8), down);
   const right = four(playerFrames.slice(8, 12), down);
   const up = four(playerFrames.slice(12, 16), down);
-  const wisp = four(wispR ? [wispR] : wispSheet ? sliceGrid(wispSheet, 128, 128) : down, down);
+  const wisp = four(wispSheet ? sliceGrid(wispSheet, 128, 128) : down, down);
   const projectile = four(projSheet ? sliceGrid(projSheet, 128, 128) : wisp, wisp);
 
   return {
@@ -170,9 +169,6 @@ export async function loadExtras(assets: GameAssets, onProgress?: LoadProgress):
     loadQuiet(asset("game/pickup/sheet.png")).then((img) => {
       if (img) assets.pickup = four(sliceGrid(img, 128, 128), assets.projectile);
       tick("Hearts");
-    }),
-    loadQuiet(asset("game/pickup/real.png")).then((img) => {
-      if (img) assets.pickup = four([img], assets.pickup);
     }),
   );
   for (const k of PROP_KEYS) {
