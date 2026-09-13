@@ -124,10 +124,10 @@ export async function loadCore(_title: HTMLImageElement | undefined, onProgress?
 
   const fallback = swatch("#e08a3c", 96, 96);
   const playerFrames = playerSheet ? sliceGrid(playerSheet, 96, 96) : [fallback, fallback, fallback, fallback];
-  const down = four(downR ? [downR] : playerFrames.slice(0, 4), [fallback]);
-  const left = four(leftR ? [leftR] : playerFrames.slice(4, 8), down);
-  const right = four(rightR ? [rightR] : playerFrames.slice(8, 12), down);
-  const up = four(upR ? [upR] : playerFrames.slice(12, 16), down);
+  const down = four(playerFrames.slice(0, 4), [fallback]);
+  const left = four(playerFrames.slice(4, 8), down);
+  const right = four(playerFrames.slice(8, 12), down);
+  const up = four(playerFrames.slice(12, 16), down);
   const wisp = four(wispR ? [wispR] : wispSheet ? sliceGrid(wispSheet, 128, 128) : down, down);
   const projectile = four(projSheet ? sliceGrid(projSheet, 128, 128) : wisp, wisp);
 

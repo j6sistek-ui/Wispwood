@@ -4971,13 +4971,15 @@ export class GameEngine {
     const i = this.player.moving ? Math.floor(this.player.frame) % 4 : 0;
     const img = frames?.[i] ?? frames?.[0];
     if (!img) return;
-    const s = 124 * this.bodySize;
-    const bob = this.player.moving ? Math.abs(Math.sin(this.player.frame * 1.8)) * 4 : 0;
-    this.drawShadow(this.player.x, this.player.y + 6, 18 * this.bodySize, 7 * this.bodySize);
+    const s = 64 * this.bodySize;
+    const bob = this.player.moving ? Math.abs(Math.sin(this.player.frame * 1.8)) * 2 : 0;
+    this.drawShadow(this.player.x, this.player.y + 6, 14 * this.bodySize, 6 * this.bodySize);
     this.drawGlow(this.player.x, this.player.y - 8, 34, "#ffd86a");
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
-    this.drawKnockSprite(img, this.player.x, this.player.y - bob, s, 0.9, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
+    this.ctx.imageSmoothingEnabled = false;
+    this.drawKnockSprite(img, this.player.x, this.player.y - bob, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
+    this.ctx.imageSmoothingEnabled = true;
     this.ctx.globalAlpha = 1;
     if (this.muzzleT > 0) {
       const mx = this.player.x + this.aim.x * 26;
@@ -5006,8 +5008,10 @@ export class GameEngine {
     const img = frames?.[Math.floor(g.frame) % 4] ?? frames?.[0];
     if (!img) return;
     this.ctx.globalAlpha = 0.92;
-    this.drawShadow(g.x, g.y + 6, 16, 7);
-    this.drawKnockSprite(img, g.x, g.y, 124, 0.9, 0, 1, 0, 0.28);
+    this.drawShadow(g.x, g.y + 6, 14, 6);
+    this.ctx.imageSmoothingEnabled = false;
+    this.drawKnockSprite(img, g.x, g.y, 64, 0.78, 0, 1, 0, 0.28);
+    this.ctx.imageSmoothingEnabled = true;
     this.ctx.globalAlpha = 1;
     const ctx = this.ctx;
     ctx.font = "8px \"Press Start 2P\", monospace";
