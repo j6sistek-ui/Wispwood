@@ -4897,10 +4897,7 @@ export class GameEngine {
       this.drawBlasts();
       this.drawBossShots();
       this.drawWeaponArts();
-      if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel" || this.phase === "forge") {
-        this.drawLight();
-        this.drawMoths();
-      }
+      if (this.phase === "playing" || this.phase === "paused" || this.phase === "book" || this.phase === "wheel" || this.phase === "forge") this.drawLight();
       this.drawFx();
     }
     ctx.restore();
@@ -4988,7 +4985,6 @@ export class GameEngine {
     this.ctx.ellipse(p.x, p.y + 2, p.drawW * 0.34, p.drawW * 0.12, 0, 0, Math.PI * 2);
     this.ctx.fill();
     this.ctx.save();
-    this.ctx.globalAlpha = this.lanternShade(p.x, p.y);
     this.ctx.translate(p.x, p.y);
     this.ctx.scale(1, UPRIGHT);
     this.ctx.drawImage(img, -p.drawW / 2, -p.drawH * 0.82, p.drawW, p.drawH);
@@ -5003,7 +4999,6 @@ export class GameEngine {
     const s = 64 * this.bodySize;
     const bob = this.player.moving ? Math.abs(Math.sin(this.player.frame * 1.8)) * 2 : 0;
     this.drawShadow(this.player.x, this.player.y + 6, 14 * this.bodySize, 6 * this.bodySize);
-    this.drawGlow(this.player.x, this.player.y - 8, 34, "#ffd86a");
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
     this.drawKnockSprite(img, this.player.x, this.player.y - bob, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
@@ -5061,7 +5056,6 @@ export class GameEngine {
     if (!img) return;
     const s = e.kind === "elite" ? 92 : e.kind === "brute" ? 78 : e.kind === "runner" ? 44 : 56;
     this.drawShadow(e.x, e.y + 8, s * 0.28, s * 0.12);
-    this.ctx.globalAlpha = this.lanternShade(e.x, e.y);
     if (e.flash > 0) this.ctx.filter = "brightness(3.4) saturate(1.6)";
     else if (e.wrapped > 0) this.ctx.filter = "hue-rotate(70deg) saturate(1.4) brightness(0.95)";
     else if (e.stun > 0) this.ctx.filter = "sepia(1) saturate(3) hue-rotate(5deg) brightness(1.25)";
@@ -5073,7 +5067,6 @@ export class GameEngine {
     else this.ctx.filter = "saturate(1.15) brightness(1.05)";
     this.drawKnockSprite(img, e.x, e.y, s, 0.72, e.knockX, e.knockY, e.knockT, 0.4);
     this.ctx.filter = "none";
-    this.ctx.globalAlpha = 1;
     if (e.wrapped > 0) this.drawVineWrap(e.x, e.y, s * 0.42);
     const barW = s * 0.7;
     this.ctx.fillStyle = "rgba(12,13,12,0.55)";
@@ -5227,12 +5220,6 @@ export class GameEngine {
       ctx.rotate(-ang);
     }
     ctx.drawImage(img, -w / 2, -h * anchor, w, h);
-    ctx.globalCompositeOperation = "screen";
-    ctx.fillStyle = "rgba(255, 244, 210, 0.32)";
-    ctx.beginPath();
-    ctx.ellipse(-w * 0.14, -h * anchor * 0.52, w * 0.2, h * 0.11, -0.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
     ctx.restore();
   }
 
@@ -5601,49 +5588,20 @@ export class GameEngine {
     const ctx = this.ctx;
     const px = this.player.x;
     const py = this.player.y;
-    const fever = this.streak >= 8;
-    const flick = 0.9 + 0.08 * Math.sin(this.animT * 19) + 0.04 * Math.sin(this.animT * 47);
-    const g = ctx.createRadialGradient(px, py - 8, 24, px, py - 8, (fever ? 460 : 420) * flick);
+    const g = ctx.createRadialGradient(px, py - 8, 24, px, py - 8, 420);
     g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(0.5, fever ? "rgba(40,18,4,0.04)" : "rgba(8,10,9,0.08)");
-    g.addColorStop(1, fever ? "rgba(18,8,4,0.42)" : "rgba(8,10,9,0.52)");
+    g.addColorStop(0.5, "rgba(8,10,9,0.08)");
+    g.addColorStop(1, "rgba(8,10,9,0.52)");
     ctx.fillStyle = g;
     ctx.fillRect(this.cam.x - 40, this.cam.y - 40, this.view.w * VIEW_ZOOM + 80, this.view.h * VIEW_ZOOM / VIEW_PITCH + 80);
-    const glow = ctx.createRadialGradient(px, py - 6, 4, px, py - 6, (fever ? 190 : 150) * flick);
-    glow.addColorStop(0, fever ? "rgba(255, 244, 200, 0.62)" : `rgba(255, 226, 122, ${0.36 + flick * 0.12})`);
-    glow.addColorStop(0.4, fever ? "rgba(255, 154, 60, 0.28)" : "rgba(255, 154, 60, 0.16)");
+    const glow = ctx.createRadialGradient(px, py - 6, 4, px, py - 6, 150);
+    glow.addColorStop(0, "rgba(255, 226, 122, 0.42)");
+    glow.addColorStop(0.4, "rgba(255, 154, 60, 0.16)");
     glow.addColorStop(1, "rgba(232, 196, 120, 0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(px, py - 6, fever ? 160 : 120, 0, Math.PI * 2);
+    ctx.arc(px, py - 6, 120, 0, Math.PI * 2);
     ctx.fill();
-    const core = ctx.createRadialGradient(px, py - 10, 2, px, py - 10, 22);
-    core.addColorStop(0, "rgba(255, 250, 210, 0.85)");
-    core.addColorStop(1, "rgba(255, 180, 60, 0)");
-    ctx.fillStyle = core;
-    ctx.beginPath();
-    ctx.arc(px, py - 10, 22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    for (let i = -5; i <= 5; i++) {
-      const a = -Math.PI / 2 + i * 0.11 + Math.sin(this.animT * 0.7) * 0.03;
-      const ray = ctx.createLinearGradient(px, py - 12, px + Math.cos(a) * 260, py + Math.sin(a) * 180);
-      ray.addColorStop(0, `rgba(255, 220, 140, ${0.16 * flick})`);
-      ray.addColorStop(1, "rgba(255, 180, 80, 0)");
-      ctx.strokeStyle = ray;
-      ctx.lineWidth = 14;
-      ctx.beginPath();
-      ctx.moveTo(px, py - 12);
-      ctx.lineTo(px + Math.cos(a) * 260, py + Math.sin(a) * 180);
-      ctx.stroke();
-    }
-    ctx.restore();
-    const moon = ctx.createRadialGradient(this.cam.x + 80, this.cam.y + 40, 10, this.cam.x + 80, this.cam.y + 40, 340);
-    moon.addColorStop(0, "rgba(160, 190, 230, 0.12)");
-    moon.addColorStop(1, "rgba(160, 190, 230, 0)");
-    ctx.fillStyle = moon;
-    ctx.fillRect(this.cam.x - 40, this.cam.y - 40, this.view.w * VIEW_ZOOM + 80, this.view.h * VIEW_ZOOM / VIEW_PITCH + 80);
   }
 
   private drawMoths() {
