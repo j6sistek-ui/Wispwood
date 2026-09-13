@@ -348,11 +348,11 @@ function sandboxWaveLabel(units: SandboxUnit[], index: number) {
 }
 
 function goldFor(kind: EnemyKind) {
-  if (kind === "buffwisp") return 200;
-  if (kind === "elite") return 35;
-  if (kind === "brute") return 16;
-  if (kind === "runner") return 7;
-  return 3;
+  if (kind === "buffwisp") return 240;
+  if (kind === "elite") return 48;
+  if (kind === "brute") return 22;
+  if (kind === "runner") return 10;
+  return 5;
 }
 
 function coinCountFor(kind: EnemyKind) {
@@ -486,6 +486,8 @@ export class GameEngine {
   private nightHurt = false;
   private bestStreak = 0;
   private feverOn = false;
+  private lastKillT = 0;
+  private multi = 0;
   private reduced = false;
   private listeners: Array<(h: HudState) => void> = [];
   private bookLatch = false;
@@ -2007,6 +2009,8 @@ export class GameEngine {
     this.nightHurt = false;
     this.bestStreak = 0;
     this.feverOn = false;
+    this.lastKillT = 0;
+    this.multi = 0;
     this.animT = 0;
     this.burnAcc = 0;
     this.secondWindUsed = false;
@@ -2129,10 +2133,10 @@ export class GameEngine {
 
   private holdNight() {
     const n = Math.max(1, this.wave);
-    let bonus = 16 + n * 16;
+    let bonus = 22 + n * 20;
     this.player.hp = Math.min(this.player.maxHp, this.player.hp + 14);
     if (!this.nightHurt) {
-      bonus += 36 + n * 10;
+      bonus += 50 + n * 14;
       this.floatAt(this.player.x, this.player.y - 70, "PERFECT", "#fff4c8");
       this.grantTrinkoo(1, this.player.x, this.player.y);
       this.audio.bolt();
@@ -2261,6 +2265,8 @@ export class GameEngine {
     this.muzzleT = Math.max(0, this.muzzleT - dt);
     this.zoomPunch = Math.max(0, this.zoomPunch - dt * 3.4);
     this.streakT = Math.max(0, this.streakT - dt);
+    this.lastKillT = Math.max(0, this.lastKillT - dt);
+    if (this.lastKillT <= 0) this.multi = 0;
     if (this.streakT <= 0) {
       this.streak = 0;
       this.feverOn = false;
@@ -3762,12 +3768,26 @@ export class GameEngine {
     }
     if (this.hasRelic("goldbeetle")) gold = Math.floor(gold * 1.5);
     this.streak += 1;
-    this.streakT = 2.8;
+    this.streakT = 3.4;
     if (this.streak > this.bestStreak) this.bestStreak = this.streak;
-    if (this.streak >= 2) gold += Math.floor(gold * Math.min(1.4, (this.streak - 1) * 0.09));
+    if (this.lastKillT > 0) this.multi += 1;
+    else this.multi = 1;
+    this.lastKillT = 0.32;
+    if (this.streak >= 2) gold += Math.floor(gold * Math.min(1.8, (this.streak - 1) * 0.12));
+    if (this.multi >= 3) {
+      gold += 8 * this.multi;
+      this.floatAt(e.x, e.y - 60, `MULTI x${this.multi}`, "#ffe14a");
+    }
+    if (this.streak === 1 && this.wave === 1 && this.bestStreak <= 1) {
+      gold += 12;
+      this.floatAt(e.x, e.y - 40, "FIRST BLOOD", "#c45a4a");
+    }
     if (this.player.hp / this.player.maxHp < 0.3) {
-      gold += 10;
+      gold += 14;
       this.floatAt(e.x, e.y - 44, "CLUTCH", "#c45a4a");
+    }
+    if (this.streak >= 8) {
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + 1);
     }
     if (this.streak === 5) {
       gold += 14;
@@ -3807,11 +3827,10 @@ export class GameEngine {
     this.burstSparks(e.x, e.y, sparkN + 10 + Math.min(18, this.streak), sparkColor);
     this.burstSparks(e.x, e.y, 10, "#fff4c8");
     this.spawnBurst(e.x, e.y, "ember");
-    this.spawnArc(e.x, e.y);
-    this.killFlash = Math.max(this.killFlash, e.kind === "boss" ? 0.24 : this.streak >= 10 ? 0.14 : 0.08);
-    this.zoomPunch = Math.max(this.zoomPunch, e.kind === "boss" ? 1 : this.streak >= 8 ? 0.7 : 0.45);
-    this.trauma = Math.min(1, this.trauma + (e.kind === "boss" ? 0.62 : 0.22));
-    this.hitstop = Math.max(this.hitstop, e.kind === "boss" ? 0.16 : this.streak >= 10 ? 0.07 : 0.05);
+    this.killFlash = Math.max(this.killFlash, e.kind === "boss" ? 0.28 : this.streak >= 10 ? 0.16 : 0.1);
+    this.zoomPunch = 0;
+    this.trauma = Math.min(1, this.trauma + (e.kind === "boss" ? 0.72 : this.streak >= 8 ? 0.32 : 0.24));
+    this.hitstop = Math.max(this.hitstop, e.kind === "boss" ? 0.18 : this.streak >= 15 ? 0.09 : this.multi >= 3 ? 0.08 : 0.05);
     if (Math.random() < 0.16) this.spawnPickup(e.x, e.y);
     this.buzz(e.kind === "boss" ? 30 : 8);
     this.audio.kill();
@@ -4487,9 +4506,9 @@ export class GameEngine {
       const dx = this.player.x - p.x;
       const dy = this.player.y - p.y;
       const d = Math.hypot(dx, dy) || 1;
-      const pull = this.hasRelic("moonmoth") ? 280 : 170;
+      const pull = this.streak >= 8 ? 360 : this.hasRelic("moonmoth") ? 280 : 170;
       if (d < pull) {
-        const spd = this.hasRelic("moonmoth") ? 220 : 160;
+        const spd = this.streak >= 8 ? 280 : this.hasRelic("moonmoth") ? 220 : 160;
         p.x += (dx / d) * spd * dt;
         p.y += (dy / d) * spd * dt;
       }
@@ -4739,7 +4758,7 @@ export class GameEngine {
 
   private draw() {
     const ctx = this.ctx;
-    const shake = this.reduced ? 0 : this.trauma * 6;
+    const shake = this.reduced ? 0 : this.trauma * 10;
     const ox = (Math.random() - 0.5) * shake;
     const oy = (Math.random() - 0.5) * shake;
     ctx.fillStyle = "#0c0d0c";
@@ -4752,12 +4771,6 @@ export class GameEngine {
     ctx.imageSmoothingEnabled = false;
     ctx.save();
     ctx.translate(ox, oy);
-    if (this.zoomPunch > 0 && !this.reduced) {
-      const punch = 1 + this.zoomPunch * 0.1;
-      ctx.translate(this.view.w / 2, this.view.h / 2);
-      ctx.scale(punch, punch);
-      ctx.translate(-this.view.w / 2, -this.view.h / 2);
-    }
     ctx.scale(1 / VIEW_ZOOM, 1 / VIEW_ZOOM);
     ctx.translate(-this.cam.x, -this.cam.y);
 
@@ -4841,7 +4854,7 @@ export class GameEngine {
     }
     if (this.streak >= 2) {
       const ctx = this.ctx;
-      const k = clamp(this.streakT / 2.8, 0, 1);
+      const k = clamp(this.streakT / 3.4, 0, 1);
       ctx.save();
       ctx.strokeStyle = this.streak >= 8 ? "rgba(255,244,200,0.7)" : "rgba(255,154,60,0.45)";
       ctx.lineWidth = this.streak >= 8 ? 3 : 2;
@@ -5054,7 +5067,7 @@ export class GameEngine {
                 : b.spell === "craft"
                   ? b.color
                   : "#ff7a32";
-      this.drawGlow(b.x, b.y, Math.max(16, b.r * (b.spell === "void" ? 1.8 : 2.6)), glow);
+      this.drawGlow(b.x, b.y, Math.max(22, b.r * (b.spell === "void" ? 2.2 : 3.2)), glow);
       if (b.spell === "frost") {
         drawCoreSigil(this.ctx, "frost", b.x, b.y, ang, this.animT, look);
         continue;
@@ -5303,15 +5316,15 @@ export class GameEngine {
       ctx.globalAlpha = (1 - b.t / 0.28) * 0.75;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(b.x, b.y, 10 + b.t * 160, 0, Math.PI * 2);
+      ctx.arc(b.x, b.y, 14 + b.t * 200, 0, Math.PI * 2);
       ctx.stroke();
       if (b.spell === "boom") this.drawBoomBurst(b.x, b.y, 28 + b.t * 140);
       ctx.globalAlpha = 1;
     }
     for (const f of this.floaters) {
       if (!f.alive) continue;
-      const big = f.text.startsWith("x") || f.text.includes("HELD") || f.text === "HOT" || f.text === "ON FIRE" || f.text === "UNSTOPPABLE" || f.text === "CLUTCH" || f.text === "FEVER" || f.text === "RAMPAGE" || f.text === "GODLIKE" || f.text === "PERFECT" || f.text === "OVERKILL";
-      ctx.font = `${big ? 14 : 10}px "Press Start 2P", monospace`;
+      const big = f.text.startsWith("x") || f.text.includes("HELD") || f.text === "HOT" || f.text === "ON FIRE" || f.text === "UNSTOPPABLE" || f.text === "CLUTCH" || f.text === "FEVER" || f.text === "RAMPAGE" || f.text === "GODLIKE" || f.text === "PERFECT" || f.text === "OVERKILL" || f.text.startsWith("MULTI") || f.text === "FIRST BLOOD";
+      ctx.font = `${big ? 16 : 10}px "Press Start 2P", monospace`;
       ctx.textAlign = "center";
       ctx.globalAlpha = clamp(f.ttl / 0.85, 0, 1);
       ctx.fillStyle = f.color;
