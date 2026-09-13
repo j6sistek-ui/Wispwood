@@ -2184,6 +2184,9 @@ function Dead({ engine, hud }: { engine: GameEngine | null; hud: HudState }) {
         <p className="mt-3 font-pixel text-xl text-fg">Night {hud.wave}</p>
         <p className="mt-2 font-pixel text-pixel-sm text-gold">Max {hud.bestNight}</p>
         <p className="mt-3 font-pixel text-pixel-sm text-gold">{hud.gold} gold</p>
+        {hud.bestStreak > 1 ? (
+          <p className="mt-1 font-pixel text-pixel-sm text-[#ff9a3c]">Best streak x{hud.bestStreak}</p>
+        ) : null}
         {hud.runTrinkoo > 0 ? (
           <p className="mt-1 font-pixel text-pixel-sm text-[#c8a4ff]">+{hud.runTrinkoo} trinkoo</p>
         ) : null}
