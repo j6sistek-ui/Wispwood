@@ -183,12 +183,12 @@ export const CORE_GLYPHS: Record<string, string[]> = {
 };
 
 export const CORE_COLOR: Record<string, string> = {
-  ember: "#ff7a32",
-  frost: "#7ef6ff",
-  bolt: "#ffe94a",
-  void: "#d070ff",
-  vine: "#4dff78",
-  boom: "#ff5a22",
+  ember: "#7a2a14",
+  frost: "#3d6e78",
+  bolt: "#8a6a1c",
+  void: "#4a2068",
+  vine: "#24582c",
+  boom: "#6a1c0c",
 };
 
 export function coreGlyph(spell: string): string[] {

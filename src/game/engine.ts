@@ -228,7 +228,7 @@ type Spark = {
   max: number;
   size: number;
   color: string;
-  kind: "dot" | "flake" | "coin" | "shard";
+  kind: "dot" | "flake" | "coin" | "shard" | "mist";
 };
 type Floater = { alive: boolean; x: number; y: number; ttl: number; text: string; color: string };
 type Burst = { alive: boolean; x: number; y: number; t: number; spell: Spell };
@@ -302,7 +302,7 @@ const BOLT_SPEED = 1280;
 const MAX_BULLETS = 140;
 const MAX_ENEMIES = 64;
 const MAX_PICKUPS = 16;
-const MAX_SPARKS = 200;
+const MAX_SPARKS = 280;
 const MAX_ARCS = 28;
 const MAX_HAZARDS = 64;
 const MAX_BOSS_SHOTS = 48;
@@ -402,14 +402,14 @@ function omenForNight(wave: number): NightOmen {
 }
 
 function spellTint(spell: Spell) {
-  if (spell === "frost") return "#7ef6ff";
-  if (spell === "bolt") return "#ffe94a";
-  if (spell === "void") return "#d070ff";
-  if (spell === "vine") return "#4dff78";
-  if (spell === "boom") return "#ff5a22";
-  if (spell === "craft") return "#ff8ad8";
-  if (spell === "fuse") return "#ffd36a";
-  return "#ff7a32";
+  if (spell === "frost") return "#3d6e78";
+  if (spell === "bolt") return "#8a6a1c";
+  if (spell === "void") return "#4a2068";
+  if (spell === "vine") return "#24582c";
+  if (spell === "boom") return "#6a1c0c";
+  if (spell === "craft") return "#6a2848";
+  if (spell === "fuse") return "#6a4a18";
+  return "#7a2a14";
 }
 
 function circleHit(ax: number, ay: number, ar: number, bx: number, by: number, br: number) {
@@ -2744,7 +2744,8 @@ export class GameEngine {
       b.y = b.oy + b.dirY * b.dist + b.dirX * wave;
       if (b.trail >= 0.05) {
         b.trail = 0;
-        this.burstSparks(b.x, b.y, 1, Math.random() > 0.5 ? "#f0b8c8" : "#9ad8ea");
+        this.burstSparks(b.x, b.y, 1, Math.random() > 0.5 ? "#6a3040" : "#3a5060");
+        this.spawnMist(b.x, b.y, "#4a3048", 2);
       }
     } else if (key === "bolt+ember") {
       if (b.mark >= 0.11 && b.hits < 3) {
@@ -2752,7 +2753,7 @@ export class GameEngine {
         b.hits += 1;
         b.x += b.dirX * 78;
         b.y += b.dirY * 78;
-        this.burstSparks(b.x, b.y, 8, "#ff9a3c");
+        this.burstSparks(b.x, b.y, 8, "#6a2410");
         this.spawnArc(b.x, b.y);
         this.fuseBurst(b, 42);
       }
@@ -2763,7 +2764,8 @@ export class GameEngine {
       b.y = this.player.y + Math.sin(b.ang) * b.orbit;
       if (b.trail >= 0.08) {
         b.trail = 0;
-        this.burstSparks(b.x, b.y, 1, "#7a48b8");
+        this.burstSparks(b.x, b.y, 1, "#3a1a58");
+        this.spawnMist(b.x, b.y, "#3a1a58", 2);
       }
     } else if (key === "ember+vine") {
       b.x += b.vx * dt;
@@ -2774,7 +2776,8 @@ export class GameEngine {
       b.y += b.vy * dt;
       if (b.trail >= 0.04) {
         b.trail = 0;
-        this.burstSparks(b.x, b.y, 2, "#f0d24a");
+        this.burstSparks(b.x, b.y, 2, "#5a1c0c");
+        this.spawnMist(b.x, b.y, "#5a1c0c", 2);
       }
     } else if (key === "bolt+frost") {
       b.x += b.vx * dt;
@@ -3398,9 +3401,10 @@ export class GameEngine {
         b.dirX = Math.cos(b.ang);
         b.dirY = Math.sin(b.ang);
         b.trail += dt;
-        if (b.trail >= 0.07) {
+        if (b.trail >= 0.045) {
           b.trail = 0;
-          this.burstSparks(b.x, b.y, 1, Math.random() > 0.5 ? "#3a1a58" : "#7a48b8");
+          this.burstSparks(b.x, b.y, 1, Math.random() > 0.5 ? "#3a1a58" : "#2a1438");
+          this.spawnMist(b.x, b.y, "#3a1a58", 2);
         }
         b.ttl -= dt;
         if (b.ttl <= 0) b.alive = false;
@@ -3426,9 +3430,10 @@ export class GameEngine {
           b.hits = sign;
         }
         b.trail += dt;
-        if (b.trail >= 0.07) {
+        if (b.trail >= 0.045) {
           b.trail = 0;
-          this.burstSparks(b.x, b.y, 1, b.spell === "craft" ? b.color : "#e8c070");
+          this.burstSparks(b.x, b.y, 1, b.spell === "craft" ? b.color : "#5a2410");
+          this.spawnMist(b.x, b.y, b.spell === "craft" ? b.color : "#5a2410", 2);
         }
       } else if (b.spell === "craft" && b.ability === "orbit") {
         b.ang += b.speed * dt;
@@ -3473,18 +3478,20 @@ export class GameEngine {
             b.vy = b.dirY * b.speed;
           }
           b.trail += dt;
-          if (b.trail >= 0.07) {
+          if (b.trail >= 0.045) {
             b.trail = 0;
-            this.burstSparks(b.x, b.y, 1, "#6fbf6a");
+            this.burstSparks(b.x, b.y, 1, "#24582c");
+            this.spawnMist(b.x, b.y, "#1a3820", 2);
           }
         }
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         if (b.spell === "craft") {
           b.trail += dt;
-          if (b.trail >= 0.08) {
+          if (b.trail >= 0.05) {
             b.trail = 0;
             this.burstSparks(b.x, b.y, 1, b.color);
+            this.spawnMist(b.x, b.y, b.color, 2);
           }
           if (b.ability === "grow") b.r = Math.min(28, b.r + 12 * dt);
           if (b.ability === "pulse") {
@@ -3496,19 +3503,21 @@ export class GameEngine {
           }
         } else if (b.spell === "bolt") {
           b.trail += dt;
-          if (b.trail >= 0.05) {
+          if (b.trail >= 0.04) {
             b.trail = 0;
             this.spawnArc(b.x, b.y);
-            this.burstSparks(b.x, b.y, 1, "#f0d24a");
+            this.burstSparks(b.x, b.y, 2, "#4a3a10");
+            this.spawnMist(b.x, b.y, "#3a2a08", 2);
           }
         }
       }
       b.ttl -= dt;
       if (b.spell === "frost") {
         b.trail += dt;
-        if (b.trail >= 0.06) {
+        if (b.trail >= 0.045) {
           b.trail = 0;
           this.spawnFlake(b.x, b.y, false);
+          this.spawnMist(b.x, b.y, "#2a4850", 2);
         }
       }
       if (b.ttl <= 0 || b.x < 0 || b.y < 0 || b.x > ARENA || b.y > ARENA) {
@@ -4649,21 +4658,40 @@ export class GameEngine {
   }
 
   private burstSparks(x: number, y: number, n: number, color: string) {
+    const extra = Math.min(6, 2 + Math.floor(n * 0.6));
+    for (let i = 0; i < n + extra; i++) {
+      const s = this.allocSpark();
+      if (!s) return;
+      const mist = i % 3 !== 0;
+      const a = Math.random() * Math.PI * 2;
+      const sp = mist ? 18 + Math.random() * 42 : 70 + Math.random() * 140;
+      s.alive = true;
+      s.x = x + (Math.random() - 0.5) * 8;
+      s.y = y + (Math.random() - 0.5) * 8;
+      s.vx = Math.cos(a) * sp;
+      s.vy = Math.sin(a) * sp - (mist ? 12 : 0);
+      s.ttl = mist ? 0.45 + Math.random() * 0.4 : 0.18 + Math.random() * 0.22;
+      s.max = s.ttl;
+      s.size = mist ? 5 + Math.random() * 8 : 1.6 + Math.random() * 2.4;
+      s.color = mist ? (i % 2 ? "#1a1210" : color) : color;
+      s.kind = mist ? "mist" : "dot";
+    }
+  }
+
+  private spawnMist(x: number, y: number, color: string, n = 3) {
     for (let i = 0; i < n; i++) {
       const s = this.allocSpark();
       if (!s) return;
-      const a = Math.random() * Math.PI * 2;
-      const sp = 80 + Math.random() * 170;
       s.alive = true;
-      s.x = x;
-      s.y = y;
-      s.vx = Math.cos(a) * sp;
-      s.vy = Math.sin(a) * sp;
-      s.ttl = 0.22 + Math.random() * 0.28;
+      s.x = x + (Math.random() - 0.5) * 10;
+      s.y = y + (Math.random() - 0.5) * 10;
+      s.vx = (Math.random() - 0.5) * 28;
+      s.vy = -18 - Math.random() * 22;
+      s.ttl = 0.5 + Math.random() * 0.45;
       s.max = s.ttl;
-      s.size = 2.4 + Math.random() * 4.2;
-      s.color = i % 3 === 0 ? "#fff4c8" : color;
-      s.kind = "dot";
+      s.size = 6 + Math.random() * 10;
+      s.color = i % 2 ? color : "#141010";
+      s.kind = "mist";
     }
   }
 
@@ -4811,6 +4839,9 @@ export class GameEngine {
           s.vx += (dx / d) * 380 * dt;
           s.vy += (dy / d) * 380 * dt;
         }
+      } else if (s.kind === "mist") {
+        s.vx *= Math.exp(-1.6 * dt);
+        s.vy -= 22 * dt;
       } else if (s.kind !== "shard") s.vy += 90 * dt;
       s.ttl -= dt;
       if (s.ttl <= 0) s.alive = false;
@@ -5007,7 +5038,7 @@ export class GameEngine {
       const mx = this.player.x + this.aim.x * 26;
       const my = this.player.y + this.aim.y * 18;
       const tint = this.spell === "fuse" && this.fused ? this.fused.color : this.spell === "craft" && this.crafted ? this.crafted.color : spellTint(this.spell);
-      this.drawGlow(mx, my, 16 + this.muzzleT * 90, tint);
+      this.drawGlow(mx, my, 10 + this.muzzleT * 40, tint);
     }
     if (this.streak >= 2) {
       const ctx = this.ctx;
@@ -5248,7 +5279,7 @@ export class GameEngine {
     for (const b of this.bullets) {
       if (!b.alive) continue;
       if (b.spell === "fuse") {
-        this.drawGlow(b.x, b.y, Math.max(18, b.r * 2.4), b.color || "#ffd36a");
+        this.drawGlow(b.x, b.y, Math.max(12, b.r * 1.4), b.color || "#4a3a10");
         this.drawFusionShot(b);
         continue;
       }
@@ -5256,17 +5287,18 @@ export class GameEngine {
       const look = this.shotLook(b);
       const glow =
         b.spell === "frost"
-          ? "#7ef6ff"
+          ? "#2a4850"
           : b.spell === "bolt"
-            ? "#ffe94a"
+            ? "#4a3a10"
             : b.spell === "void"
-              ? "#d070ff"
+              ? "#2a1038"
               : b.spell === "vine"
-                ? "#4dff78"
+                ? "#143018"
                 : b.spell === "craft"
                   ? b.color
-                  : "#ff7a32";
-      this.drawGlow(b.x, b.y, Math.max(22, b.r * (b.spell === "void" ? 2.2 : 3.2)), glow);
+                  : "#3a140c";
+      this.drawGlow(b.x, b.y, Math.max(12, b.r * (b.spell === "void" ? 1.4 : 1.7)), glow);
+      this.drawMystic(b.x, b.y, glow, look);
       if (b.spell === "frost") {
         drawCoreSigil(this.ctx, "frost", b.x, b.y, ang, this.animT, look);
         continue;
@@ -5353,11 +5385,11 @@ export class GameEngine {
   private drawGlow(x: number, y: number, r: number, color: string) {
     const ctx = this.ctx;
     ctx.save();
-    const g = ctx.createRadialGradient(x, y, r * 0.12, x, y, r);
+    const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
     g.addColorStop(0, color);
-    g.addColorStop(0.45, color);
+    g.addColorStop(0.55, color);
     g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.globalAlpha = 0.7;
+    ctx.globalAlpha = 0.28;
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -5365,17 +5397,41 @@ export class GameEngine {
     ctx.restore();
   }
 
+  private drawMystic(x: number, y: number, color: string, scale: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(this.animT * 1.6);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.28;
+    ctx.lineWidth = 1;
+    const r = 10 * scale + 6;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0.2, Math.PI * 1.1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.62, Math.PI * 0.8, Math.PI * 1.7);
+    ctx.stroke();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = color;
+    for (let i = 0; i < 5; i++) {
+      const a = this.animT * 2 + i * 1.256;
+      ctx.fillRect(Math.cos(a) * r * 1.15 - 1, Math.sin(a) * r * 0.7 - 1, 2, 2);
+    }
+    ctx.restore();
+  }
+
   private drawVoidOrb(b: Bullet) {
     const spin = b.ang * 2.4;
     const r = 70 + Math.sin(this.animT * 14) * 5;
-    this.drawGlow(b.x, b.y, r, "#4a2068");
+    this.drawGlow(b.x, b.y, r * 0.7, "#2a1038");
     this.drawTinted(this.impactFrame(this.animT), b.x, b.y, r * 1.1, r * 1.1, spin, "#7a48b8");
     this.drawTinted(this.projFrame(), b.x, b.y, 48, 28, spin + 0.6, "#d8c4f0");
   }
 
   private drawEmberOrb(b: Bullet) {
     const ang = Math.atan2(b.vy, b.vx);
-    this.drawGlow(b.x, b.y, 28, "#e08a3c");
+    this.drawGlow(b.x, b.y, 16, "#3a140c");
     this.drawTinted(this.impactFrame(this.animT), b.x, b.y, 34, 34, ang, "#c45a48");
     this.drawTinted(this.projFrame(), b.x, b.y, 40, 24, ang, "#f0d24a");
   }
@@ -5498,6 +5554,11 @@ export class GameEngine {
         const arm = s.size;
         ctx.fillRect(s.x - arm, s.y - 0.8, arm * 2, 1.6);
         ctx.fillRect(s.x - 0.8, s.y - arm, 1.6, arm * 2);
+      } else if (s.kind === "mist") {
+        ctx.globalAlpha = a * 0.35;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, s.size, s.size * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
       } else if (s.kind === "coin") {
         ctx.fillRect(s.x - s.size * 0.5, s.y - s.size * 0.5, s.size, s.size);
       } else {
@@ -5512,8 +5573,8 @@ export class GameEngine {
       const tint = spellTint(b.spell);
       this.drawTinted(this.impactFrame(b.t * 8), b.x, b.y, hit, hit, b.t * 6, tint);
       ctx.strokeStyle = tint;
-      ctx.globalAlpha = (1 - b.t / 0.28) * 0.75;
-      ctx.lineWidth = 3;
+      ctx.globalAlpha = (1 - b.t / 0.28) * 0.35;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(b.x, b.y, 14 + b.t * 200, 0, Math.PI * 2);
       ctx.stroke();
