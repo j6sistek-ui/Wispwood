@@ -285,9 +285,9 @@ type BossShot = {
 type Prop = { kind: string; x: number; y: number; r: number; drawW: number; drawH: number };
 
 const ARENA = 2200;
-const VIEW_ZOOM = 1.38;
-const VIEW_PITCH = 0.64;
-const UPRIGHT = 1 / VIEW_PITCH;
+const VIEW_ZOOM = 1.22;
+const VIEW_PITCH = 1;
+const UPRIGHT = 1;
 const FIXED = 1 / 60;
 const PLAYER_R = 16;
 const PLAYER_SPEED = 232;
@@ -499,19 +499,6 @@ export class GameEngine {
   private feverOn = false;
   private lastKillT = 0;
   private multi = 0;
-  private moths = Array.from({ length: 36 }, (_, i) => ({
-    hx: 140 + ((i * 173) % (ARENA - 280)),
-    hy: 140 + ((i * 251) % (ARENA - 280)),
-    ph: i * 0.81,
-    s: 1.4 + (i % 3) * 0.7,
-  }));
-  private grass = Array.from({ length: 96 }, (_, i) => ({
-    x: 70 + ((i * 197) % (ARENA - 140)),
-    y: 70 + ((i * 311) % (ARENA - 140)),
-    h: 11 + (i % 6) * 3,
-    w: 4 + (i % 4),
-    tint: i % 3,
-  }));
   private reduced = false;
   private listeners: Array<(h: HudState) => void> = [];
   private bookLatch = false;
@@ -4892,13 +4879,11 @@ export class GameEngine {
     ctx.fillStyle = "#0b0e0a";
     ctx.fillRect(0, 0, this.view.w, this.view.h);
     if ((this.phase === "title" || this.phase === "boot") && this.assets) {
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
+      ctx.imageSmoothingEnabled = false;
       this.drawTitleCover();
       return;
     }
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    ctx.imageSmoothingEnabled = false;
     ctx.save();
     ctx.translate(ox, oy);
     ctx.scale(1 / VIEW_ZOOM, VIEW_PITCH / VIEW_ZOOM);
@@ -4906,7 +4891,6 @@ export class GameEngine {
 
     if (this.assets) {
       this.drawGround();
-      this.drawGrass();
       this.drawHazards();
       const drawables: Array<{ y: number; draw: () => void }> = [];
       for (const p of this.props) drawables.push({ y: p.y, draw: () => this.drawProp(p) });
@@ -4975,37 +4959,6 @@ export class GameEngine {
         ctx.drawImage(img, x, y, tile, tile);
       }
     }
-    ctx.fillStyle = "rgba(18, 36, 22, 0.18)";
-    ctx.fillRect(0, 0, ARENA, ARENA);
-  }
-
-  private drawGrass() {
-    const ctx = this.ctx;
-    const cols = ["#2f6a38", "#3d7c42", "#24582c"];
-    for (const g of this.grass) {
-      ctx.save();
-      ctx.translate(g.x, g.y);
-      ctx.scale(1, UPRIGHT);
-      ctx.fillStyle = "rgba(8,14,8,0.28)";
-      ctx.beginPath();
-      ctx.ellipse(0, 2, g.w * 1.4, 2.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = cols[g.tint]!;
-      ctx.beginPath();
-      ctx.moveTo(-g.w, 0);
-      ctx.lineTo(0, -g.h);
-      ctx.lineTo(g.w, 0);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "rgba(190, 230, 150, 0.35)";
-      ctx.beginPath();
-      ctx.moveTo(-g.w * 0.2, -2);
-      ctx.lineTo(0, -g.h);
-      ctx.lineTo(g.w * 0.15, -2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
   }
 
   private drawProp(p: Prop) {
@@ -5027,7 +4980,7 @@ export class GameEngine {
     const i = this.player.moving ? Math.floor(this.player.frame) % 4 : 0;
     const img = frames?.[i] ?? frames?.[0];
     if (!img) return;
-    const s = 64 * this.bodySize;
+    const s = 76 * this.bodySize;
     const bob = this.player.moving ? Math.abs(Math.sin(this.player.frame * 1.8)) * 2 : 0;
     this.drawShadow(this.player.x, this.player.y + 6, 14 * this.bodySize, 6 * this.bodySize);
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
@@ -5663,19 +5616,6 @@ export class GameEngine {
     ctx.beginPath();
     ctx.arc(px, py - 6, 120, 0, Math.PI * 2);
     ctx.fill();
-  }
-
-  private drawMoths() {
-    const ctx = this.ctx;
-    for (const m of this.moths) {
-      const x = m.hx + Math.sin(this.animT * 0.7 + m.ph) * 46;
-      const y = m.hy + Math.cos(this.animT * 0.52 + m.ph * 1.3) * 30;
-      const a = 0.22 + 0.55 * (0.5 + 0.5 * Math.sin(this.animT * 7 + m.ph));
-      ctx.globalAlpha = a;
-      ctx.fillStyle = "#ffe9a0";
-      ctx.fillRect(x, y, m.s, m.s);
-    }
-    ctx.globalAlpha = 1;
   }
 
   private installControlsTest() {
