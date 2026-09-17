@@ -157,6 +157,7 @@ export type HudState = {
   omen: NightOmen;
   streak: number;
   bestStreak: number;
+  relic: boolean;
 };
 
 type Dir = "down" | "left" | "right" | "up";
@@ -512,7 +513,7 @@ export class GameEngine {
   private heldPause = false;
   private menuHold = false;
   private worldReady = false;
-  private pendingPlay: boolean | "sandbox" | "max" | null = null;
+  private pendingPlay: boolean | "sandbox" | "max" | "relic" | null = null;
   private loadPct = 0;
   private loadNote = "Gathering dusk";
 
@@ -535,6 +536,7 @@ export class GameEngine {
   vineUnlocked = false;
   boomUnlocked = false;
   richRun = false;
+  relicRun = false;
   maxRun = false;
   crafted: CraftedSpell | null = null;
   fused: FusedSpell | null = null;
@@ -670,6 +672,7 @@ export class GameEngine {
       omen: this.omen,
       streak: this.streak,
       bestStreak: this.bestStreak,
+      relic: WISP_RELIC || this.relicRun,
       tunes: {
         ember: { ...this.tunes.ember },
         frost: { ...this.tunes.frost },
@@ -800,7 +803,7 @@ export class GameEngine {
     this.view.h = h;
   }
 
-  play(mode: boolean | "sandbox" | "max" = false) {
+  play(mode: boolean | "sandbox" | "max" | "relic" = false) {
     if (!this.worldReady) {
       this.pendingPlay = mode;
       this.loading = true;
@@ -808,9 +811,11 @@ export class GameEngine {
       return;
     }
     this.audio.unlock();
-    if (WISP_RELIC) {
+    if (WISP_RELIC || mode === "relic") {
+      this.relicRun = true;
+      this.maxRun = false;
+      this.richRun = false;
       this.resetRun();
-      this.richRun = true;
       this.phase = "playing";
       this.toSpawn = 0;
       this.wave = 0;
@@ -818,6 +823,7 @@ export class GameEngine {
       this.emit();
       return;
     }
+    this.relicRun = false;
     this.captureMeta();
     this.maxRun = mode === "max";
     this.richRun = mode === true || mode === "sandbox";
@@ -1737,6 +1743,7 @@ export class GameEngine {
     this.resetRun();
     this.maxRun = false;
     this.richRun = false;
+    this.relicRun = false;
     this.trinkoo = this.metaSave.trinkoo;
     this.ownedRelics = [...this.metaSave.ownedRelics];
     this.equipped = [...this.metaSave.equipped];
@@ -2179,7 +2186,7 @@ export class GameEngine {
   }
 
   private beginWave() {
-    if (WISP_RELIC) {
+    if (WISP_RELIC || this.relicRun) {
       this.toSpawn = 0;
       this.emit();
       return;
@@ -2421,7 +2428,7 @@ export class GameEngine {
   }
 
   private shoot() {
-    if (WISP_RELIC) return;
+    if (WISP_RELIC || this.relicRun) return;
     if (this.spell === "bolt" && !this.boltUnlocked) return;
     if (this.spell === "void" && !this.voidUnlocked) return;
     if (this.spell === "vine" && !this.vineUnlocked) return;

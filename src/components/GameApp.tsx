@@ -57,6 +57,7 @@ const idleHud: HudState = {
   omen: "calm",
   streak: 0,
   bestStreak: 0,
+  relic: false,
   tunes: {
     ember: { move: 1, reload: 1, size: 1, dmg: 1 },
     frost: { move: 1, reload: 1, size: 1, dmg: 1 },

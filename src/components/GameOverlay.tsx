@@ -89,7 +89,7 @@ export function GameOverlay({ engine, hud }: Props) {
 
   const showSticks = coarse && hud.phase === "playing" && !spawnOpen;
 
-  if (WISP_RELIC) {
+  if (WISP_RELIC || hud.relic) {
     return (
       <div
         className="pointer-events-none text-fg"
@@ -651,6 +651,9 @@ function Title({
               <>
                 <PixelButton primary disabled={!hud.worldReady} onClick={() => engine?.play()}>
                   {hud.worldReady ? "Clearing" : "Loading…"}
+                </PixelButton>
+                <PixelButton disabled={!hud.worldReady} onClick={() => engine?.play("relic")}>
+                  wispRelic
                 </PixelButton>
                 <div className="grid grid-cols-2 gap-1.5">
                   <PixelButton compact disabled={!hud.worldReady} onClick={() => engine?.play(true)}>
