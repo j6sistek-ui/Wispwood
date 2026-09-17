@@ -147,7 +147,7 @@ export function GameOverlay({ engine, hud }: Props) {
           <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-start gap-6 overflow-y-auto px-4 py-[max(2rem,env(safe-area-inset-top))] pointer-events-auto">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(18,22,12,0.15),rgba(8,10,6,0.62))]" />
             <div className="relative z-10 flex w-full max-w-xs flex-col items-center gap-6">
-              <PixelBanner text="WISPRELIC" />
+              <PixelBanner text="CAST THY HEARTS CONTENT" />
               <p className="text-center font-pixel text-[8px] leading-relaxed text-muted">An empty clearing</p>
               <PixelButton
                 primary
@@ -1145,6 +1145,7 @@ function SpellGlyph({ color, name }: { color: string; name: string }) {
 
 function PixelBanner({ text }: { text: string }) {
   const small = text.length > 10;
+  const tiny = text.length > 16;
   return (
     <div className="w-[min(90vw,20rem)] shrink-0 border-4 border-[#3d3424] bg-[#10140c] shadow-[5px_5px_0_0_#1a1810]">
       <div className="flex h-2">
@@ -1156,8 +1157,12 @@ function PixelBanner({ text }: { text: string }) {
         <span className="h-3 w-3 shrink-0 bg-gold shadow-[0_0_8px_#ffd86a]" />
         <p
           className={
-            "flex-1 text-center font-pixel leading-none tracking-[0.16em] text-gold " +
-            (small ? "text-[12px]" : "text-[20px]")
+            "flex-1 text-center font-pixel text-gold " +
+            (tiny
+              ? "text-[8px] leading-4 tracking-[0.08em]"
+              : small
+                ? "text-[12px] leading-none tracking-[0.16em]"
+                : "text-[20px] leading-none tracking-[0.16em]")
           }
         >
           {text}

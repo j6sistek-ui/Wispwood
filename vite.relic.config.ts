@@ -14,7 +14,7 @@ export default defineConfig({
       name: "wisprelic-html",
       transformIndexHtml(html) {
         return html
-          .replace("<title>Wispwood</title>", "<title>wispRelic</title>")
+          .replace("<title>Wispwood</title>", "<title>cast thy hearts content</title>")
           .replace("Hold the lantern. Outlast the night.", "An empty clearing.");
       },
     },
