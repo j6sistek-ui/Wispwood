@@ -12,13 +12,14 @@ fi
 git rev-parse --is-inside-work-tree >/dev/null
 
 npm run build:pages
+npm run build:relic
 
 NEW_JS=$(ls docs/assets/index-*.js 2>/dev/null | grep -v CmrSzhEm | head -1 || true)
 NEW_CSS=$(ls docs/assets/index-*.css 2>/dev/null | grep -v BOVmQV1H | head -1 || true)
 if [ -n "${NEW_JS:-}" ]; then cp "$NEW_JS" docs/assets/index-CmrSzhEm.js; fi
 if [ -n "${NEW_CSS:-}" ]; then cp "$NEW_CSS" docs/assets/index-BOVmQV1H.css; fi
 
-for f in src public docs README.md package.json vite.pages.config.ts \
+for f in src public docs README.md package.json vite.pages.config.ts vite.relic.config.ts \
   scripts/push-github.sh scripts/watch-github.sh AGENTS.project.md startup.sh; do
   if [ -e "$f" ]; then git add "$f"; fi
 done

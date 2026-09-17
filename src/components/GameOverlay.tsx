@@ -652,9 +652,6 @@ function Title({
                 <PixelButton primary disabled={!hud.worldReady} onClick={() => engine?.play()}>
                   {hud.worldReady ? "Clearing" : "Loading…"}
                 </PixelButton>
-                <PixelButton disabled={!hud.worldReady} onClick={() => engine?.play("relic")}>
-                  wispRelic
-                </PixelButton>
                 <div className="grid grid-cols-2 gap-1.5">
                   <PixelButton compact disabled={!hud.worldReady} onClick={() => engine?.play(true)}>
                     Sandbox
