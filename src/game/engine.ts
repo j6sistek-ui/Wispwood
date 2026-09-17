@@ -302,7 +302,7 @@ const BOLT_SPEED = 1280;
 const MAX_BULLETS = 140;
 const MAX_ENEMIES = 64;
 const MAX_PICKUPS = 16;
-const MAX_SPARKS = 280;
+const MAX_SPARKS = 96;
 const MAX_ARCS = 28;
 const MAX_HAZARDS = 64;
 const MAX_BOSS_SHOTS = 48;
@@ -3589,14 +3589,14 @@ export class GameEngine {
     e.knockX = nx;
     e.knockY = ny;
     e.knockT = Math.min(0.55, 0.1 + impulse / mass * 0.0035);
-    this.spawnKnockDust(e.x, e.y, nx, ny, spell === "boom" ? 6 : 8);
+    this.spawnKnockDust(e.x, e.y, nx, ny, spell === "boom" ? 4 : 3);
     if (spell === "void") e.stun = Math.max(e.stun, 0.35);
-    const heavy = e.kind === "boss" ? 0.12 : e.kind === "elite" ? 0.08 : e.kind === "brute" ? 0.06 : spell === "boom" ? 0.07 : 0.04;
+    const heavy = e.kind === "boss" ? 0.08 : e.kind === "elite" ? 0.04 : spell === "boom" ? 0.04 : 0.02;
     this.hitstop = Math.max(this.hitstop, heavy);
-    this.trauma = Math.min(1, this.trauma + (spell === "boom" ? 0.38 : e.kind === "boss" ? 0.32 : 0.2));
+    this.trauma = Math.min(1, this.trauma + (spell === "boom" ? 0.22 : e.kind === "boss" ? 0.2 : 0.1));
     this.audio.hit();
     this.spawnBurst(e.x, e.y, spell);
-    this.burstSparks(e.x, e.y, spell === "boom" ? 22 : e.kind === "boss" ? 18 : 12, spellTint(spell));
+    this.burstSparks(e.x, e.y, spell === "boom" || e.kind === "boss" ? 8 : 5, spellTint(spell));
     this.floatAt(e.x, e.y - 14, `${Math.round(dmg)}`, spellTint(spell));
     if (e.hp <= 0) {
       const over = Math.round(-e.hp);
@@ -3849,8 +3849,7 @@ export class GameEngine {
     if (e.kind === "boss") this.grantTrinkoo(5, e.x, e.y);
     if (e.kind === "buffwisp") this.grantForgeDrop(e.x, e.y);
     this.spawnCoins(e.x, e.y, coins + Math.min(10, Math.floor(this.streak / 3)));
-    this.burstSparks(e.x, e.y, sparkN + 10 + Math.min(18, this.streak), sparkColor);
-    this.burstSparks(e.x, e.y, 10, "#fff4c8");
+    this.burstSparks(e.x, e.y, Math.min(8, sparkN + 2), sparkColor);
     this.spawnBurst(e.x, e.y, "ember");
     this.killFlash = Math.max(this.killFlash, e.kind === "boss" ? 0.28 : this.streak >= 10 ? 0.16 : 0.1);
     this.zoomPunch = 0;
@@ -4645,39 +4644,40 @@ export class GameEngine {
   }
 
   private burstSparks(x: number, y: number, n: number, color: string) {
-    const extra = Math.min(6, 2 + Math.floor(n * 0.6));
-    for (let i = 0; i < n + extra; i++) {
+    const count = Math.min(8, Math.max(1, n));
+    for (let i = 0; i < count; i++) {
       const s = this.allocSpark();
       if (!s) return;
-      const mist = i % 3 !== 0;
+      const mist = i === 0;
       const a = Math.random() * Math.PI * 2;
-      const sp = mist ? 18 + Math.random() * 42 : 70 + Math.random() * 140;
+      const sp = mist ? 22 + Math.random() * 28 : 80 + Math.random() * 140;
       s.alive = true;
-      s.x = x + (Math.random() - 0.5) * 8;
-      s.y = y + (Math.random() - 0.5) * 8;
+      s.x = x + (Math.random() - 0.5) * 6;
+      s.y = y + (Math.random() - 0.5) * 6;
       s.vx = Math.cos(a) * sp;
-      s.vy = Math.sin(a) * sp - (mist ? 12 : 0);
-      s.ttl = mist ? 0.45 + Math.random() * 0.4 : 0.18 + Math.random() * 0.22;
+      s.vy = Math.sin(a) * sp - (mist ? 10 : 0);
+      s.ttl = mist ? 0.28 : 0.16 + Math.random() * 0.14;
       s.max = s.ttl;
-      s.size = mist ? 5 + Math.random() * 8 : 1.6 + Math.random() * 2.4;
-      s.color = mist ? (i % 2 ? "#1a1210" : color) : color;
+      s.size = mist ? 5 + Math.random() * 4 : 1.8 + Math.random() * 2;
+      s.color = mist ? color : color;
       s.kind = mist ? "mist" : "dot";
     }
   }
 
-  private spawnMist(x: number, y: number, color: string, n = 3) {
-    for (let i = 0; i < n; i++) {
+  private spawnMist(x: number, y: number, color: string, n = 1) {
+    const count = 1;
+    for (let i = 0; i < count; i++) {
       const s = this.allocSpark();
       if (!s) return;
       s.alive = true;
-      s.x = x + (Math.random() - 0.5) * 10;
-      s.y = y + (Math.random() - 0.5) * 10;
-      s.vx = (Math.random() - 0.5) * 28;
-      s.vy = -18 - Math.random() * 22;
-      s.ttl = 0.5 + Math.random() * 0.45;
+      s.x = x + (Math.random() - 0.5) * 8;
+      s.y = y + (Math.random() - 0.5) * 8;
+      s.vx = (Math.random() - 0.5) * 20;
+      s.vy = -14 - Math.random() * 16;
+      s.ttl = 0.28 + Math.random() * 0.18;
       s.max = s.ttl;
-      s.size = 6 + Math.random() * 10;
-      s.color = i % 2 ? color : "#141010";
+      s.size = 5 + Math.random() * 5;
+      s.color = color;
       s.kind = "mist";
     }
   }
@@ -5508,10 +5508,8 @@ export class GameEngine {
         ctx.fillRect(s.x - arm, s.y - 0.8, arm * 2, 1.6);
         ctx.fillRect(s.x - 0.8, s.y - arm, 1.6, arm * 2);
       } else if (s.kind === "mist") {
-        ctx.globalAlpha = a * 0.35;
-        ctx.beginPath();
-        ctx.ellipse(s.x, s.y, s.size, s.size * 0.55, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.globalAlpha = a * 0.4;
+        ctx.fillRect(s.x - s.size * 0.5, s.y - s.size * 0.3, s.size, s.size * 0.6);
       } else if (s.kind === "coin") {
         ctx.fillRect(s.x - s.size * 0.5, s.y - s.size * 0.5, s.size, s.size);
       } else {
