@@ -164,10 +164,10 @@ export function GameOverlay({ engine, hud }: Props) {
           </div>
         ) : null}
         {tabletOpen && (hud.phase === "playing" || hud.phase === "paused") ? (
-          <RelicTablet onClose={() => setTabletOpen(false)} />
+          <RelicTablet engine={engine} onClose={() => setTabletOpen(false)} />
         ) : null}
         {casterOpen && (hud.phase === "playing" || hud.phase === "paused") ? (
-          <RelicCaster onClose={() => setCasterOpen(false)} />
+          <RelicCaster engine={engine} hud={hud} onClose={() => setCasterOpen(false)} />
         ) : null}
         {showSticks && !tabletOpen && !casterOpen ? <TouchSticks engine={engine} /> : null}
       </div>

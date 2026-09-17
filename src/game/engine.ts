@@ -7,6 +7,7 @@ import { drawBuffWisp } from "./buff-wisp";
 import { drawWeaponGlyph } from "./weapon-sprites";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 import { WISP_RELIC } from "@/game/mode";
+import { emptyRelicWells, forgeRelicCast, type RelicCast, type RelicElement, type RelicFunction, type RelicTrikeee } from "@/game/relic-cast";
 import { FUSIONS, drawFusionSigil } from "./fusions";
 import { rollForgePiece, parseForgeBag, makeWeapon, weaponKey, pieceById, FORGE_PIECES, ABILITY_LABEL, type ForgedWeapon, type WeaponAbility } from "./forge";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
@@ -17,7 +18,7 @@ export type SpellStat = "speed" | "damage";
 export type SpellTuneStat = "move" | "reload" | "size" | "dmg";
 export type SpellUpgrades = { speed: number; damage: number };
 export type SpellTune = { move: number; reload: number; size: number; dmg: number };
-export type CraftShape = "single" | "triple" | "weave" | "orb" | "beam" | "nova" | "wave" | "meteor" | "shard" | "homing";
+export type CraftShape = "single" | "triple" | "weave" | "orb" | "beam" | "nova" | "wave" | "meteor" | "shard" | "homing" | "straight";
 export type CraftExtra = "none" | "burn" | "slow" | "stun";
 export type CraftAbility =
   | "pierce"
@@ -158,6 +159,8 @@ export type HudState = {
   streak: number;
   bestStreak: number;
   relic: boolean;
+  relicCasts: Array<RelicCast | null>;
+  relicSlot: number;
 };
 
 type Dir = "down" | "left" | "right" | "up";
@@ -537,6 +540,8 @@ export class GameEngine {
   boomUnlocked = false;
   richRun = false;
   relicRun = false;
+  relicCasts: Array<RelicCast | null> = emptyRelicWells();
+  relicSlot = 0;
   maxRun = false;
   crafted: CraftedSpell | null = null;
   fused: FusedSpell | null = null;
@@ -673,6 +678,8 @@ export class GameEngine {
       streak: this.streak,
       bestStreak: this.bestStreak,
       relic: WISP_RELIC || this.relicRun,
+      relicCasts: this.relicCasts.map((c) => (c ? { ...c } : null)),
+      relicSlot: this.relicSlot,
       tunes: {
         ember: { ...this.tunes.ember },
         frost: { ...this.tunes.frost },
@@ -1769,6 +1776,39 @@ export class GameEngine {
     }
   }
 
+  makeRelicCast(element: RelicElement, fn: RelicFunction, trikeee: RelicTrikeee = null) {
+    if (!element || !fn) return "Need element and function";
+    const i = this.relicCasts.findIndex((c) => !c);
+    if (i < 0) return "Caster is full";
+    const made = forgeRelicCast(element, fn, trikeee);
+    this.relicCasts[i] = made;
+    this.relicSlot = i;
+    this.audio.pickup();
+    this.emit();
+    return `Cast ${made.name}`;
+  }
+
+  pickRelicSlot(i: number) {
+    if (i < 0 || i > 3) return;
+    this.relicSlot = i;
+    this.emit();
+  }
+
+  private shootRelic() {
+    const c = this.relicCasts[this.relicSlot];
+    if (!c) return;
+    this.fireCd = 0.45;
+    if (c.fn === "singleshot") {
+      const b = this.spawnShot("ember", 0);
+      b.form = "straight";
+      b.color = c.color;
+      this.audio.fire();
+    }
+    this.player.vx -= this.aim.x * 28;
+    this.player.vy -= this.aim.y * 28;
+    this.muzzleT = 0.08;
+  }
+
   redeemCode(code: string) {
     const key = code.trim().toUpperCase();
     if (!key) return "Need a code";
@@ -2428,7 +2468,10 @@ export class GameEngine {
   }
 
   private shoot() {
-    if (WISP_RELIC || this.relicRun) return;
+    if (WISP_RELIC || this.relicRun) {
+      this.shootRelic();
+      return;
+    }
     if (this.spell === "bolt" && !this.boltUnlocked) return;
     if (this.spell === "void" && !this.voidUnlocked) return;
     if (this.spell === "vine" && !this.vineUnlocked) return;
@@ -3277,6 +3320,7 @@ export class GameEngine {
       this.burstSparks(b.x, b.y, 6, "#fff4c8");
     }
     if (spell === "ember") this.burstSparks(b.x, b.y, 5, "#ffd36a");
+    return b;
   }
 
   private shootVine() {
@@ -3428,7 +3472,7 @@ export class GameEngine {
         }
         continue;
       }
-      if (b.spell === "ember" || (b.spell === "craft" && (b.form === "weave" || b.ability === "trail"))) {
+      if ((b.spell === "ember" && b.form !== "straight") || (b.spell === "craft" && (b.form === "weave" || b.ability === "trail"))) {
         b.dist += b.speed * dt;
         const amp = b.spell === "ember" ? 14 : b.ability === "trail" ? 18 : 30;
         const phase = b.dist * 0.038;

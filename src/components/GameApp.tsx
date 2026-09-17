@@ -58,6 +58,8 @@ const idleHud: HudState = {
   streak: 0,
   bestStreak: 0,
   relic: false,
+  relicCasts: [null, null, null, null],
+  relicSlot: 0,
   tunes: {
     ember: { move: 1, reload: 1, size: 1, dmg: 1 },
     frost: { move: 1, reload: 1, size: 1, dmg: 1 },

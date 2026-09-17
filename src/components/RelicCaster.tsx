@@ -1,11 +1,17 @@
-const SLOTS = [
-  { id: 1, mark: "I", hint: "empty" },
-  { id: 2, mark: "II", hint: "empty" },
-  { id: 3, mark: "III", hint: "empty" },
-  { id: 4, mark: "IV", hint: "empty" },
-] as const;
+import type { GameEngine, HudState } from "@/game/engine";
 
-export function RelicCaster({ onClose }: { onClose: () => void }) {
+const MARKS = ["I", "II", "III", "IV"] as const;
+
+export function RelicCaster({
+  engine,
+  hud,
+  onClose,
+}: {
+  engine: GameEngine | null;
+  hud: HudState;
+  onClose: () => void;
+}) {
+  const filled = hud.relicCasts.filter(Boolean).length;
   return (
     <div className="absolute inset-0 z-40 grid place-items-center bg-[#080a06]/80 px-3 py-4 pointer-events-auto" data-ui>
       <div className="relative w-[min(94vw,22rem)]">
@@ -23,27 +29,47 @@ export function RelicCaster({ onClose }: { onClose: () => void }) {
             <span className="w-4 bg-[#8a6a28]" />
           </div>
           <p className="pt-3 text-center font-pixel text-[12px] tracking-[0.28em] text-gold">CASTER</p>
-          <p className="mt-1 text-center font-pixel text-[7px] text-[#8a7a58]">four wells · no spell seated</p>
+          <p className="mt-1 text-center font-pixel text-[7px] text-[#8a7a58]">
+            {filled ? `${filled} seated · tap to wield` : "four wells · cast from the tablet"}
+          </p>
 
           <div className="relative mx-auto my-4 grid w-[88%] grid-cols-2 gap-3">
             <span className="pointer-events-none absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold shadow-[0_0_16px_#ffd86a]" />
-            {SLOTS.map((s) => (
-              <div
-                key={s.id}
-                className="relative flex aspect-square flex-col items-center justify-center border-2 border-[#7a7a7a] bg-[#0c0c0c]/70"
-                style={{ boxShadow: "inset 0 0 0 3px #14110c, inset 0 8px 0 #0c0a08, 3px 3px 0 #0c0a08" }}
-              >
-                <span className="font-pixel text-[16px] leading-none text-[#5a5a5a]">{s.mark}</span>
-                <span className="mt-2 font-pixel text-[6px] tracking-[0.18em] text-[#6a6a6a]">{s.hint}</span>
-                <span className="absolute left-1 top-1 h-1.5 w-1.5 bg-[#8a6a28]" />
-                <span className="absolute right-1 top-1 h-1.5 w-1.5 bg-[#8a6a28]" />
-                <span className="absolute bottom-1 left-1 h-1.5 w-1.5 bg-[#8a6a28]" />
-                <span className="absolute bottom-1 right-1 h-1.5 w-1.5 bg-[#8a6a28]" />
-              </div>
-            ))}
+            {MARKS.map((mark, i) => {
+              const c = hud.relicCasts[i];
+              const on = hud.relicSlot === i && !!c;
+              return (
+                <button
+                  key={mark}
+                  type="button"
+                  data-ui
+                  onClick={() => engine?.pickRelicSlot(i)}
+                  className="relative flex aspect-square flex-col items-center justify-center border-2 bg-[#0c0c0c]/70"
+                  style={{
+                    borderColor: on ? (c?.color ?? "#ffd86a") : c ? c.color : "#7a7a7a",
+                    boxShadow: on
+                      ? `0 0 18px ${c?.color ?? "#ffd86a"}`
+                      : "inset 0 0 0 3px #14110c, inset 0 8px 0 #0c0a08, 3px 3px 0 #0c0a08",
+                  }}
+                >
+                  <span className="font-pixel text-[16px] leading-none" style={{ color: c ? c.color : "#5a5a5a" }}>
+                    {mark}
+                  </span>
+                  <span className="mt-2 px-1 text-center font-pixel text-[6px] tracking-[0.08em]" style={{ color: c ? "#ecece8" : "#6a6a6a" }}>
+                    {c ? c.name : "empty"}
+                  </span>
+                  <span className="absolute left-1 top-1 h-1.5 w-1.5 bg-[#8a6a28]" />
+                  <span className="absolute right-1 top-1 h-1.5 w-1.5 bg-[#8a6a28]" />
+                  <span className="absolute bottom-1 left-1 h-1.5 w-1.5 bg-[#8a6a28]" />
+                  <span className="absolute bottom-1 right-1 h-1.5 w-1.5 bg-[#8a6a28]" />
+                </button>
+              );
+            })}
           </div>
 
-          <p className="pb-3 text-center font-pixel text-[7px] text-[#6a5a40]">Seat a made spell here later</p>
+          <p className="pb-3 text-center font-pixel text-[7px] text-[#6a5a40]">
+            {hud.relicCasts[hud.relicSlot] ? `Wielding ${hud.relicCasts[hud.relicSlot]!.name}` : "No cast seated"}
+          </p>
         </div>
         <button
           type="button"

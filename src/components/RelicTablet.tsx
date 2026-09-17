@@ -1,4 +1,6 @@
 import { useRef, useState, type PointerEvent } from "react";
+import type { GameEngine } from "@/game/engine";
+import type { RelicElement, RelicFunction } from "@/game/relic-cast";
 
 const EMBER: string[] = [
   "....11....",
@@ -49,11 +51,12 @@ const SLOTS: Array<{ id: SlotId; x: number; y: number; kind: Kind | "trikeee"; l
 
 type Drag = { id: RuneId; x: number; y: number };
 
-export function RelicTablet({ onClose }: { onClose: () => void }) {
+export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; onClose: () => void }) {
   const slab = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [seat, setSeat] = useState<Record<RuneId, Seat>>({ ember: "tray", singleshot: "tray" });
+  const [note, setNote] = useState("element + function to cast");
 
   const toPct = (e: PointerEvent, el: HTMLDivElement) => {
     const r = el.getBoundingClientRect();
@@ -135,7 +138,7 @@ export function RelicTablet({ onClose }: { onClose: () => void }) {
             <span className="w-4 bg-[#8a6a28]" />
           </div>
           <p className="pt-2 text-center font-pixel text-[11px] tracking-[0.22em] text-gold">RUNE TABLET</p>
-          <p className="mt-1 text-center font-pixel text-[7px] text-[#8a7a58]">element + function · they do nothing</p>
+          <p className="mt-1 text-center font-pixel text-[7px] text-[#8a7a58]">{note}</p>
 
           {SLOTS.map((sl) => {
             const lit = hover?.id === sl.id && drag && (sl.kind === RUNES[drag.id].kind);
@@ -203,14 +206,44 @@ export function RelicTablet({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
-        <button
-          type="button"
-          data-ui
-          onClick={onClose}
-          className="mt-2 h-11 w-full border-2 border-[#5a4a28] bg-[#10140c] font-pixel text-[9px] text-gold shadow-[3px_3px_0_0_#0c0a08]"
-        >
-          Close tablet
-        </button>
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            data-ui
+            onClick={() => {
+              const elem = (Object.keys(RUNES) as RuneId[]).find(
+                (id) => seat[id] !== "tray" && RUNES[id].kind === "element",
+              );
+              const fn = (Object.keys(RUNES) as RuneId[]).find(
+                (id) => seat[id] !== "tray" && RUNES[id].kind === "function",
+              );
+              if (!elem) {
+                setNote("Need an element");
+                return;
+              }
+              if (!fn) {
+                setNote("Need a function");
+                return;
+              }
+              const msg = engine?.makeRelicCast(elem as RelicElement, fn as RelicFunction) ?? "Need the lantern";
+              setNote(msg);
+              if (msg.startsWith("Cast")) {
+                setSeat({ ember: "tray", singleshot: "tray" });
+              }
+            }}
+            className="h-11 border-2 border-gold bg-[#10140c] font-pixel text-[9px] text-gold shadow-[3px_3px_0_0_#0c0a08]"
+          >
+            Cast
+          </button>
+          <button
+            type="button"
+            data-ui
+            onClick={onClose}
+            className="h-11 border-2 border-[#5a4a28] bg-[#10140c] font-pixel text-[9px] text-gold shadow-[3px_3px_0_0_#0c0a08]"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
