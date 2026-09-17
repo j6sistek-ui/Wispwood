@@ -678,8 +678,8 @@ export class GameEngine {
       streak: this.streak,
       bestStreak: this.bestStreak,
       relic: WISP_RELIC || this.relicRun,
-      relicCasts: this.relicCasts.map((c) => (c ? { ...c } : null)),
-      relicSlot: this.relicSlot,
+      relicCasts: (this.relicCasts ?? emptyRelicWells()).map((c) => (c ? { ...c } : null)),
+      relicSlot: this.relicSlot ?? 0,
       tunes: {
         ember: { ...this.tunes.ember },
         frost: { ...this.tunes.frost },

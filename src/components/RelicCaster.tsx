@@ -11,7 +11,9 @@ export function RelicCaster({
   hud: HudState;
   onClose: () => void;
 }) {
-  const filled = hud.relicCasts.filter(Boolean).length;
+  const wells = hud.relicCasts ?? [null, null, null, null];
+  const filled = wells.filter(Boolean).length;
+  const slot = hud.relicSlot ?? 0;
   return (
     <div className="absolute inset-0 z-40 grid place-items-center bg-[#080a06]/80 px-3 py-4 pointer-events-auto" data-ui>
       <div className="relative w-[min(94vw,22rem)]">
@@ -36,8 +38,8 @@ export function RelicCaster({
           <div className="relative mx-auto my-4 grid w-[88%] grid-cols-2 gap-3">
             <span className="pointer-events-none absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold shadow-[0_0_16px_#ffd86a]" />
             {MARKS.map((mark, i) => {
-              const c = hud.relicCasts[i];
-              const on = hud.relicSlot === i && !!c;
+              const c = wells[i];
+              const on = slot === i && !!c;
               return (
                 <button
                   key={mark}
@@ -68,7 +70,7 @@ export function RelicCaster({
           </div>
 
           <p className="pb-3 text-center font-pixel text-[7px] text-[#6a5a40]">
-            {hud.relicCasts[hud.relicSlot] ? `Wielding ${hud.relicCasts[hud.relicSlot]!.name}` : "No cast seated"}
+            {wells[slot] ? `Wielding ${wells[slot]!.name}` : "No cast seated"}
           </p>
         </div>
         <button
