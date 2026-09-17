@@ -31,192 +31,150 @@ const SHOT: string[] = [
 const EMBER_PAL = { "1": "#5a1808", "2": "#c45a28", "3": "#e08a3c", "4": "#fff0a8" };
 const SHOT_PAL = { "1": "#2a2c38", "2": "#8a90a8", "3": "#ecece8", "4": "#fff4c8" };
 
-type Kind = "element" | "function";
+type Kind = "element" | "function" | "trikeee";
 type SlotId = "funcN" | "elemW" | "trikeee" | "elemE" | "funcS";
 type RuneId = "ember" | "singleshot";
 type Seat = SlotId | "tray";
 
-const RUNES: Record<RuneId, { name: string; rows: string[]; pal: Record<string, string>; glow: string; kind: Kind; tray: { x: number; y: number } }> = {
-  ember: { name: "Ember", rows: EMBER, pal: EMBER_PAL, glow: "#e08a3c", kind: "element", tray: { x: 28, y: 86 } },
-  singleshot: { name: "Singleshot", rows: SHOT, pal: SHOT_PAL, glow: "#d8dce8", kind: "function", tray: { x: 72, y: 86 } },
+const RUNES: Record<RuneId, { name: string; rows: string[]; pal: Record<string, string>; glow: string; kind: Exclude<Kind, "trikeee"> }> = {
+  ember: { name: "Ember", rows: EMBER, pal: EMBER_PAL, glow: "#e08a3c", kind: "element" },
+  singleshot: { name: "Singleshot", rows: SHOT, pal: SHOT_PAL, glow: "#d8dce8", kind: "function" },
 };
 
-const SLOTS: Array<{ id: SlotId; x: number; y: number; kind: Kind | "trikeee"; label: string }> = [
-  { id: "funcN", x: 50, y: 24, kind: "function", label: "function" },
-  { id: "elemW", x: 22, y: 50, kind: "element", label: "element" },
-  { id: "trikeee", x: 50, y: 50, kind: "trikeee", label: "trikeee" },
-  { id: "elemE", x: 78, y: 50, kind: "element", label: "element" },
-  { id: "funcS", x: 50, y: 76, kind: "function", label: "function" },
+const SLOTS: Array<{ id: SlotId; kind: Kind; label: string }> = [
+  { id: "funcN", kind: "function", label: "function" },
+  { id: "elemW", kind: "element", label: "element" },
+  { id: "trikeee", kind: "trikeee", label: "trikeee" },
+  { id: "elemE", kind: "element", label: "element" },
+  { id: "funcS", kind: "function", label: "function" },
 ];
+
+const GRID: Array<SlotId | null> = [null, "funcN", null, "elemW", "trikeee", "elemE", null, "funcS", null];
 
 type Drag = { id: RuneId; x: number; y: number };
 
 export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; onClose: () => void }) {
-  const slab = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<Drag | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [hover, setHover] = useState<SlotId | null>(null);
   const [seat, setSeat] = useState<Record<RuneId, Seat>>({ ember: "tray", singleshot: "tray" });
   const [note, setNote] = useState("element + function to cast");
+  const dragRef = useRef<Drag | null>(null);
 
-  const toPct = (e: PointerEvent, el: HTMLDivElement) => {
-    const r = el.getBoundingClientRect();
-    return {
-      x: ((e.clientX - r.left) / r.width) * 100,
-      y: ((e.clientY - r.top) / r.height) * 100,
-    };
-  };
-
-  const posOf = (id: RuneId) => {
-    const s = seat[id];
-    if (s === "tray") return RUNES[id].tray;
-    const slot = SLOTS.find((sl) => sl.id === s);
-    return slot ? { x: slot.x, y: slot.y } : RUNES[id].tray;
-  };
-
-  const occupied = (slot: SlotId, except?: RuneId) =>
-    (Object.entries(seat) as Array<[RuneId, Seat]>).some(([id, s]) => s === slot && id !== except);
+  const occupant = (slot: SlotId) =>
+    (Object.keys(RUNES) as RuneId[]).find((id) => seat[id] === slot);
 
   const grab = (id: RuneId, e: PointerEvent<HTMLButtonElement>) => {
-    const el = slab.current;
-    if (!el) return;
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
-    const p = toPct(e, el);
-    const next = { id, x: p.x, y: p.y };
+    const next = { id, x: e.clientX, y: e.clientY };
     dragRef.current = next;
     setDrag(next);
   };
 
-  const move = (e: PointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current || !slab.current) return;
-    const p = toPct(e, slab.current);
-    const next = { id: dragRef.current.id, x: Math.max(8, Math.min(92, p.x)), y: Math.max(12, Math.min(92, p.y)) };
+  const move = (e: PointerEvent) => {
+    if (!dragRef.current) return;
+    const next = { id: dragRef.current.id, x: e.clientX, y: e.clientY };
     dragRef.current = next;
     setDrag(next);
+    const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-slot]");
+    setHover((hit?.getAttribute("data-slot") as SlotId | null) ?? null);
   };
 
-  const drop = () => {
+  const drop = (e: PointerEvent) => {
     const d = dragRef.current;
     dragRef.current = null;
     setDrag(null);
+    setHover(null);
     if (!d) return;
+    const node = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-slot]");
+    const slot = (node?.getAttribute("data-slot") as SlotId | null) ?? null;
+    const def = slot ? SLOTS.find((s) => s.id === slot) : null;
     const rune = RUNES[d.id];
-    let best: { id: SlotId; dist: number } | null = null;
-    for (const sl of SLOTS) {
-      const dist = Math.hypot(d.x - sl.x, d.y - sl.y);
-      if (dist < 14 && (!best || dist < best.dist)) best = { id: sl.id, dist };
-    }
-    const hit = best ? SLOTS.find((s) => s.id === best!.id) : null;
-    const ok = hit && hit.kind === rune.kind && !occupied(hit.id, d.id);
-    setSeat((cur) => ({ ...cur, [d.id]: ok && hit ? hit.id : "tray" }));
+    const taken = slot ? occupant(slot) : null;
+    const ok = def && def.kind === rune.kind && (!taken || taken === d.id);
+    setSeat((cur) => ({ ...cur, [d.id]: ok && slot ? slot : "tray" }));
   };
 
-  const hover = drag
-    ? SLOTS.find((sl) => Math.hypot(drag.x - sl.x, drag.y - sl.y) < 14)
-    : null;
-
   return (
-    <div className="absolute inset-0 z-40 grid place-items-center bg-[#080a06]/80 px-3 py-4 pointer-events-auto" data-ui>
+    <div
+      className="absolute inset-0 z-40 grid place-items-center bg-[#080a06]/85 px-3 py-4 pointer-events-auto"
+      data-ui
+      onPointerMove={move}
+      onPointerUp={drop}
+      onPointerCancel={drop}
+    >
       <div className="relative w-[min(94vw,22rem)]">
-        <div className="absolute -inset-1 border-2 border-[#1a140c]" />
-        <div
-          ref={slab}
-          onPointerMove={move}
-          onPointerUp={drop}
-          onPointerCancel={drop}
-          className="relative overflow-hidden border-4 border-[#5a4a28] bg-[#1c1810] shadow-[6px_6px_0_0_#0c0a08]"
-          style={{
-            height: "min(68vh, 28rem)",
-            backgroundImage:
-              "linear-gradient(180deg, rgba(90,74,40,0.18), rgba(8,10,6,0.2)), repeating-linear-gradient(90deg, transparent 0 11px, rgba(0,0,0,0.12) 11px 12px)",
-          }}
-        >
-          <div className="flex h-2">
-            <span className="w-4 bg-[#8a6a28]" />
-            <span className="flex-1 bg-gold" />
-            <span className="w-4 bg-[#8a6a28]" />
+        <div className="border-4 border-[#5a4a28] bg-[#1c1810] p-3 shadow-[6px_6px_0_0_#0c0a08]">
+          <p className="text-center font-pixel text-[11px] tracking-[0.22em] text-gold">RUNE TABLET</p>
+          <p className="mt-1 mb-3 text-center font-pixel text-[7px] text-[#8a7a58]">{note}</p>
+
+          <div className="mx-auto grid w-[92%] grid-cols-3 gap-2">
+            {GRID.map((id, i) => {
+              if (!id) return <div key={i} />;
+              const sl = SLOTS.find((s) => s.id === id)!;
+              const held = occupant(id);
+              const lit = hover === id && drag && RUNES[drag.id].kind === sl.kind;
+              const deny = hover === id && drag && RUNES[drag.id].kind !== sl.kind;
+              return (
+                <div key={id} className="flex flex-col items-center gap-1">
+                  <div
+                    data-slot={id}
+                    className="relative grid aspect-square w-full place-items-center rounded-full"
+                    style={{
+                      border: `2px solid ${lit ? "#ecece8" : deny ? "#6a3030" : "#7a7a7a"}`,
+                      background: "rgba(12,12,12,0.55)",
+                      boxShadow: lit ? "0 0 14px rgba(236,236,232,0.35)" : "inset 0 0 0 3px #14110c",
+                    }}
+                  >
+                    {held && drag?.id !== held ? (
+                      <button
+                        type="button"
+                        data-ui
+                        onPointerDown={(e) => grab(held, e)}
+                        className="grid h-full w-full place-items-center rounded-full"
+                        style={{ touchAction: "none" }}
+                      >
+                        <RuneFace id={held} />
+                      </button>
+                    ) : null}
+                  </div>
+                  <span className="font-pixel text-[6px] tracking-[0.1em]" style={{ color: sl.kind === "trikeee" ? "#c8a4ff" : "#8a8a8a" }}>
+                    {sl.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-          <p className="pt-2 text-center font-pixel text-[11px] tracking-[0.22em] text-gold">RUNE TABLET</p>
-          <p className="mt-1 text-center font-pixel text-[7px] text-[#8a7a58]">{note}</p>
 
-          {SLOTS.map((sl) => {
-            const lit = hover?.id === sl.id && drag && (sl.kind === RUNES[drag.id].kind);
-            const deny = hover?.id === sl.id && drag && sl.kind !== RUNES[drag.id].kind;
-            return (
-              <div
-                key={sl.id}
-                className="pointer-events-none absolute grid place-items-center"
-                style={{
-                  left: `${sl.x}%`,
-                  top: `${sl.y}%`,
-                  width: "24%",
-                  transform: "translate(-50%, -50%)",
-                }}
-              >
-                <div
-                  className="aspect-square w-full rounded-full"
-                  style={{
-                    border: `2px solid ${lit ? "#ecece8" : deny ? "#6a3030" : "#7a7a7a"}`,
-                    background: "rgba(12,12,12,0.55)",
-                    boxShadow: lit
-                      ? "0 0 16px rgba(236,236,232,0.35), inset 0 0 0 3px #1a1810"
-                      : "inset 0 0 0 3px #14110c, inset 0 6px 0 #0c0a08",
-                  }}
-                />
-                <span
-                  className="absolute -bottom-3 font-pixel text-[6px] tracking-[0.12em]"
-                  style={{ color: sl.kind === "trikeee" ? "#c8a4ff" : "#8a8a8a" }}
+          <p className="mt-3 mb-1 text-center font-pixel text-[6px] text-[#6a5a40]">runes</p>
+          <div className="flex justify-center gap-4">
+            {(Object.keys(RUNES) as RuneId[]).map((id) =>
+              seat[id] === "tray" && drag?.id !== id ? (
+                <button
+                  key={id}
+                  type="button"
+                  data-ui
+                  onPointerDown={(e) => grab(id, e)}
+                  className="grid w-[30%] place-items-center rounded-full border-2 bg-[#14110c] py-2"
+                  style={{ borderColor: RUNES[id].glow, touchAction: "none" }}
                 >
-                  {sl.label}
-                </span>
-              </div>
-            );
-          })}
-
-          {(Object.keys(RUNES) as RuneId[]).map((id) => {
-            const r = RUNES[id];
-            const held = drag?.id === id;
-            const p = held && drag ? { x: drag.x, y: drag.y } : posOf(id);
-            return (
-              <button
-                key={id}
-                type="button"
-                data-ui
-                onPointerDown={(e) => grab(id, e)}
-                className="absolute grid place-items-center rounded-full border-2 bg-[#14110c] p-1.5"
-                style={{
-                  left: `${p.x}%`,
-                  top: `${p.y}%`,
-                  width: "22%",
-                  transform: "translate(-50%, -50%)",
-                  borderColor: r.glow,
-                  boxShadow: held ? `0 0 22px ${r.glow}` : `0 0 10px ${r.glow}88, 3px 3px 0 #0c0a08`,
-                  zIndex: held ? 6 : 3,
-                  transition: held ? "none" : "left 180ms ease-out, top 180ms ease-out",
-                  cursor: "grab",
-                  touchAction: "none",
-                }}
-              >
-                <Glyph rows={r.rows} pal={r.pal} />
-                <span className="mt-0.5 font-pixel text-[6px] leading-none" style={{ color: r.glow }}>
-                  {r.name}
-                </span>
-              </button>
-            );
-          })}
+                  <RuneFace id={id} />
+                </button>
+              ) : (
+                <div key={id} className="h-16 w-[30%]" />
+              ),
+            )}
+          </div>
         </div>
+
         <div className="mt-2 grid grid-cols-2 gap-1.5">
           <button
             type="button"
             data-ui
             onClick={() => {
-              const elem = (Object.keys(RUNES) as RuneId[]).find(
-                (id) => seat[id] !== "tray" && RUNES[id].kind === "element",
-              );
-              const fn = (Object.keys(RUNES) as RuneId[]).find(
-                (id) => seat[id] !== "tray" && RUNES[id].kind === "function",
-              );
+              const elem = (Object.keys(RUNES) as RuneId[]).find((id) => seat[id] !== "tray" && RUNES[id].kind === "element");
+              const fn = (Object.keys(RUNES) as RuneId[]).find((id) => seat[id] !== "tray" && RUNES[id].kind === "function");
               if (!elem) {
                 setNote("Need an element");
                 return;
@@ -227,9 +185,7 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
               }
               const msg = engine?.makeRelicCast(elem as RelicElement, fn as RelicFunction) ?? "Need the lantern";
               setNote(msg);
-              if (msg.startsWith("Cast")) {
-                setSeat({ ember: "tray", singleshot: "tray" });
-              }
+              if (msg.startsWith("Cast")) setSeat({ ember: "tray", singleshot: "tray" });
             }}
             className="h-11 border-2 border-gold bg-[#10140c] font-pixel text-[9px] text-gold shadow-[3px_3px_0_0_#0c0a08]"
           >
@@ -245,7 +201,34 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
           </button>
         </div>
       </div>
+
+      {drag ? (
+        <div
+          className="pointer-events-none fixed z-50 grid w-20 place-items-center rounded-full border-2 bg-[#14110c] p-2"
+          style={{
+            left: drag.x,
+            top: drag.y,
+            transform: "translate(-50%, -50%)",
+            borderColor: RUNES[drag.id].glow,
+            boxShadow: `0 0 18px ${RUNES[drag.id].glow}`,
+          }}
+        >
+          <RuneFace id={drag.id} />
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function RuneFace({ id }: { id: RuneId }) {
+  const r = RUNES[id];
+  return (
+    <>
+      <Glyph rows={r.rows} pal={r.pal} />
+      <span className="mt-1 font-pixel text-[6px] leading-none" style={{ color: r.glow }}>
+        {r.name}
+      </span>
+    </>
   );
 }
 

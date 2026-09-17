@@ -1,9 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { GameEngine, HudState } from "@/game/engine";
 import { ensureGuestAccount } from "@/game/guest-account";
+import { WISP_RELIC } from "@/game/mode";
 
 const GameOverlay = lazy(() =>
-  import("./GameOverlay").then((m) => ({ default: m.GameOverlay })),
+  WISP_RELIC
+    ? import("./RelicOverlay").then((m) => ({ default: m.RelicOverlay }))
+    : import("./GameOverlay").then((m) => ({ default: m.GameOverlay })),
 );
 
 const idleHud: HudState = {
