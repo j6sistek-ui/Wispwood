@@ -12,6 +12,7 @@ import { FORGE_CATALOG, FORGE_PIECES, ABILITY_LABEL, type ForgeKind, type ForgeP
 import { weaponGlyph, pieceGlyph, piecePalette } from "@/game/weapon-sprites";
 import { asset } from "@/game/paths";
 import { WISP_RELIC } from "@/game/mode";
+import { RelicTablet } from "@/components/RelicTablet";
 import { useP2PRoom, type P2PRoomHandle } from "@/lib/multiplayer/use-p2p-room";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -23,6 +24,7 @@ type Props = {
 export function GameOverlay({ engine, hud }: Props) {
   const [coarse, setCoarse] = useState(false);
   const [spawnOpen, setSpawnOpen] = useState(false);
+  const [tabletOpen, setTabletOpen] = useState(false);
   const [playerName, setPlayerName] = useState(() => loadPlayerName());
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
@@ -100,14 +102,25 @@ export function GameOverlay({ engine, hud }: Props) {
             className="pointer-events-none px-3"
             style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
           >
-            <div className="mx-auto mt-2 flex max-w-xs justify-center">
+            <div className="mx-auto mt-2 grid max-w-xs grid-cols-2 gap-1.5">
               <button
                 type="button"
                 data-ui
-                onClick={() => engine?.leaveRun()}
-                className="pointer-events-auto flex h-11 min-w-[8rem] items-center justify-center border-2 border-fg bg-bg font-pixel text-[10px] text-fg shadow-[2px_2px_0_0_var(--color-border)]"
+                onClick={() => {
+                  setTabletOpen(false);
+                  engine?.leaveRun();
+                }}
+                className="pointer-events-auto flex h-11 items-center justify-center border-2 border-fg bg-bg font-pixel text-[10px] text-fg shadow-[2px_2px_0_0_var(--color-border)]"
               >
                 Leave
+              </button>
+              <button
+                type="button"
+                data-ui
+                onClick={() => setTabletOpen(true)}
+                className="pointer-events-auto flex h-11 items-center justify-center border-2 border-gold bg-bg font-pixel text-[10px] text-gold shadow-[2px_2px_0_0_var(--color-border)]"
+              >
+                Tablet
               </button>
             </div>
           </div>
@@ -119,13 +132,23 @@ export function GameOverlay({ engine, hud }: Props) {
             <div className="relative z-10 flex w-full max-w-xs flex-col items-center gap-6">
               <PixelBanner text="WISPRELIC" />
               <p className="text-center font-pixel text-[8px] leading-relaxed text-muted">An empty clearing</p>
-              <PixelButton primary disabled={!hud.worldReady} onClick={() => engine?.play()}>
+              <PixelButton
+                primary
+                disabled={!hud.worldReady}
+                onClick={() => {
+                  setTabletOpen(false);
+                  engine?.play("relic");
+                }}
+              >
                 {hud.worldReady ? "Enter the clearing" : "Loading…"}
               </PixelButton>
             </div>
           </div>
         ) : null}
-        {showSticks ? <TouchSticks engine={engine} /> : null}
+        {tabletOpen && (hud.phase === "playing" || hud.phase === "paused") ? (
+          <RelicTablet onClose={() => setTabletOpen(false)} />
+        ) : null}
+        {showSticks && !tabletOpen ? <TouchSticks engine={engine} /> : null}
       </div>
     );
   }
