@@ -6,6 +6,7 @@ import { BOSSES, BOSS_ATTACK, drawBossPixels, type BossDef } from "./bosses";
 import { drawBuffWisp } from "./buff-wisp";
 import { drawWeaponGlyph } from "./weapon-sprites";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
+import { WISP_RELIC } from "@/game/mode";
 import { FUSIONS, drawFusionSigil } from "./fusions";
 import { rollForgePiece, parseForgeBag, makeWeapon, weaponKey, pieceById, FORGE_PIECES, ABILITY_LABEL, type ForgedWeapon, type WeaponAbility } from "./forge";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
@@ -807,6 +808,16 @@ export class GameEngine {
       return;
     }
     this.audio.unlock();
+    if (WISP_RELIC) {
+      this.resetRun();
+      this.richRun = true;
+      this.phase = "playing";
+      this.toSpawn = 0;
+      this.wave = 0;
+      this.audio.startBed();
+      this.emit();
+      return;
+    }
     this.captureMeta();
     this.maxRun = mode === "max";
     this.richRun = mode === true || mode === "sandbox";
@@ -2168,6 +2179,11 @@ export class GameEngine {
   }
 
   private beginWave() {
+    if (WISP_RELIC) {
+      this.toSpawn = 0;
+      this.emit();
+      return;
+    }
     this.wave += 1;
     if (this.wave > 1) this.grantTrinkoo(1, this.player.x, this.player.y);
     if (this.wave > this.bestNight && !this.maxRun) {
@@ -2405,6 +2421,7 @@ export class GameEngine {
   }
 
   private shoot() {
+    if (WISP_RELIC) return;
     if (this.spell === "bolt" && !this.boltUnlocked) return;
     if (this.spell === "void" && !this.voidUnlocked) return;
     if (this.spell === "vine" && !this.vineUnlocked) return;

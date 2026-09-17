@@ -11,6 +11,7 @@ import { RELICS, RELIC_COST, relicById, type RelicId } from "@/game/relics";
 import { FORGE_CATALOG, FORGE_PIECES, ABILITY_LABEL, type ForgeKind, type ForgePiece } from "@/game/forge";
 import { weaponGlyph, pieceGlyph, piecePalette } from "@/game/weapon-sprites";
 import { asset } from "@/game/paths";
+import { WISP_RELIC } from "@/game/mode";
 import { useP2PRoom, type P2PRoomHandle } from "@/lib/multiplayer/use-p2p-room";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -87,6 +88,47 @@ export function GameOverlay({ engine, hud }: Props) {
   }, [roomCode, engine, p2p.broadcast, playerName]);
 
   const showSticks = coarse && hud.phase === "playing" && !spawnOpen;
+
+  if (WISP_RELIC) {
+    return (
+      <div
+        className="pointer-events-none text-fg"
+        style={{ position: "absolute", inset: 0, zIndex: 20, width: "100%", height: "100%" }}
+      >
+        {hud.phase === "playing" || hud.phase === "paused" ? (
+          <div
+            className="pointer-events-none px-3"
+            style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
+          >
+            <div className="mx-auto mt-2 flex max-w-xs justify-center">
+              <button
+                type="button"
+                data-ui
+                onClick={() => engine?.leaveRun()}
+                className="pointer-events-auto flex h-11 min-w-[8rem] items-center justify-center border-2 border-fg bg-bg font-pixel text-[10px] text-fg shadow-[2px_2px_0_0_var(--color-border)]"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {hud.phase === "boot" || hud.loading ? <Boot pct={hud.loadPct} note={hud.loadNote} /> : null}
+        {hud.phase === "title" && !hud.loading ? (
+          <div className="absolute inset-0 flex min-h-0 flex-col items-center justify-start gap-6 overflow-y-auto px-4 py-[max(2rem,env(safe-area-inset-top))] pointer-events-auto">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(18,22,12,0.15),rgba(8,10,6,0.62))]" />
+            <div className="relative z-10 flex w-full max-w-xs flex-col items-center gap-6">
+              <PixelBanner text="WISPRELIC" />
+              <p className="text-center font-pixel text-[8px] leading-relaxed text-muted">An empty clearing</p>
+              <PixelButton primary disabled={!hud.worldReady} onClick={() => engine?.play()}>
+                {hud.worldReady ? "Enter the clearing" : "Loading…"}
+              </PixelButton>
+            </div>
+          </div>
+        ) : null}
+        {showSticks ? <TouchSticks engine={engine} /> : null}
+      </div>
+    );
+  }
 
   return (
     <div
