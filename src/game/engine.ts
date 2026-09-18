@@ -829,7 +829,7 @@ export class GameEngine {
       this.phase = "playing";
       this.toSpawn = 0;
       this.wave = 0;
-      this.audio.startBed();
+      this.audio.stopBed();
       this.emit();
       return;
     }
@@ -5030,27 +5030,20 @@ export class GameEngine {
     const x = Math.round(this.player.x);
     const y = Math.round(this.player.y);
     const bob = this.player.moving ? Math.round(Math.abs(Math.sin(this.player.frame * 1.8)) * 2) : 0;
-    const gy = y - bob;
+    const face = this.player.face;
+    const col = this.player.moving ? Math.floor(this.player.frame) % 4 : 0;
+    const img = this.assets?.player[face]?.[col] ?? this.assets?.player.down?.[0];
     ctx.fillStyle = "rgba(8,10,6,0.4)";
     ctx.beginPath();
     ctx.ellipse(x, y + 6, 12, 5, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#2c2e1c";
-    ctx.fillRect(x - 8, gy - 20, 16, 24);
-    ctx.fillStyle = "#3a3c28";
-    ctx.fillRect(x - 6, gy - 16, 12, 18);
-    ctx.fillStyle = "#1a1c14";
-    ctx.fillRect(x - 7, gy - 32, 14, 8);
-    ctx.fillStyle = "#c4a070";
-    ctx.fillRect(x - 5, gy - 26, 10, 10);
-    ctx.fillStyle = "#2a1c10";
-    ctx.fillRect(x - 4, gy - 22, 8, 3);
-    ctx.fillStyle = "#5a3a18";
-    ctx.fillRect(x + 7, gy - 18, 8, 11);
-    ctx.fillStyle = "#ffe14a";
-    ctx.fillRect(x + 9, gy - 16, 4, 5);
-    ctx.fillStyle = "#fff8d0";
-    ctx.fillRect(x + 10, gy - 15, 2, 2);
+    if (!img) return;
+    const iw = Number((img as { width?: number }).width) || 96;
+    const ih = Number((img as { height?: number }).height) || 96;
+    if (iw > 128 || ih > 128) return;
+    const s = 76;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, x - s / 2, y - bob - s * 0.78, s, s);
   }
 
   private drawTitleCover() {
