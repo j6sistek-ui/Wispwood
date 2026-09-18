@@ -1816,7 +1816,7 @@ export class GameEngine {
       if (c.fn === "weave") b.form = "weave";
       if (c.fn === "seek") {
         b.form = "homing";
-        b.home = this.nearestFoe();
+        b.home = this.nearestFoe(this.player.x, this.player.y, 900);
       }
       if (c.trikeee === "burn") b.spell = "ember";
       return b;
