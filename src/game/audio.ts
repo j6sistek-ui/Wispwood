@@ -15,6 +15,10 @@ export class GameAudio {
   private jackBuf: AudioBuffer | null = null;
   private jackLoading = false;
   private noiseBuf: AudioBuffer | null = null;
+  private friendsBuf: AudioBuffer | null = null;
+  private friendsLoading = false;
+  private friendsSrc: AudioBufferSourceNode | null = null;
+  private friendsGain: GainNode | null = null;
   muted = false;
   private relicQuiet = false;
 
@@ -46,6 +50,7 @@ export class GameAudio {
     }
     if (this.ctx.state === "suspended") void this.ctx.resume().catch(() => {});
     this.loadJackpot();
+    this.loadFriends();
   }
 
   private clampWhen(when: number) {
@@ -94,11 +99,12 @@ export class GameAudio {
   silenceRelic() {
     this.relicQuiet = true;
     this.stopBed();
-    if (this.music && this.ctx) this.music.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04);
+    this.startFriends();
   }
 
   allowBed() {
     this.relicQuiet = false;
+    this.stopFriends();
   }
 
   stopBed() {
@@ -121,7 +127,81 @@ export class GameAudio {
       }
     }
     this.bedNodes = [];
-    if (this.music && this.ctx) this.music.gain.setTargetAtTime(0, this.ctx.currentTime, 0.06);
+    this.stopFriends();
+  }
+
+  startFriends() {
+    this.unlock();
+    if (!this.ctx || this.muted) return;
+    if (!this.friendsBuf) {
+      this.loadFriends();
+      return;
+    }
+    this.stopFriends();
+    if (this.ctx.state === "suspended") {
+      void this.ctx.resume().then(() => this.startFriends()).catch(() => {});
+      return;
+    }
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.friendsBuf;
+    src.loop = true;
+    src.loopStart = 0;
+    src.loopEnd = this.friendsBuf.duration;
+    const g = this.ctx.createGain();
+    g.gain.value = 0;
+    src.connect(g);
+    g.connect(this.master!);
+    const now = this.ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.95, now + 0.12);
+    src.start();
+    this.friendsSrc = src;
+    this.friendsGain = g;
+  }
+
+  stopFriends() {
+    if (this.friendsGain && this.ctx) {
+      try {
+        this.friendsGain.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.05);
+      } catch {
+        /* ignore */
+      }
+    }
+    const src = this.friendsSrc;
+    this.friendsSrc = null;
+    if (src) {
+      window.setTimeout(() => {
+        try {
+          src.stop();
+        } catch {
+          /* already stopped */
+        }
+        try {
+          src.disconnect();
+        } catch {
+          /* already disconnected */
+        }
+      }, 180);
+    }
+    this.friendsGain = null;
+  }
+
+  private loadFriends() {
+    if (this.friendsBuf || this.friendsLoading || !this.ctx) return;
+    this.friendsLoading = true;
+    fetch(asset("game/audio/friends.m4a"))
+      .then((r) => {
+        if (!r.ok) throw new Error("missing friends audio");
+        return r.arrayBuffer();
+      })
+      .then((b) => this.ctx!.decodeAudioData(b))
+      .then((buf) => {
+        this.friendsBuf = buf;
+        if (this.relicQuiet && !this.muted) this.startFriends();
+      })
+      .catch(() => {
+        this.friendsLoading = false;
+      });
   }
 
   private tickBed() {
