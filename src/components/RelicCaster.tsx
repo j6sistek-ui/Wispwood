@@ -19,23 +19,23 @@ export function RelicCaster({
     onClose();
   };
   return (
-    <div className="absolute inset-0 z-50 overflow-y-auto bg-[#080a06]/88 px-3 py-3 pointer-events-auto" data-ui>
+    <div className="absolute inset-0 z-50 overflow-y-auto bg-[#0c0a10]/90 px-3 py-3 pointer-events-auto" data-ui>
       <div className="mx-auto w-[min(94vw,22rem)]">
-        <div className="border-4 border-[#5a4a28] bg-[#1c1810] p-3 shadow-[6px_6px_0_0_#0c0a08]">
+        <div className="border-4 border-[#3a3048] bg-[#141018] p-3 shadow-[6px_6px_0_0_#08060c]">
           <div className="mb-2 flex items-center justify-between">
-            <p className="font-pixel text-[12px] tracking-[0.22em] text-gold">CASTER</p>
+            <p className="font-pixel text-[12px] tracking-[0.22em] text-[#e8a0a8]">RELIQUARY</p>
             <button
               type="button"
               data-ui
               onPointerDown={close}
               onClick={close}
-              className="h-8 border-2 border-[#5a4a28] px-2 font-pixel text-[8px] text-gold"
+              className="h-8 border-2 border-[#3a3048] px-2 font-pixel text-[8px] text-[#e8d8a0]"
             >
               Close
             </button>
           </div>
-          <p className="mb-3 text-center font-pixel text-[7px] text-[#8a7a58]">
-            {filled ? `${filled} seated · tap to wield` : "four wells · cast from the tablet"}
+          <p className="mb-3 text-center font-pixel text-[7px] text-[#8a7a90]">
+            {filled ? `${filled} bound · tap to wield` : "four wells · bind at the altar"}
           </p>
           <div className="grid grid-cols-2 gap-3">
             {MARKS.map((mark, i) => {
@@ -49,8 +49,8 @@ export function RelicCaster({
                   onClick={() => engine?.pickRelicSlot(i)}
                   className="relative flex aspect-[5/4] flex-col items-center justify-center border-2 bg-[#0c0c0c]/70"
                   style={{
-                    borderColor: on ? (c?.color ?? "#ffd86a") : c ? c.color : "#7a7a7a",
-                    boxShadow: on ? `0 0 18px ${c?.color ?? "#ffd86a"}` : "3px 3px 0 #0c0a08",
+                    borderColor: on ? (c?.color ?? "#e8a0a8") : c ? c.color : "#5a4a68",
+                    boxShadow: on ? `0 0 18px ${c?.color ?? "#e8a0a8"}` : "3px 3px 0 #08060c",
                   }}
                 >
                   <span className="font-pixel text-[16px] leading-none" style={{ color: c ? c.color : "#5a5a5a" }}>
@@ -63,8 +63,8 @@ export function RelicCaster({
               );
             })}
           </div>
-          <p className="mt-3 text-center font-pixel text-[7px] text-[#6a5a40]">
-            {wells[slot] ? `Wielding ${wells[slot]!.name}` : "No cast seated"}
+          <p className="mt-3 text-center font-pixel text-[7px] text-[#6a5a70]">
+            {wells[slot] ? `Wielding ${wells[slot]!.name}` : "No cast bound"}
           </p>
         </div>
         <button
@@ -72,9 +72,9 @@ export function RelicCaster({
           data-ui
           onPointerDown={close}
           onClick={close}
-          className="mt-2 h-11 w-full border-2 border-[#5a4a28] bg-[#10140c] font-pixel text-[9px] text-gold shadow-[3px_3px_0_0_#0c0a08]"
+          className="mt-2 h-11 w-full border-2 border-[#3a3048] bg-[#141018] font-pixel text-[9px] text-[#e8d8a0] shadow-[3px_3px_0_0_#08060c]"
         >
-          Close caster
+          Close
         </button>
       </div>
     </div>

@@ -7,10 +7,10 @@ import {
   RUNE_GLOW,
   RUNE_KIND,
   RUNE_LABEL,
-  type RelicElement,
-  type RelicFunction,
+  type RelicMatter,
+  type RelicGesture,
+  type RelicHeart,
   type RelicRuneId,
-  type RelicTrikeee,
 } from "@/game/relic-cast";
 
 type SlotId = "funcN" | "elemW" | "trikeee" | "elemE" | "funcS";
@@ -18,12 +18,12 @@ type Seat = SlotId | "tray";
 type Drag = { id: RelicRuneId; x: number; y: number };
 
 const ALL: RelicRuneId[] = [...RELIC_ELEMENTS, ...RELIC_FUNCTIONS, ...RELIC_TRIKEEE];
-const SLOTS: Array<{ id: SlotId; kind: "element" | "function" | "trikeee"; label: string }> = [
-  { id: "funcN", kind: "function", label: "function" },
-  { id: "elemW", kind: "element", label: "element" },
-  { id: "trikeee", kind: "trikeee", label: "trikeee" },
-  { id: "elemE", kind: "element", label: "element" },
-  { id: "funcS", kind: "function", label: "function" },
+const SLOTS: Array<{ id: SlotId; kind: "matter" | "gesture" | "heart"; label: string }> = [
+  { id: "funcN", kind: "gesture", label: "gesture" },
+  { id: "elemW", kind: "matter", label: "matter" },
+  { id: "trikeee", kind: "heart", label: "heart" },
+  { id: "elemE", kind: "matter", label: "matter" },
+  { id: "funcS", kind: "gesture", label: "gesture" },
 ];
 const GRID: Array<SlotId | null> = [null, "funcN", null, "elemW", "trikeee", "elemE", null, "funcS", null];
 
@@ -37,7 +37,7 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
   const [drag, setDrag] = useState<Drag | null>(null);
   const [hover, setHover] = useState<SlotId | null>(null);
   const [seat, setSeat] = useState<Record<RelicRuneId, Seat>>(emptySeat);
-  const [note, setNote] = useState("element + function · trikeee optional");
+  const [note, setNote] = useState("matter + gesture · heart optional");
   const dragRef = useRef<Drag | null>(null);
 
   const occupant = (slot: SlotId) => ALL.find((id) => seat[id] === slot);
@@ -81,27 +81,27 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
 
   return (
     <div
-      className="absolute inset-0 z-50 overflow-y-auto bg-[#080a06]/88 px-3 py-3 pointer-events-auto"
+      className="absolute inset-0 z-50 overflow-y-auto bg-[#0c0a10]/90 px-3 py-3 pointer-events-auto"
       data-ui
       onPointerMove={move}
       onPointerUp={drop}
       onPointerCancel={drop}
     >
       <div className="mx-auto w-[min(94vw,22rem)] pb-4">
-        <div className="border-4 border-[#5a4a28] bg-[#1c1810] p-3 shadow-[6px_6px_0_0_#0c0a08]">
+        <div className="border-4 border-[#3a3048] bg-[#141018] p-3 shadow-[6px_6px_0_0_#08060c]">
           <div className="mb-2 flex items-center justify-between">
-            <p className="font-pixel text-[11px] tracking-[0.18em] text-gold">RUNE TABLET</p>
+            <p className="font-pixel text-[11px] tracking-[0.18em] text-[#e8d8a0]">ALTAR</p>
             <button
               type="button"
               data-ui
               onPointerDown={close}
               onClick={close}
-              className="h-8 border-2 border-[#5a4a28] px-2 font-pixel text-[8px] text-gold"
+              className="h-8 border-2 border-[#3a3048] px-2 font-pixel text-[8px] text-[#e8d8a0]"
             >
               Close
             </button>
           </div>
-          <p className="mb-3 text-center font-pixel text-[7px] text-[#8a7a58]">{note}</p>
+          <p className="mb-3 text-center font-pixel text-[7px] text-[#8a7a90]">{note}</p>
           <div className="mx-auto grid w-[92%] grid-cols-3 gap-2">
             {GRID.map((id, i) => {
               if (!id) return <div key={i} />;
@@ -115,8 +115,8 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
                     data-slot={id}
                     className="relative grid aspect-square w-full place-items-center rounded-full"
                     style={{
-                      border: `2px solid ${lit ? "#ecece8" : deny ? "#6a3030" : "#7a7a7a"}`,
-                      background: "rgba(12,12,12,0.55)",
+                      border: `2px solid ${lit ? "#ecece8" : deny ? "#6a3030" : "#5a4a68"}`,
+                      background: "rgba(12,10,16,0.7)",
                     }}
                   >
                     {held && drag?.id !== held ? (
@@ -125,14 +125,14 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
                       </button>
                     ) : null}
                   </div>
-                  <span className="font-pixel text-[6px]" style={{ color: sl.kind === "trikeee" ? "#c8a4ff" : "#8a8a8a" }}>
+                  <span className="font-pixel text-[6px]" style={{ color: sl.kind === "heart" ? "#e8a0a8" : "#8a8a8a" }}>
                     {sl.label}
                   </span>
                 </div>
               );
             })}
           </div>
-          <p className="mt-3 mb-1 text-center font-pixel text-[6px] text-[#6a5a40]">runes</p>
+          <p className="mt-3 mb-1 text-center font-pixel text-[6px] text-[#6a5a70]">runes</p>
           <div className="grid grid-cols-4 gap-1.5">
             {ALL.map((id) =>
               seat[id] === "tray" && drag?.id !== id ? (
@@ -141,7 +141,7 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
                   type="button"
                   data-ui
                   onPointerDown={(e) => grab(id, e)}
-                  className="grid place-items-center rounded-full border-2 bg-[#14110c] py-1.5"
+                  className="grid place-items-center rounded-full border-2 bg-[#100c14] py-1.5"
                   style={{ borderColor: RUNE_GLOW[id], touchAction: "none" }}
                 >
                   <RuneChip id={id} />
@@ -161,27 +161,27 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
               const fn = RELIC_FUNCTIONS.find((id) => seat[id] !== "tray");
               const tri = RELIC_TRIKEEE.find((id) => seat[id] !== "tray") ?? null;
               if (!elem) {
-                setNote("Need an element");
+                setNote("Need a matter");
                 return;
               }
               if (!fn) {
-                setNote("Need a function");
+                setNote("Need a gesture");
                 return;
               }
-              const msg = engine?.makeRelicCast(elem as RelicElement, fn as RelicFunction, tri as RelicTrikeee) ?? "Need the lantern";
+              const msg = engine?.makeRelicCast(elem as RelicMatter, fn as RelicGesture, tri as RelicHeart) ?? "Need a heart";
               setNote(msg);
               if (msg.startsWith("Cast")) setSeat(emptySeat());
             }}
-            className="h-11 border-2 border-gold bg-[#10140c] font-pixel text-[9px] text-gold shadow-[3px_3px_0_0_#0c0a08]"
+            className="h-11 border-2 border-[#e8d8a0] bg-[#141018] font-pixel text-[9px] text-[#e8d8a0] shadow-[3px_3px_0_0_#08060c]"
           >
-            Cast
+            Bind
           </button>
           <button
             type="button"
             data-ui
             onPointerDown={close}
             onClick={close}
-            className="h-11 border-2 border-[#5a4a28] bg-[#10140c] font-pixel text-[9px] text-gold shadow-[3px_3px_0_0_#0c0a08]"
+            className="h-11 border-2 border-[#3a3048] bg-[#141018] font-pixel text-[9px] text-[#e8d8a0] shadow-[3px_3px_0_0_#08060c]"
           >
             Close
           </button>
@@ -189,7 +189,7 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
       </div>
       {drag ? (
         <div
-          className="pointer-events-none fixed z-50 grid w-16 place-items-center rounded-full border-2 bg-[#14110c] p-1"
+          className="pointer-events-none fixed z-50 grid w-16 place-items-center rounded-full border-2 bg-[#141018] p-1"
           style={{ left: drag.x, top: drag.y, transform: "translate(-50%, -50%)", borderColor: RUNE_GLOW[drag.id] }}
         >
           <RuneChip id={drag.id} />

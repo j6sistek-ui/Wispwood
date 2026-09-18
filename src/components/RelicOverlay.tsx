@@ -43,19 +43,19 @@ export function RelicOverlay({ engine, hud }: { engine: GameEngine | null; hud: 
       {hud.phase === "title" && !hud.loading ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-4 pointer-events-auto">
           <div className="w-[min(90vw,20rem)] border-4 border-[#3d3424] bg-[#10140c] px-3 py-4 shadow-[5px_5px_0_0_#1a1810]">
-            <p className="whitespace-pre-line text-center font-pixel text-[11px] leading-5 tracking-[0.12em] text-gold">
+            <p className="whitespace-pre-line text-center font-pixel text-[11px] leading-5 tracking-[0.12em] text-[#e8d8a0]">
               {"CAST THY\nHEARTS CONTENT"}
             </p>
           </div>
-          <p className="font-pixel text-[8px] text-muted">Forge a cast. Hold the nights.</p>
+          <p className="font-pixel text-[8px] text-[#8a7a90]">Matter. Gesture. Heart.</p>
           <button
             type="button"
             data-ui
             disabled={!hud.worldReady}
             onClick={() => engine?.play("relic")}
-            className="h-12 w-full max-w-xs border-2 border-[#5a4a28] bg-accent font-pixel text-[10px] text-accent-fg shadow-[3px_3px_0_0_#1a1810] disabled:opacity-40"
+            className="h-12 w-full max-w-xs border-2 border-[#3a3048] bg-[#e8a0a8] font-pixel text-[10px] text-[#141018] shadow-[3px_3px_0_0_#08060c] disabled:opacity-40"
           >
-            {hud.worldReady ? "Enter the clearing" : "Loading…"}
+            {hud.worldReady ? "Step in" : "Loading…"}
           </button>
         </div>
       ) : null}
@@ -63,31 +63,31 @@ export function RelicOverlay({ engine, hud }: { engine: GameEngine | null; hud: 
       {hud.phase === "playing" || hud.phase === "paused" ? (
         <div className="pointer-events-none px-3" style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top, 0px))" }}>
           <div className="mx-auto mt-1 max-w-xs">
-            <div className="mb-1 flex justify-between font-pixel text-[8px] text-gold">
-              <span>Night {hud.wave || 1}</span>
-              <span>{Math.max(0, Math.round(hud.hp))} hp</span>
-              <span className="text-[#f0d24a]">{hud.gold}g</span>
+            <div className="mb-1 flex justify-between font-pixel text-[8px] text-[#e8d8a0]">
+              <span>Vigil {hud.wave || 1}</span>
+              <span>{Math.max(0, Math.round(hud.hp))} pulse</span>
+              <span className="text-[#c8d46a]">{hud.gold} ash</span>
             </div>
-            <p className="mb-1 text-center font-pixel text-[7px] text-[#c8a4ff]">{cast ? cast.name : "No cast · open tablet"}</p>
+            <p className="mb-1 text-center font-pixel text-[7px] text-[#e8a0a8]">{cast ? cast.name : "No cast · open the altar"}</p>
             <div className="grid grid-cols-3 gap-1.5">
               <HudBtn
-                label="Leave"
+                label="Depart"
                 onClick={() => {
                   closeMenus();
                   engine?.leaveRun();
                 }}
               />
               <HudBtn
-                label="Tablet"
-                color="text-gold border-gold"
+                label="Altar"
+                color="text-[#e8d8a0] border-[#e8d8a0]"
                 onClick={() => {
                   setCasterOpen(false);
                   setTabletOpen(true);
                 }}
               />
               <HudBtn
-                label="Caster"
-                color="text-[#c8a4ff] border-[#c8a4ff]"
+                label="Heart"
+                color="text-[#e8a0a8] border-[#e8a0a8]"
                 onClick={() => {
                   setTabletOpen(false);
                   setCasterOpen(true);
@@ -101,23 +101,23 @@ export function RelicOverlay({ engine, hud }: { engine: GameEngine | null; hud: 
       {hud.phase === "dead" ? (
         <div className="absolute inset-0 z-40 grid place-items-center bg-[#080a06]/75 px-4 pointer-events-auto">
           <div className="w-full max-w-xs border-4 border-[#5a4a28] bg-[#10140c] p-4 text-center shadow-[5px_5px_0_0_#1a1810]">
-            <p className="font-pixel text-[12px] text-gold">The lantern fades</p>
-            <p className="mt-2 font-pixel text-[8px] text-muted">Held {Math.max(1, hud.wave)} night{hud.wave === 1 ? "" : "s"}</p>
+            <p className="font-pixel text-[12px] text-[#e8a0a8]">The heart goes still</p>
+            <p className="mt-2 font-pixel text-[8px] text-[#8a7a90]">Held {Math.max(1, hud.wave)} vigil{hud.wave === 1 ? "" : "s"}</p>
             <button
               type="button"
               data-ui
               onClick={() => engine?.play("relic")}
-              className="mt-4 h-11 w-full border-2 border-gold bg-accent font-pixel text-[9px] text-accent-fg"
+              className="mt-4 h-11 w-full border-2 border-[#e8d8a0] bg-[#e8a0a8] font-pixel text-[9px] text-[#141018]"
             >
-              Enter again
+              Step in again
             </button>
             <button
               type="button"
               data-ui
               onClick={() => engine?.leaveRun()}
-              className="mt-2 h-11 w-full border-2 border-[#5a4a28] bg-[#10140c] font-pixel text-[9px] text-gold"
+              className="mt-2 h-11 w-full border-2 border-[#3a3048] bg-[#141018] font-pixel text-[9px] text-[#e8d8a0]"
             >
-              Leave
+              Depart
             </button>
           </div>
         </div>

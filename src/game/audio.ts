@@ -504,6 +504,15 @@ export class GameAudio {
     };
   }
 
+  relicNote() {
+    if (this.relicQuiet) {
+      this.tone(620, 0.07, "triangle", 0.08, 80);
+      this.tone(930, 0.05, "sine", 0.04, 40, 0.02);
+      return;
+    }
+    this.fire();
+  }
+
   private tone(
     freq: number,
     dur: number,
