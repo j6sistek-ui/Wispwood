@@ -7,7 +7,7 @@ import { drawBuffWisp } from "./buff-wisp";
 import { drawWeaponGlyph } from "./weapon-sprites";
 import { drawCraftSigil, drawCoreSigil } from "./craft-sprites";
 import { WISP_RELIC } from "@/game/mode";
-import { emptyRelicWells, forgeRelicCast, type RelicCast, type RelicElement, type RelicFunction, type RelicTrikeee } from "@/game/relic-cast";
+import { emptyRelicWells, forgeRelicCast, relicSpellOf, relicCooldown, type RelicCast, type RelicElement, type RelicFunction, type RelicTrikeee } from "@/game/relic-cast";
 import { FUSIONS, drawFusionSigil } from "./fusions";
 import { rollForgePiece, parseForgeBag, makeWeapon, weaponKey, pieceById, FORGE_PIECES, ABILITY_LABEL, type ForgedWeapon, type WeaponAbility } from "./forge";
 import { emptyLoadout, RELIC_COST, MAX_EQUIP, rollFromPool, parseLoadout, RELICS, type RelicId } from "./relics";
@@ -826,10 +826,13 @@ export class GameEngine {
       this.equipped = [null, null, null];
       this.weapons = [];
       this.hands = "spell";
+      this.relicCasts = emptyRelicWells();
+      this.relicCasts[0] = forgeRelicCast("ember", "singleshot");
+      this.relicSlot = 0;
       this.phase = "playing";
-      this.toSpawn = 0;
       this.wave = 0;
-      this.audio.stopBed();
+      this.audio.silenceRelic();
+      this.beginRelicWave();
       this.emit();
       return;
     }
@@ -1800,16 +1803,51 @@ export class GameEngine {
   private shootRelic() {
     const c = this.relicCasts[this.relicSlot];
     if (!c) return;
-    this.fireCd = 0.45;
-    if (c.fn === "singleshot") {
-      const b = this.spawnShot("ember", 0);
-      b.form = "straight";
+    const spell = relicSpellOf(c.element);
+    this.fireCd = relicCooldown(c.fn);
+    const aim = { x: this.aim.x, y: this.aim.y };
+    const fireOne = (dx: number, dy: number, side = 0) => {
+      const m = Math.hypot(dx, dy) || 1;
+      this.aim.x = dx / m;
+      this.aim.y = dy / m;
+      const b = this.spawnShot(spell, side);
       b.color = c.color;
-      this.audio.fire();
+      b.form = "straight";
+      if (c.fn === "weave") b.form = "weave";
+      if (c.fn === "seek") {
+        b.form = "homing";
+        b.home = this.nearestFoe();
+      }
+      if (c.trikeee === "burn") b.spell = "ember";
+      return b;
+    };
+    if (c.fn === "spread") {
+      for (const side of [-20, 0, 20]) fireOne(aim.x, aim.y, side);
+    } else if (c.fn === "nova") {
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        fireOne(Math.cos(a), Math.sin(a));
+      }
+    } else if (c.fn === "orbit") {
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + this.animT;
+        const b = fireOne(Math.cos(a), Math.sin(a));
+        b.form = "orb";
+        b.orbit = 78;
+        b.ang = a;
+        b.ttl = 2.1;
+        b.x = this.player.x + Math.cos(a) * 78;
+        b.y = this.player.y + Math.sin(a) * 78;
+      }
+    } else {
+      fireOne(aim.x, aim.y);
     }
-    this.player.vx -= this.aim.x * 28;
-    this.player.vy -= this.aim.y * 28;
+    this.aim.x = aim.x;
+    this.aim.y = aim.y;
+    this.player.vx -= aim.x * 22;
+    this.player.vy -= aim.y * 22;
     this.muzzleT = 0.08;
+    this.audio.fire();
   }
 
   redeemCode(code: string) {
@@ -2228,10 +2266,24 @@ export class GameEngine {
     this.nightHurt = false;
   }
 
+  private beginRelicWave() {
+    this.wave += 1;
+    this.spawnT = 0.32;
+    this.waveGap = 0;
+    this.toSpawn = 3 + this.wave * 2;
+    if (this.wave % 5 === 0) {
+      this.placeBoss((Math.floor(this.wave / 5) - 1) % BOSSES.length);
+      this.toSpawn = 4 + Math.floor(this.wave / 2);
+    } else if (this.wave % 3 === 0) {
+      this.toSpawn += 2;
+    }
+    this.floatAt(this.player.x, this.player.y - 48, `NIGHT ${this.wave}`, "#ffd86a");
+    this.emit();
+  }
+
   private beginWave() {
     if (WISP_RELIC || this.relicRun) {
-      this.toSpawn = 0;
-      this.emit();
+      this.beginRelicWave();
       return;
     }
     this.wave += 1;
@@ -5005,14 +5057,20 @@ export class GameEngine {
     ctx.translate(-this.cam.x, -this.cam.y);
     this.drawGround();
     for (const p of this.props) this.drawProp(p);
+    for (const e of this.enemies) {
+      if (e.alive) this.drawEnemy(e);
+    }
     this.drawRelicKeeper();
     for (const b of this.bullets) {
       if (!b.alive) continue;
-      ctx.fillStyle = "#e08a3c";
-      ctx.fillRect(Math.round(b.x) - 4, Math.round(b.y) - 4, 8, 8);
-      ctx.fillStyle = "#fff0a8";
+      const col = b.color || "#e08a3c";
+      ctx.fillStyle = col;
+      const r = Math.max(5, Math.min(16, b.r * 0.45));
+      ctx.fillRect(Math.round(b.x) - r, Math.round(b.y) - r, r * 2, r * 2);
+      ctx.fillStyle = "#fff8d0";
       ctx.fillRect(Math.round(b.x) - 2, Math.round(b.y) - 2, 4, 4);
     }
+    this.drawFx();
     const px = this.player.x;
     const py = this.player.y;
     const glow = ctx.createRadialGradient(px, py - 6, 4, px, py - 6, 90);

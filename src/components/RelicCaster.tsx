@@ -14,29 +14,30 @@ export function RelicCaster({
   const wells = hud.relicCasts ?? [null, null, null, null];
   const filled = wells.filter(Boolean).length;
   const slot = hud.relicSlot ?? 0;
+  const close = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    onClose();
+  };
   return (
-    <div className="absolute inset-0 z-40 grid place-items-center bg-[#080a06]/80 px-3 py-4 pointer-events-auto" data-ui>
-      <div className="relative w-[min(94vw,22rem)]">
-        <div className="absolute -inset-1 border-2 border-[#1a140c]" />
-        <div
-          className="relative overflow-hidden border-4 border-[#5a4a28] bg-[#1c1810] shadow-[6px_6px_0_0_#0c0a08]"
-          style={{
-            backgroundImage:
-              "linear-gradient(180deg, rgba(90,74,40,0.22), rgba(8,10,6,0.28)), repeating-linear-gradient(0deg, transparent 0 13px, rgba(0,0,0,0.14) 13px 14px)",
-          }}
-        >
-          <div className="flex h-2">
-            <span className="w-4 bg-[#8a6a28]" />
-            <span className="flex-1 bg-gold" />
-            <span className="w-4 bg-[#8a6a28]" />
+    <div className="absolute inset-0 z-50 overflow-y-auto bg-[#080a06]/88 px-3 py-3 pointer-events-auto" data-ui>
+      <div className="mx-auto w-[min(94vw,22rem)]">
+        <div className="border-4 border-[#5a4a28] bg-[#1c1810] p-3 shadow-[6px_6px_0_0_#0c0a08]">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="font-pixel text-[12px] tracking-[0.22em] text-gold">CASTER</p>
+            <button
+              type="button"
+              data-ui
+              onPointerDown={close}
+              onClick={close}
+              className="h-8 border-2 border-[#5a4a28] px-2 font-pixel text-[8px] text-gold"
+            >
+              Close
+            </button>
           </div>
-          <p className="pt-3 text-center font-pixel text-[12px] tracking-[0.28em] text-gold">CASTER</p>
-          <p className="mt-1 text-center font-pixel text-[7px] text-[#8a7a58]">
+          <p className="mb-3 text-center font-pixel text-[7px] text-[#8a7a58]">
             {filled ? `${filled} seated · tap to wield` : "four wells · cast from the tablet"}
           </p>
-
-          <div className="relative mx-auto my-4 grid w-[88%] grid-cols-2 gap-3">
-            <span className="pointer-events-none absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold shadow-[0_0_16px_#ffd86a]" />
+          <div className="grid grid-cols-2 gap-3">
             {MARKS.map((mark, i) => {
               const c = wells[i];
               const on = slot === i && !!c;
@@ -46,37 +47,31 @@ export function RelicCaster({
                   type="button"
                   data-ui
                   onClick={() => engine?.pickRelicSlot(i)}
-                  className="relative flex aspect-square flex-col items-center justify-center border-2 bg-[#0c0c0c]/70"
+                  className="relative flex aspect-[5/4] flex-col items-center justify-center border-2 bg-[#0c0c0c]/70"
                   style={{
                     borderColor: on ? (c?.color ?? "#ffd86a") : c ? c.color : "#7a7a7a",
-                    boxShadow: on
-                      ? `0 0 18px ${c?.color ?? "#ffd86a"}`
-                      : "inset 0 0 0 3px #14110c, inset 0 8px 0 #0c0a08, 3px 3px 0 #0c0a08",
+                    boxShadow: on ? `0 0 18px ${c?.color ?? "#ffd86a"}` : "3px 3px 0 #0c0a08",
                   }}
                 >
                   <span className="font-pixel text-[16px] leading-none" style={{ color: c ? c.color : "#5a5a5a" }}>
                     {mark}
                   </span>
-                  <span className="mt-2 px-1 text-center font-pixel text-[6px] tracking-[0.08em]" style={{ color: c ? "#ecece8" : "#6a6a6a" }}>
+                  <span className="mt-2 px-1 text-center font-pixel text-[6px]" style={{ color: c ? "#ecece8" : "#6a6a6a" }}>
                     {c ? c.name : "empty"}
                   </span>
-                  <span className="absolute left-1 top-1 h-1.5 w-1.5 bg-[#8a6a28]" />
-                  <span className="absolute right-1 top-1 h-1.5 w-1.5 bg-[#8a6a28]" />
-                  <span className="absolute bottom-1 left-1 h-1.5 w-1.5 bg-[#8a6a28]" />
-                  <span className="absolute bottom-1 right-1 h-1.5 w-1.5 bg-[#8a6a28]" />
                 </button>
               );
             })}
           </div>
-
-          <p className="pb-3 text-center font-pixel text-[7px] text-[#6a5a40]">
+          <p className="mt-3 text-center font-pixel text-[7px] text-[#6a5a40]">
             {wells[slot] ? `Wielding ${wells[slot]!.name}` : "No cast seated"}
           </p>
         </div>
         <button
           type="button"
           data-ui
-          onClick={onClose}
+          onPointerDown={close}
+          onClick={close}
           className="mt-2 h-11 w-full border-2 border-[#5a4a28] bg-[#10140c] font-pixel text-[9px] text-gold shadow-[3px_3px_0_0_#0c0a08]"
         >
           Close caster

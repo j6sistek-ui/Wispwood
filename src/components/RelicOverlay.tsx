@@ -8,6 +8,7 @@ export function RelicOverlay({ engine, hud }: { engine: GameEngine | null; hud: 
   const [casterOpen, setCasterOpen] = useState(false);
   const [coarse, setCoarse] = useState(false);
   const menu = tabletOpen || casterOpen;
+  const cast = hud.relicCasts?.[hud.relicSlot ?? 0] ?? null;
 
   useEffect(() => {
     setCoarse(window.matchMedia("(pointer: coarse)").matches);
@@ -17,11 +18,19 @@ export function RelicOverlay({ engine, hud }: { engine: GameEngine | null; hud: 
     return () => engine?.holdSim(false);
   }, [menu, engine]);
   useEffect(() => {
-    if (hud.phase === "title") {
+    if (hud.phase === "title" || hud.phase === "dead") {
       setTabletOpen(false);
       setCasterOpen(false);
     }
   }, [hud.phase]);
+  useEffect(() => {
+    engine?.audio.silenceRelic();
+  }, [engine]);
+
+  const closeMenus = () => {
+    setTabletOpen(false);
+    setCasterOpen(false);
+  };
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 text-fg">
@@ -38,7 +47,7 @@ export function RelicOverlay({ engine, hud }: { engine: GameEngine | null; hud: 
               {"CAST THY\nHEARTS CONTENT"}
             </p>
           </div>
-          <p className="font-pixel text-[8px] text-muted">An empty clearing</p>
+          <p className="font-pixel text-[8px] text-muted">Forge a cast. Hold the nights.</p>
           <button
             type="button"
             data-ui
@@ -52,32 +61,64 @@ export function RelicOverlay({ engine, hud }: { engine: GameEngine | null; hud: 
       ) : null}
 
       {hud.phase === "playing" || hud.phase === "paused" ? (
-        <div className="pointer-events-none px-3" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))" }}>
-          <div className="mx-auto mt-2 grid max-w-xs grid-cols-3 gap-1.5">
-            <HudBtn
-              label="Leave"
-              onClick={() => {
-                setTabletOpen(false);
-                setCasterOpen(false);
-                engine?.leaveRun();
-              }}
-            />
-            <HudBtn
-              label="Tablet"
-              color="text-gold border-gold"
-              onClick={() => {
-                setCasterOpen(false);
-                setTabletOpen(true);
-              }}
-            />
-            <HudBtn
-              label="Caster"
-              color="text-[#c8a4ff] border-[#c8a4ff]"
-              onClick={() => {
-                setTabletOpen(false);
-                setCasterOpen(true);
-              }}
-            />
+        <div className="pointer-events-none px-3" style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top, 0px))" }}>
+          <div className="mx-auto mt-1 max-w-xs">
+            <div className="mb-1 flex justify-between font-pixel text-[8px] text-gold">
+              <span>Night {hud.wave || 1}</span>
+              <span>{Math.max(0, Math.round(hud.hp))} hp</span>
+              <span className="text-[#f0d24a]">{hud.gold}g</span>
+            </div>
+            <p className="mb-1 text-center font-pixel text-[7px] text-[#c8a4ff]">{cast ? cast.name : "No cast · open tablet"}</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              <HudBtn
+                label="Leave"
+                onClick={() => {
+                  closeMenus();
+                  engine?.leaveRun();
+                }}
+              />
+              <HudBtn
+                label="Tablet"
+                color="text-gold border-gold"
+                onClick={() => {
+                  setCasterOpen(false);
+                  setTabletOpen(true);
+                }}
+              />
+              <HudBtn
+                label="Caster"
+                color="text-[#c8a4ff] border-[#c8a4ff]"
+                onClick={() => {
+                  setTabletOpen(false);
+                  setCasterOpen(true);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {hud.phase === "dead" ? (
+        <div className="absolute inset-0 z-40 grid place-items-center bg-[#080a06]/75 px-4 pointer-events-auto">
+          <div className="w-full max-w-xs border-4 border-[#5a4a28] bg-[#10140c] p-4 text-center shadow-[5px_5px_0_0_#1a1810]">
+            <p className="font-pixel text-[12px] text-gold">The lantern fades</p>
+            <p className="mt-2 font-pixel text-[8px] text-muted">Held {Math.max(1, hud.wave)} night{hud.wave === 1 ? "" : "s"}</p>
+            <button
+              type="button"
+              data-ui
+              onClick={() => engine?.play("relic")}
+              className="mt-4 h-11 w-full border-2 border-gold bg-accent font-pixel text-[9px] text-accent-fg"
+            >
+              Enter again
+            </button>
+            <button
+              type="button"
+              data-ui
+              onClick={() => engine?.leaveRun()}
+              className="mt-2 h-11 w-full border-2 border-[#5a4a28] bg-[#10140c] font-pixel text-[9px] text-gold"
+            >
+              Leave
+            </button>
           </div>
         </div>
       ) : null}

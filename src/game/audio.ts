@@ -16,6 +16,7 @@ export class GameAudio {
   private jackLoading = false;
   private noiseBuf: AudioBuffer | null = null;
   muted = false;
+  private relicQuiet = false;
 
   unlock() {
     if (!this.ctx) {
@@ -64,6 +65,7 @@ export class GameAudio {
   }
 
   startBed() {
+    if (this.relicQuiet) return;
     this.unlock();
     if (!this.ctx || !this.master || !this.music || this.bedOn || this.bedArming) return;
     this.bedArming = true;
@@ -87,6 +89,16 @@ export class GameAudio {
     else void this.ctx.resume().then(arm).catch(() => {
       this.bedArming = false;
     });
+  }
+
+  silenceRelic() {
+    this.relicQuiet = true;
+    this.stopBed();
+    if (this.music && this.ctx) this.music.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04);
+  }
+
+  allowBed() {
+    this.relicQuiet = false;
   }
 
   stopBed() {
@@ -113,7 +125,7 @@ export class GameAudio {
   }
 
   private tickBed() {
-    if (!this.bedOn || !this.ctx) return;
+    if (this.relicQuiet || !this.bedOn || !this.ctx) return;
     if (this.ctx.state !== "running") {
       void this.ctx.resume().catch(() => {});
       this.bedTimer = window.setTimeout(() => this.tickBed(), 80);
