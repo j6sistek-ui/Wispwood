@@ -4954,6 +4954,10 @@ export class GameEngine {
       this.drawTitleCover();
       return;
     }
+    if (this.relicRun || WISP_RELIC) {
+      this.drawRelicWorld();
+      return;
+    }
     ctx.imageSmoothingEnabled = false;
     ctx.save();
     ctx.translate(ox, oy);
@@ -4991,6 +4995,62 @@ export class GameEngine {
       ctx.fillStyle = `rgba(255, 236, 180, ${this.killFlash * 0.9})`;
       ctx.fillRect(0, 0, this.view.w, this.view.h);
     }
+  }
+
+  private drawRelicWorld() {
+    const ctx = this.ctx;
+    ctx.imageSmoothingEnabled = false;
+    ctx.save();
+    ctx.scale(1 / VIEW_ZOOM, 1 / VIEW_ZOOM);
+    ctx.translate(-this.cam.x, -this.cam.y);
+    this.drawGround();
+    for (const p of this.props) this.drawProp(p);
+    this.drawRelicKeeper();
+    for (const b of this.bullets) {
+      if (!b.alive) continue;
+      ctx.fillStyle = "#e08a3c";
+      ctx.fillRect(Math.round(b.x) - 4, Math.round(b.y) - 4, 8, 8);
+      ctx.fillStyle = "#fff0a8";
+      ctx.fillRect(Math.round(b.x) - 2, Math.round(b.y) - 2, 4, 4);
+    }
+    const px = this.player.x;
+    const py = this.player.y;
+    const glow = ctx.createRadialGradient(px, py - 6, 4, px, py - 6, 90);
+    glow.addColorStop(0, "rgba(255, 226, 122, 0.32)");
+    glow.addColorStop(1, "rgba(232, 196, 120, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(px, py - 6, 90, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  private drawRelicKeeper() {
+    const ctx = this.ctx;
+    const x = Math.round(this.player.x);
+    const y = Math.round(this.player.y);
+    const bob = this.player.moving ? Math.round(Math.abs(Math.sin(this.player.frame * 1.8)) * 2) : 0;
+    const gy = y - bob;
+    ctx.fillStyle = "rgba(8,10,6,0.4)";
+    ctx.beginPath();
+    ctx.ellipse(x, y + 6, 12, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#2c2e1c";
+    ctx.fillRect(x - 8, gy - 20, 16, 24);
+    ctx.fillStyle = "#3a3c28";
+    ctx.fillRect(x - 6, gy - 16, 12, 18);
+    ctx.fillStyle = "#1a1c14";
+    ctx.fillRect(x - 7, gy - 32, 14, 8);
+    ctx.fillStyle = "#c4a070";
+    ctx.fillRect(x - 5, gy - 26, 10, 10);
+    ctx.fillStyle = "#2a1c10";
+    ctx.fillRect(x - 4, gy - 22, 8, 3);
+    ctx.fillStyle = "#5a3a18";
+    ctx.fillRect(x + 7, gy - 18, 8, 11);
+    ctx.fillStyle = "#ffe14a";
+    ctx.fillRect(x + 9, gy - 16, 4, 5);
+    ctx.fillStyle = "#fff8d0";
+    ctx.fillRect(x + 10, gy - 15, 2, 2);
   }
 
   private drawTitleCover() {
