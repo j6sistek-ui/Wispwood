@@ -6,9 +6,13 @@ A twin-stick autumn-forest survival game: Ember, Ice, Bolt, Void, a fortune whee
 
 ## Play
 
-Live build (GitHub Pages):
+[![Play Wispwood](https://img.shields.io/badge/PLAY-Wispwood-e8c070?style=for-the-badge&labelColor=1c1810)](https://j6sistek-ui.github.io/Wispwood/)
+[![Play wispRelic](https://img.shields.io/badge/PLAY-wispRelic-c8a4ff?style=for-the-badge&labelColor=1c1810)](https://j6sistek-ui.github.io/Wispwood/relic/)
 
-**https://j6sistek-ui.github.io/Wispwood/**
+- **Wispwood:** https://j6sistek-ui.github.io/Wispwood/
+- **wispRelic:** https://j6sistek-ui.github.io/Wispwood/relic/
+
+Click those. They open the live game in your browser.
 
 ## Run locally
 
