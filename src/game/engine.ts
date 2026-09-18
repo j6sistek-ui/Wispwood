@@ -703,7 +703,7 @@ export class GameEngine {
   }
 
   private persist() {
-    if (this.maxRun || this.richRun) return;
+    if (this.maxRun || this.richRun || this.relicRun || WISP_RELIC) return;
     writeSave({
       version: 2,
       best: this.best,
@@ -823,6 +823,9 @@ export class GameEngine {
       this.maxRun = false;
       this.richRun = false;
       this.resetRun();
+      this.equipped = [null, null, null];
+      this.weapons = [];
+      this.hands = "spell";
       this.phase = "playing";
       this.toSpawn = 0;
       this.wave = 0;
@@ -5055,6 +5058,7 @@ export class GameEngine {
     if (blink) this.ctx.globalAlpha = 0.45;
     this.drawKnockSprite(img, this.player.x, this.player.y - bob, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
     this.ctx.globalAlpha = 1;
+    if (this.relicRun || WISP_RELIC) return;
     if (this.muzzleT > 0) {
       const mx = this.player.x + this.aim.x * 26;
       const my = this.player.y + this.aim.y * 18;
@@ -5215,6 +5219,20 @@ export class GameEngine {
     ctx.restore();
   }
 
+  private srcSize(img: CanvasImageSource) {
+    const any = img as { naturalWidth?: number; naturalHeight?: number; width?: number; height?: number };
+    const iw = Number(any.naturalWidth || any.width) || 0;
+    const ih = Number(any.naturalHeight || any.height) || 0;
+    return { iw, ih };
+  }
+
+  private spriteCell(img: CanvasImageSource) {
+    const { iw, ih } = this.srcSize(img);
+    if (iw <= 128 && ih <= 128) return { sx: 0, sy: 0, sw: iw || 96, sh: ih || 96 };
+    const cell = iw % 96 === 0 ? 96 : iw % 128 === 0 ? 128 : 96;
+    return { sx: 0, sy: 0, sw: Math.min(cell, iw || cell), sh: Math.min(cell, ih || cell) };
+  }
+
   private drawKnockSprite(
     img: CanvasImageSource | null | undefined,
     x: number,
@@ -5230,10 +5248,12 @@ export class GameEngine {
     const ctx = this.ctx;
     const k = this.reduced ? 0 : clamp(knockT / maxT, 0, 1);
     const ang = Math.atan2(ky, kx);
-    const iw = "width" in img ? Number(img.width) || s : s;
-    const ih = "height" in img ? Number(img.height) || s : s;
+    const cell = this.spriteCell(img);
+    const w = s;
     const h = s;
-    const w = s * (iw / Math.max(1, ih));
+    const blit = () => {
+      ctx.drawImage(img, cell.sx, cell.sy, cell.sw, cell.sh, -w / 2, -h * anchor, w, h);
+    };
     if (k > 0.04) {
       ctx.save();
       ctx.strokeStyle = "rgba(236,236,232,0.35)";
@@ -5259,7 +5279,7 @@ export class GameEngine {
         ctx.rotate(ang);
         ctx.scale(1 + 0.45 * k, 1 - 0.28 * k);
         ctx.rotate(-ang);
-        ctx.drawImage(img, -w / 2, -h * anchor, w, h);
+        blit();
         ctx.restore();
       }
     }
@@ -5271,7 +5291,7 @@ export class GameEngine {
       ctx.scale(1 + 0.55 * k, 1 - 0.32 * k);
       ctx.rotate(-ang);
     }
-    ctx.drawImage(img, -w / 2, -h * anchor, w, h);
+    blit();
     ctx.restore();
   }
 
