@@ -5047,16 +5047,12 @@ export class GameEngine {
   }
 
   private drawPlayer() {
-    const frames = this.assets?.player[this.player.face];
-    const i = this.player.moving ? Math.floor(this.player.frame) % 4 : 0;
-    const img = frames?.[i] ?? frames?.[0];
-    if (!img) return;
     const s = 76 * this.bodySize;
     const bob = this.player.moving ? Math.abs(Math.sin(this.player.frame * 1.8)) * 2 : 0;
     this.drawShadow(this.player.x, this.player.y + 6, 14 * this.bodySize, 6 * this.bodySize);
     const blink = this.player.invuln > 0 && Math.floor(this.animT * 16) % 2 === 0;
     if (blink) this.ctx.globalAlpha = 0.45;
-    this.drawKnockSprite(img, this.player.x, this.player.y - bob, s, 0.78, this.player.knockX, this.player.knockY, this.player.knockT, 0.28);
+    this.blitKeeper(this.player.face, this.player.moving ? this.player.frame : 0, this.player.x, this.player.y - bob, s);
     this.ctx.globalAlpha = 1;
     if (this.relicRun || WISP_RELIC) return;
     if (this.muzzleT > 0) {
@@ -5079,6 +5075,23 @@ export class GameEngine {
     }
     if (this.hands === "weapon") this.drawHeldWeapon();
     if (this.hands === "spell" && this.spell === "vine") this.drawVineAura(this.player.x, this.player.y);
+  }
+
+  private blitKeeper(face: Dir, frame: number, x: number, y: number, s: number) {
+    const ctx = this.ctx;
+    const col = Math.floor(frame) % 4;
+    const row = face === "down" ? 0 : face === "left" ? 1 : face === "right" ? 2 : 3;
+    const sheet = this.assets?.playerSheet;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.imageSmoothingEnabled = false;
+    if (sheet) {
+      ctx.drawImage(sheet, col * 96, row * 96, 96, 96, -s / 2, -s * 0.78, s, s);
+    } else {
+      const img = this.assets?.player[face]?.[col] ?? this.assets?.player[face]?.[0];
+      if (img) ctx.drawImage(img, -s / 2, -s * 0.78, s, s);
+    }
+    ctx.restore();
   }
 
   private drawGhost(g: { name: string; x: number; y: number; face: Dir; hp: number; frame: number }) {

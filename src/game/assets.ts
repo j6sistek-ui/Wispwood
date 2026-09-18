@@ -32,6 +32,7 @@ async function loadQuiet(src: string): Promise<HTMLImageElement | null> {
 
 export type GameAssets = {
   player: Record<"down" | "left" | "right" | "up", Gfx[]>;
+  playerSheet: Gfx | null;
   wisp: Gfx[];
   projectile: Gfx[];
   impact: Gfx[];
@@ -65,9 +66,20 @@ function swatch(color: string, w = 64, h = 64): HTMLCanvasElement {
   return c;
 }
 
-function sliceGrid(img: HTMLImageElement, fw: number, fh: number): HTMLCanvasElement[] {
-  const cols = Math.max(1, Math.floor(img.width / fw));
-  const rows = Math.max(1, Math.floor(img.height / fh));
+function flatten(img: HTMLImageElement): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, img.naturalWidth || img.width || 1);
+  c.height = Math.max(1, img.naturalHeight || img.height || 1);
+  const ctx = c.getContext("2d")!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, 0, 0);
+  return c;
+}
+
+function sliceGrid(img: HTMLImageElement | HTMLCanvasElement, fw: number, fh: number): HTMLCanvasElement[] {
+  const src = img instanceof HTMLImageElement ? flatten(img) : img;
+  const cols = Math.max(1, Math.floor(src.width / fw));
+  const rows = Math.max(1, Math.floor(src.height / fh));
   const out: HTMLCanvasElement[] = [];
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
@@ -76,7 +88,7 @@ function sliceGrid(img: HTMLImageElement, fw: number, fh: number): HTMLCanvasEle
       c.height = fh;
       const ctx = c.getContext("2d")!;
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, x * fw, y * fh, fw, fh, 0, 0, fw, fh);
+      ctx.drawImage(src, x * fw, y * fh, fw, fh, 0, 0, fw, fh);
       out.push(c);
     }
   }
@@ -118,7 +130,8 @@ export async function loadCore(_title: HTMLImageElement | undefined, onProgress?
   ]);
 
   const fallback = swatch("#e08a3c", 96, 96);
-  const playerFrames = playerSheet ? sliceGrid(playerSheet, 96, 96) : [fallback, fallback, fallback, fallback];
+  const playerSrc = playerSheet ? flatten(playerSheet) : null;
+  const playerFrames = playerSrc ? sliceGrid(playerSrc, 96, 96) : [fallback, fallback, fallback, fallback];
   const down = four(playerFrames.slice(0, 4), [fallback]);
   const left = four(playerFrames.slice(4, 8), down);
   const right = four(playerFrames.slice(8, 12), down);
@@ -128,6 +141,7 @@ export async function loadCore(_title: HTMLImageElement | undefined, onProgress?
 
   return {
     player: { down, left, right, up },
+    playerSheet: playerSrc,
     wisp,
     projectile,
     impact: projectile,
