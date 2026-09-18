@@ -133,7 +133,7 @@ export function RelicTablet({ engine, onClose }: { engine: GameEngine | null; on
             })}
           </div>
           <p className="mt-3 mb-1 text-center font-pixel text-[6px] text-[#6a5a70]">runes</p>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-6 gap-1">
             {ALL.map((id) =>
               seat[id] === "tray" && drag?.id !== id ? (
                 <button

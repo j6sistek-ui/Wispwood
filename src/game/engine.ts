@@ -1821,10 +1821,8 @@ export class GameEngine {
       b.ttl -= dt;
       b.phase += dt;
       if (b.ttl <= 0) {
-        if (b.gesture === "bloom" && !b.bloomed) {
-          b.bloomed = true;
-          extra.push(...bloomShards(b));
-        }
+        if (b.gesture === "bloom" && !b.bloomed) extra.push(...bloomShards(b));
+        if (b.matter === "glass" && b.hits === 0) extra.push(...bloomShards(b));
         b.alive = false;
         continue;
       }
@@ -1842,6 +1840,15 @@ export class GameEngine {
             this.relicStrike(e, Math.max(2, Math.round(b.dmg * 0.32)), 0, 0, b);
           }
         } else b.alive = false;
+      } else if (b.gesture === "pulse") {
+        b.r += 140 * dt;
+        if (Math.floor(b.phase * 8) !== Math.floor((b.phase - dt) * 8)) {
+          for (const e of this.enemies) {
+            if (!e.alive) continue;
+            const d = Math.hypot(e.x - b.x, e.y - b.y);
+            if (d < b.r + e.r && d > b.r - 18) this.relicStrike(e, b.dmg, e.x - b.x, e.y - b.y, b);
+          }
+        }
       } else {
         if (b.gesture === "latch") {
           const e = this.nearestFoe(b.x, b.y, 240);
@@ -1853,6 +1860,24 @@ export class GameEngine {
             b.vy += (dy / d) * 640 * dt;
           }
         }
+        if (b.gesture === "arc") {
+          const sp = Math.hypot(b.vx, b.vy) || 1;
+          const a = Math.atan2(b.vy, b.vx) + dt * (b.ang || 4);
+          b.vx = Math.cos(a) * sp;
+          b.vy = Math.sin(a) * sp;
+        }
+        if (b.gesture === "drill") {
+          b.vx *= 1 + 2.4 * dt;
+          b.vy *= 1 + 2.4 * dt;
+        }
+        if (b.gesture === "fold" && !b.bloomed && b.phase > 0.14) {
+          b.bloomed = true;
+          const sp = Math.hypot(b.vx, b.vy) || 1;
+          b.x += (b.vx / sp) * 120;
+          b.y += (b.vy / sp) * 120;
+          b.vx *= 2.4;
+          b.vy *= 2.4;
+        }
         b.x += b.vx * dt;
         b.y += b.vy * dt;
       }
@@ -1861,6 +1886,7 @@ export class GameEngine {
         continue;
       }
       if (b.gesture === "latch" && b.latchId >= 0) continue;
+      if (b.gesture === "pulse") continue;
       for (const e of this.enemies) {
         if (!e.alive) continue;
         if (Math.hypot(e.x - b.x, e.y - b.y) < e.r + b.r) {
@@ -1890,8 +1916,19 @@ export class GameEngine {
     e.kvy += (vy / m) * 70;
     if (b.heart === "hush") e.freeze = Math.max(e.freeze, 1.5);
     if (b.heart === "knot") e.wrapped = Math.max(e.wrapped, 1.7);
-    if (b.matter === "ink") e.burn = Math.max(e.burn, 2);
-    if (b.matter === "salt") e.stun = Math.max(e.stun, 0.35);
+    if (b.heart === "scar") e.burn = Math.max(e.burn, 4);
+    if (b.heart === "tide") {
+      const dx = this.player.x - e.x;
+      const dy = this.player.y - e.y;
+      const d = Math.hypot(dx, dy) || 1;
+      e.kvx += (dx / d) * 140;
+      e.kvy += (dy / d) * 140;
+    }
+    if (b.matter === "ink" || b.matter === "tar") e.burn = Math.max(e.burn, 2);
+    if (b.matter === "salt" || b.matter === "glass") e.stun = Math.max(e.stun, 0.35);
+    if (b.matter === "moss" || b.matter === "wool") e.wrapped = Math.max(e.wrapped, 1.1);
+    if (b.matter === "brine") e.freeze = Math.max(e.freeze, 0.9);
+    if (b.matter === "rust") e.stun = Math.max(e.stun, 0.55);
     this.burstSparks(e.x, e.y, 4, b.color);
     if (e.hp <= 0) this.killEnemy(e);
   }
@@ -5199,6 +5236,23 @@ export class GameEngine {
       ctx.globalAlpha = 1;
       ctx.fillStyle = b.hi;
       ctx.fillRect(x - 2, y - 2, 4, 4);
+    } else if (b.gesture === "pulse") {
+      ctx.strokeStyle = b.hi;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x - r, y - r, r * 2, r * 2);
+    } else if (b.gesture === "arc" || b.gesture === "drill") {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.atan2(b.vy, b.vx));
+      ctx.fillRect(-8, -2, 16, 4);
+      ctx.fillStyle = b.hi;
+      ctx.fillRect(4, -2, 6, 4);
+      ctx.restore();
+    } else if (b.gesture === "fold") {
+      ctx.fillStyle = b.hi;
+      ctx.fillRect(x - r - 2, y - r - 2, r * 2 + 4, r * 2 + 4);
+      ctx.fillStyle = b.color;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
     } else {
       ctx.fillRect(x - r, y - r, r * 2, r * 2);
       ctx.fillStyle = b.hi;
