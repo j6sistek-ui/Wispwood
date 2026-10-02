@@ -98,7 +98,12 @@ export class GameAudio {
 
   silenceRelic() {
     this.relicQuiet = true;
-    this.stopBed();
+    this.bedOn = false;
+    this.bedArming = false;
+    if (this.bedTimer) {
+      window.clearTimeout(this.bedTimer);
+      this.bedTimer = 0;
+    }
     this.startFriends();
   }
 
@@ -131,32 +136,37 @@ export class GameAudio {
   }
 
   startFriends() {
-    this.unlock();
-    if (!this.ctx || this.muted) return;
+    try {
+      this.unlock();
+    } catch {
+      return;
+    }
+    if (!this.ctx || this.muted || !this.relicQuiet) return;
     if (!this.friendsBuf) {
       this.loadFriends();
       return;
     }
-    this.stopFriends();
-    if (this.ctx.state === "suspended") {
-      void this.ctx.resume().then(() => this.startFriends()).catch(() => {});
+    if (this.ctx.state !== "running") {
+      void this.ctx.resume().then(() => {
+        if (this.ctx?.state === "running" && this.relicQuiet && !this.friendsSrc) this.startFriends();
+      }).catch(() => {});
       return;
     }
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.friendsBuf;
-    src.loop = true;
-    src.loopStart = 0;
-    src.loopEnd = this.friendsBuf.duration;
-    const g = this.ctx.createGain();
-    g.gain.value = 0;
-    src.connect(g);
-    g.connect(this.master!);
-    const now = this.ctx.currentTime;
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.95, now + 0.12);
-    src.start();
-    this.friendsSrc = src;
-    this.friendsGain = g;
+    if (this.friendsSrc) return;
+    try {
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.friendsBuf;
+      src.loop = true;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.85;
+      src.connect(g);
+      g.connect(this.master!);
+      src.start();
+      this.friendsSrc = src;
+      this.friendsGain = g;
+    } catch {
+      this.friendsSrc = null;
+    }
   }
 
   stopFriends() {

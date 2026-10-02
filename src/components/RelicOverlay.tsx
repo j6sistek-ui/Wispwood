@@ -23,9 +23,6 @@ export function RelicOverlay({ engine, hud }: { engine: GameEngine | null; hud: 
       setCasterOpen(false);
     }
   }, [hud.phase]);
-  useEffect(() => {
-    engine?.audio.silenceRelic();
-  }, [engine]);
 
   const closeMenus = () => {
     setTabletOpen(false);

@@ -82,8 +82,10 @@ function isChromeTarget(target: EventTarget | null) {
 
 function lockViewport() {
   const vv = window.visualViewport;
-  const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth));
-  const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight));
+  const rawW = Math.round(vv?.width ?? window.innerWidth);
+  const rawH = Math.round(vv?.height ?? window.innerHeight);
+  const w = Math.max(1, rawW || window.innerWidth || 390);
+  const h = Math.max(320, rawH || window.innerHeight || 700);
   const top = Math.max(0, Math.round(vv?.offsetTop ?? 0));
   const left = Math.max(0, Math.round(vv?.offsetLeft ?? 0));
   const root = document.documentElement;
@@ -121,7 +123,8 @@ export function GameApp() {
     let cancelled = false;
     let cleanup = () => {};
 
-    void import("@/game/engine").then(({ GameEngine }) => {
+    void import("@/game/engine")
+      .then(({ GameEngine }) => {
       if (cancelled || !canvasRef.current) return;
       let game: GameEngine;
       try {
@@ -198,7 +201,10 @@ export function GameApp() {
         window.removeEventListener("pointercancel", onUp);
         game.stop();
       };
-    });
+    })
+      .catch((err) => {
+        setCrash(err instanceof Error ? err.message : "Could not start");
+      });
 
     return () => {
       cancelled = true;
