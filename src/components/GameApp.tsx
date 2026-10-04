@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import type { GameEngine, HudState } from "@/game/engine";
 import { ensureGuestAccount } from "@/game/guest-account";
 import { WISP_RELIC } from "@/game/mode";
@@ -8,6 +8,17 @@ const GameOverlay = lazy(() =>
     ? import("./RelicOverlay").then((m) => ({ default: m.RelicOverlay }))
     : import("./GameOverlay").then((m) => ({ default: m.GameOverlay })),
 );
+
+class MenuGuard extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
 
 const idleHud: HudState = {
   phase: "boot",
@@ -236,15 +247,36 @@ export function GameApp() {
           imageRendering: "pixelated",
         }}
       />
-      <Suspense
-        fallback={
-          <div className="absolute inset-0 z-20 grid place-items-center bg-bg">
-            <p className="font-pixel text-pixel-sm text-muted">Gathering dusk</p>
-          </div>
-        }
-      >
-        <GameOverlay engine={engine} hud={hud} />
-      </Suspense>
+      {(hud.phase === "title" || hud.phase === "boot") && !crash ? (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-[#0c0d0c] px-4">
+          <p className="text-center font-pixel text-[12px] leading-6 tracking-widest text-[#e8d8a0]">
+            WISPWOOD
+          </p>
+          <button
+            type="button"
+            data-ui
+            disabled={!engine}
+            onClick={() => engine?.play(false)}
+            className="h-12 w-full max-w-xs border-2 border-[#e8d8a0] bg-[#c45a48] font-pixel text-[10px] text-[#14120c] disabled:opacity-40"
+          >
+            {engine ? "Enter the clearing" : "Loading…"}
+          </button>
+          <button
+            type="button"
+            data-ui
+            disabled={!engine}
+            onClick={() => engine?.play("sandbox")}
+            className="h-11 w-full max-w-xs border-2 border-[#8a9a6a] bg-[#1c2414] font-pixel text-[9px] text-[#d8e8b0] disabled:opacity-40"
+          >
+            Sandbox clearing
+          </button>
+        </div>
+      ) : null}
+      <MenuGuard>
+        <Suspense fallback={null}>
+          <GameOverlay engine={engine} hud={hud} />
+        </Suspense>
+      </MenuGuard>
       {crash ? (
         <div className="absolute inset-0 z-50 grid place-items-center bg-bg px-6 text-center">
           <p className="font-pixel text-pixel text-fg">Could not load</p>

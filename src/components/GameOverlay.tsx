@@ -142,7 +142,7 @@ export function GameOverlay({ engine, hud }: Props) {
             </div>
           </div>
         ) : null}
-        {hud.phase === "boot" || hud.loading ? <Boot pct={hud.loadPct} note={hud.loadNote} /> : null}
+        {hud.phase === "boot" ? <Boot pct={hud.loadPct} note={hud.loadNote} /> : null}
         {hud.phase === "title" && !hud.loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 overflow-y-auto px-4 pointer-events-auto">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(18,22,12,0.15),rgba(8,10,6,0.55))]" />
@@ -191,7 +191,7 @@ export function GameOverlay({ engine, hud }: Props) {
         />
       ) : null}
 
-      {hud.phase === "boot" || hud.loading ? <Boot pct={hud.loadPct} note={hud.loadNote} /> : null}
+      {hud.phase === "boot" ? <Boot pct={hud.loadPct} note={hud.loadNote} /> : null}
       {hud.phase === "title" && !hud.loading ? (
         <Title
           engine={engine}

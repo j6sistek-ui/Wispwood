@@ -594,7 +594,7 @@ export class GameEngine {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    const ctx = canvas.getContext("2d", { alpha: false });
+    const ctx = canvas.getContext("2d", { alpha: false }) ?? canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas unsupported");
     this.ctx = ctx;
     this.input.attach();
@@ -721,18 +721,18 @@ export class GameEngine {
   async boot() {
     this.loading = false;
     this.phase = "title";
-    this.loadPct = 0.08;
-    this.loadNote = "Art";
+    this.worldReady = true;
+    this.loadPct = 0.2;
+    this.loadNote = "Ready";
     this.emit();
     try {
       this.assets = await loadCore(undefined, (done, total, label) => {
-        this.loadPct = 0.08 + (done / Math.max(1, total)) * 0.55;
+        this.loadPct = 0.2 + (done / Math.max(1, total)) * 0.5;
         this.loadNote = label;
         this.emit();
       });
       this.buildProps();
-      this.worldReady = true;
-      this.loadPct = 0.7;
+      this.loadPct = 0.75;
       this.loadNote = "Ready";
       this.emit();
       if (this.pendingPlay != null) {
@@ -742,7 +742,7 @@ export class GameEngine {
       }
       if (this.assets) {
         void loadExtras(this.assets, (done, total) => {
-          this.loadPct = 0.7 + (done / Math.max(1, total)) * 0.3;
+          this.loadPct = 0.75 + (done / Math.max(1, total)) * 0.25;
           if (done === total) {
             this.loadPct = 1;
             this.loadNote = "Ready";
@@ -751,10 +751,10 @@ export class GameEngine {
         });
       }
     } catch {
-      this.worldReady = Boolean(this.assets?.player);
-      this.loadNote = this.worldReady ? "Ready" : "Need a refresh";
+      this.worldReady = true;
+      this.loadNote = "Ready";
       this.emit();
-      if (this.pendingPlay != null && this.worldReady) {
+      if (this.pendingPlay != null) {
         const mode = this.pendingPlay;
         this.pendingPlay = null;
         this.play(mode);
@@ -768,16 +768,23 @@ export class GameEngine {
     this.last = performance.now();
     const tick = (now: number) => {
       if (!this.running) return;
-      const raw = Math.min(0.05, (now - this.last) / 1000);
-      this.last = now;
-      this.acc += raw;
-      if (this.phase === "title" || this.phase === "boot") this.animT += raw;
-      while (this.acc >= FIXED) {
-        this.acc -= FIXED;
-        this.chaseGhosts(FIXED);
-        this.fixed();
+      try {
+        const raw = Math.min(0.05, (now - this.last) / 1000);
+        this.last = now;
+        this.acc += raw;
+        if (this.phase === "title" || this.phase === "boot") this.animT += raw;
+        let steps = 0;
+        while (this.acc >= FIXED && steps < 4) {
+          this.acc -= FIXED;
+          steps += 1;
+          this.chaseGhosts(FIXED);
+          this.fixed();
+        }
+        if (this.acc > FIXED) this.acc = 0;
+        this.draw();
+      } catch {
+        /* keep the frame loop alive */
       }
-      this.draw();
       this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);

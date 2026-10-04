@@ -31,7 +31,7 @@ export function RelicOverlay({ engine, hud }: { engine: GameEngine | null; hud: 
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 text-fg">
-      {hud.phase === "boot" || hud.loading ? (
+      {hud.phase === "boot" ? (
         <div className="absolute inset-0 z-30 grid place-items-center bg-bg">
           <p className="font-pixel text-[10px] text-muted">{hud.loadNote || "Gathering dusk"}</p>
         </div>
